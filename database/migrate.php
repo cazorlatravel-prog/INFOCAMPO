@@ -1,0 +1,135 @@
+<?php
+/**
+ * INFOCAMPO SaaS - Migración de base de datos
+ * Ejecuta el schema.sql para crear todas las tablas
+ *
+ * USO: Acceder desde el navegador una sola vez
+ *      https://fotogps.app/database/migrate.php
+ *
+ * SEGURIDAD: Eliminar este archivo después de ejecutar la migración
+ */
+
+// Mostrar errores durante la migración
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/../includes/config.php';
+
+header('Content-Type: text/html; charset=utf-8');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>INFOCAMPO - Migración</title>
+    <style>
+        body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 2rem; }
+        .ok { color: #0f0; }
+        .error { color: #f44; }
+        .warn { color: #ff0; }
+        pre { background: #16213e; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+<h1>INFOCAMPO SaaS - Migración</h1>
+<pre>
+<?php
+try {
+    echo "<span class='ok'>[OK]</span> Conectando a la base de datos...\n";
+    $pdo = getDB();
+    echo "<span class='ok'>[OK]</span> Conexión establecida: " . DB_HOST . " / " . DB_NAME . "\n\n";
+
+    // Leer el archivo SQL
+    $sqlFile = __DIR__ . '/schema.sql';
+    if (!file_exists($sqlFile)) {
+        throw new Exception("No se encontró el archivo schema.sql en: $sqlFile");
+    }
+
+    $sql = file_get_contents($sqlFile);
+    echo "<span class='ok'>[OK]</span> Archivo schema.sql leído (" . strlen($sql) . " bytes)\n\n";
+
+    // Verificar si las tablas ya existen
+    $stmt = $pdo->query("SHOW TABLES");
+    $existingTables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (count($existingTables) > 0) {
+        echo "<span class='warn'>[AVISO]</span> Ya existen tablas en la base de datos:\n";
+        foreach ($existingTables as $table) {
+            echo "  - $table\n";
+        }
+        echo "\n<span class='warn'>[AVISO]</span> Si deseas recrear las tablas, primero elimínalas desde phpMyAdmin.\n";
+        echo "<span class='warn'>[AVISO]</span> Intentando ejecutar igualmente (puede fallar si las tablas ya existen)...\n\n";
+    }
+
+    // Ejecutar las sentencias SQL una por una
+    // Separar por punto y coma, ignorando los que están dentro de comentarios
+    $statements = [];
+    $current = '';
+    $lines = explode("\n", $sql);
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        // Ignorar comentarios de línea
+        if (str_starts_with($trimmed, '--') || $trimmed === '') {
+            continue;
+        }
+        $current .= $line . "\n";
+        if (str_ends_with($trimmed, ';')) {
+            $statements[] = trim($current);
+            $current = '';
+        }
+    }
+
+    $success = 0;
+    $errors = 0;
+
+    foreach ($statements as $i => $stmt) {
+        try {
+            $pdo->exec($stmt);
+            // Extraer nombre descriptivo
+            if (preg_match('/CREATE\s+TABLE\s+(\w+)/i', $stmt, $m)) {
+                echo "<span class='ok'>[OK]</span> Tabla creada: {$m[1]}\n";
+            } elseif (preg_match('/CREATE\s+OR\s+REPLACE\s+VIEW\s+(\w+)/i', $stmt, $m)) {
+                echo "<span class='ok'>[OK]</span> Vista creada: {$m[1]}\n";
+            } elseif (preg_match('/INSERT\s+INTO\s+(\w+)/i', $stmt, $m)) {
+                echo "<span class='ok'>[OK]</span> Datos insertados en: {$m[1]}\n";
+            } elseif (preg_match('/SET\s+/i', $stmt)) {
+                echo "<span class='ok'>[OK]</span> SET ejecutado\n";
+            } else {
+                echo "<span class='ok'>[OK]</span> Sentencia #" . ($i + 1) . " ejecutada\n";
+            }
+            $success++;
+        } catch (PDOException $e) {
+            echo "<span class='error'>[ERROR]</span> Sentencia #" . ($i + 1) . ": " . $e->getMessage() . "\n";
+            $errors++;
+        }
+    }
+
+    echo "\n========================================\n";
+    echo "Resultado: <span class='ok'>$success ejecutadas</span>";
+    if ($errors > 0) {
+        echo ", <span class='error'>$errors errores</span>";
+    }
+    echo "\n========================================\n\n";
+
+    // Verificar tablas finales
+    $stmt = $pdo->query("SHOW TABLES");
+    $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    echo "Tablas en la base de datos:\n";
+    foreach ($tables as $table) {
+        echo "  <span class='ok'>✓</span> $table\n";
+    }
+
+    echo "\n<span class='warn'>⚠ IMPORTANTE: Elimina este archivo (migrate.php) después de la migración por seguridad.</span>\n";
+
+} catch (Exception $e) {
+    echo "<span class='error'>[ERROR FATAL]</span> " . $e->getMessage() . "\n";
+    echo "\nVerifica los datos de conexión en .env:\n";
+    echo "  DB_HOST: " . DB_HOST . "\n";
+    echo "  DB_NAME: " . DB_NAME . "\n";
+    echo "  DB_USER: " . DB_USER . "\n";
+}
+?>
+</pre>
+</body>
+</html>
