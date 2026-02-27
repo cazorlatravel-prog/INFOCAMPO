@@ -46,10 +46,30 @@ echo "<span class='info'>[DEBUG]</span> .env existe:           " . ($envExists ?
 
 if ($envExists) {
     echo "<span class='ok'>[OK]</span> Archivo .env encontrado\n";
+    // Mostrar contenido del .env (censurar valores)
+    $envLines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    echo "<span class='info'>[DEBUG]</span> Contenido del .env (" . count($envLines) . " líneas):\n";
+    foreach ($envLines as $el) {
+        $el = trim($el);
+        if ($el === '' || $el[0] === '#') {
+            echo "  $el\n";
+            continue;
+        }
+        if (strpos($el, '=') !== false) {
+            [$k, $v] = explode('=', $el, 2);
+            $k = trim($k);
+            $v = trim($v);
+            // Mostrar clave y primeros 3 chars del valor
+            $preview = strlen($v) > 3 ? substr($v, 0, 3) . '***' : $v;
+            echo "  <span class='ok'>$k</span> = $preview\n";
+        } else {
+            echo "  (línea sin '='): $el\n";
+        }
+    }
+    echo "\n";
 } else {
     echo "<span class='error'>[ERROR]</span> NO se encuentra .env en: $envPath\n";
     echo "<span class='warn'>[AYUDA]</span> Crea el archivo .env en esa ruta con tus credenciales de BD\n";
-    // Listar archivos del directorio padre para ayudar
     $parentDir = realpath(__DIR__ . '/..');
     echo "\n<span class='info'>[DEBUG]</span> Archivos en $parentDir:\n";
     $files = scandir($parentDir);

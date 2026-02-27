@@ -6,41 +6,51 @@
 // -----------------------------------------------------------
 // Cargar variables de entorno desde .env
 // -----------------------------------------------------------
+$_ENV_VARS = [];
 $envFile = __DIR__ . '/../.env';
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (str_starts_with(trim($line), '#')) continue;
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
         if (strpos($line, '=') === false) continue;
         [$key, $value] = explode('=', $line, 2);
         $key   = trim($key);
         $value = trim($value);
-        if (!getenv($key)) {
-            putenv("$key=$value");
+        // Quitar comillas si las tiene
+        if (strlen($value) >= 2 && ($value[0] === '"' || $value[0] === "'")) {
+            $value = substr($value, 1, -1);
         }
+        $_ENV_VARS[$key] = $value;
     }
+}
+
+// Helper: leer del .env parseado, con fallback
+function env(string $key, string $default = ''): string {
+    global $_ENV_VARS;
+    return $_ENV_VARS[$key] ?? $default;
 }
 
 // -----------------------------------------------------------
 // Base de datos
 // -----------------------------------------------------------
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: 'infocampo_saas');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_HOST', env('DB_HOST', 'localhost'));
+define('DB_NAME', env('DB_NAME', 'infocampo_saas'));
+define('DB_USER', env('DB_USER', 'root'));
+define('DB_PASS', env('DB_PASS', ''));
 define('DB_CHARSET', 'utf8mb4');
 
 // -----------------------------------------------------------
 // Cloudinary
 // -----------------------------------------------------------
-define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME') ?: '');
-define('CLOUDINARY_API_KEY',    getenv('CLOUDINARY_API_KEY')    ?: '');
-define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET') ?: '');
+define('CLOUDINARY_CLOUD_NAME', env('CLOUDINARY_CLOUD_NAME'));
+define('CLOUDINARY_API_KEY',    env('CLOUDINARY_API_KEY'));
+define('CLOUDINARY_API_SECRET', env('CLOUDINARY_API_SECRET'));
 
 // -----------------------------------------------------------
 // App
 // -----------------------------------------------------------
-define('APP_URL', getenv('APP_URL') ?: 'http://localhost');
+define('APP_URL', env('APP_URL', 'http://localhost'));
 define('APP_NAME', 'INFOCAMPO');
 
 // -----------------------------------------------------------
