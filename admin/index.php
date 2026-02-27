@@ -1,0 +1,290 @@
+<?php
+/**
+ * INFOCAMPO SaaS - Panel de Administración
+ *
+ * Lista de infraestructuras filtrables por empresa.
+ * Al seleccionar una, muestra la línea de tiempo con fotos.
+ */
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../includes/config.php';
+
+$pdo = getDB();
+
+// ---------------------------------------------------------------
+// Cargar empresas para el selector de filtro
+// ---------------------------------------------------------------
+$empresas = $pdo->query(
+    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+)->fetchAll();
+
+// ---------------------------------------------------------------
+// Filtro de empresa (por query string)
+// ---------------------------------------------------------------
+$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : 0;
+$infraId   = isset($_GET['infra_id'])   ? (int) $_GET['infra_id']   : 0;
+
+// ---------------------------------------------------------------
+// Cargar infraestructuras de la empresa seleccionada
+// ---------------------------------------------------------------
+$infraestructuras = [];
+if ($empresaId > 0) {
+    $stmt = $pdo->prepare(
+        "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo
+         FROM infraestructuras
+         WHERE empresa_id = :empresa_id AND activa = 1
+         ORDER BY nombre"
+    );
+    $stmt->execute([':empresa_id' => $empresaId]);
+    $infraestructuras = $stmt->fetchAll();
+}
+
+// ---------------------------------------------------------------
+// Cargar registros (timeline) de la infraestructura seleccionada
+// ---------------------------------------------------------------
+$registros = [];
+$infraSeleccionada = null;
+if ($infraId > 0) {
+    $stmt = $pdo->prepare(
+        "SELECT r.*, u.nombre AS usuario_nombre
+         FROM registros r
+         INNER JOIN usuarios u ON r.usuario_id = u.id
+         WHERE r.infra_id = :infra_id
+         ORDER BY r.fecha DESC"
+    );
+    $stmt->execute([':infra_id' => $infraId]);
+    $registros = $stmt->fetchAll();
+
+    // Info de la infra
+    $stmt2 = $pdo->prepare(
+        "SELECT i.*, e.nombre AS empresa_nombre
+         FROM infraestructuras i
+         INNER JOIN empresas e ON i.empresa_id = e.id
+         WHERE i.id = :id"
+    );
+    $stmt2->execute([':id' => $infraId]);
+    $infraSeleccionada = $stmt2->fetch();
+}
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INFOCAMPO - Panel de Administración</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          rel="stylesheet">
+    <style>
+        body { background: #f4f6f9; }
+        .brand-bar {
+            background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
+            color: #fff;
+            padding: 18px 24px;
+        }
+        .brand-bar h1 { font-size: 1.3rem; margin: 0; font-weight: 700; }
+        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .timeline { position: relative; padding-left: 40px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 16px; top: 0; bottom: 0;
+            width: 3px;
+            background: #dee2e6;
+            border-radius: 2px;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 24px;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -32px; top: 6px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            box-shadow: 0 0 0 2px #adb5bd;
+        }
+        .timeline-dot.bajo    { background: #22c55e; box-shadow: 0 0 0 2px #22c55e; }
+        .timeline-dot.medio   { background: #eab308; box-shadow: 0 0 0 2px #eab308; }
+        .timeline-dot.critico { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
+
+        .timeline-photo {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .badge-inc {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .infra-list .list-group-item.active {
+            background: #1e3a5f;
+            border-color: #1e3a5f;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="brand-bar d-flex align-items-center justify-content-between">
+        <h1>INFOCAMPO &mdash; Panel de Administración</h1>
+        <span class="small opacity-75"><?= date('d/m/Y H:i') ?></span>
+    </div>
+
+    <div class="container-fluid py-4">
+        <div class="row g-4">
+
+            <!-- ==========================================
+                 COLUMNA IZQUIERDA: Filtros
+                 ========================================== -->
+            <div class="col-lg-3">
+                <!-- Selector de empresa -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">Filtrar por empresa</h6>
+                        <form method="get" action="">
+                            <select name="empresa_id" class="form-select mb-2"
+                                    onchange="this.form.submit()">
+                                <option value="">-- Seleccionar empresa --</option>
+                                <?php foreach ($empresas as $emp): ?>
+                                    <option value="<?= $emp['id'] ?>"
+                                        <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($emp['nombre']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Lista de infraestructuras -->
+                <?php if ($infraestructuras): ?>
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title text-muted mb-3">Infraestructuras</h6>
+                        <div class="list-group list-group-flush infra-list">
+                            <?php foreach ($infraestructuras as $inf): ?>
+                                <a href="?empresa_id=<?= $empresaId ?>&infra_id=<?= $inf['id'] ?>"
+                                   class="list-group-item list-group-item-action <?= $infraId === (int)$inf['id'] ? 'active' : '' ?>">
+                                    <strong><?= htmlspecialchars($inf['codigo_unico']) ?></strong>
+                                    <br>
+                                    <small><?= htmlspecialchars($inf['nombre']) ?></small>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- ==========================================
+                 COLUMNA DERECHA: Timeline
+                 ========================================== -->
+            <div class="col-lg-9">
+                <?php if ($infraSeleccionada): ?>
+                    <!-- Cabecera de la infra -->
+                    <div class="card mb-4">
+                        <div class="card-body d-flex justify-content-between align-items-start">
+                            <div>
+                                <h4 class="mb-1">
+                                    <?= htmlspecialchars($infraSeleccionada['nombre']) ?>
+                                </h4>
+                                <p class="text-muted mb-1">
+                                    <strong>Código:</strong>
+                                    <?= htmlspecialchars($infraSeleccionada['codigo_unico']) ?>
+                                    &nbsp;|&nbsp;
+                                    <strong>Empresa:</strong>
+                                    <?= htmlspecialchars($infraSeleccionada['empresa_nombre']) ?>
+                                </p>
+                                <p class="text-muted mb-0 small">
+                                    GPS teórico: <?= $infraSeleccionada['lat_teorica'] ?>,
+                                    <?= $infraSeleccionada['lon_teorica'] ?>
+                                    <?php if ($infraSeleccionada['tipo']): ?>
+                                        &nbsp;|&nbsp;
+                                        Tipo: <?= htmlspecialchars($infraSeleccionada['tipo']) ?>
+                                    <?php endif; ?>
+                                </p>
+                            </div>
+                            <a href="generar_pdf.php?infra_id=<?= $infraId ?>"
+                               class="btn btn-outline-primary btn-sm"
+                               target="_blank">
+                                Generar Informe PDF
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Timeline de registros -->
+                    <?php if ($registros): ?>
+                        <div class="timeline">
+                            <?php foreach ($registros as $reg): ?>
+                                <div class="timeline-item">
+                                    <div class="timeline-dot <?= $reg['estado_incidencia'] ?>"></div>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="fw-bold">
+                                                    <?= date('d/m/Y H:i', strtotime($reg['fecha'])) ?>
+                                                </span>
+                                                <span>
+                                                    <?php
+                                                    $badgeClass = match($reg['estado_incidencia']) {
+                                                        'bajo'    => 'bg-success',
+                                                        'medio'   => 'bg-warning text-dark',
+                                                        'critico' => 'bg-danger',
+                                                        default   => 'bg-secondary',
+                                                    };
+                                                    ?>
+                                                    <span class="badge <?= $badgeClass ?> badge-inc">
+                                                        <?= strtoupper($reg['estado_incidencia']) ?>
+                                                    </span>
+                                                </span>
+                                            </div>
+
+                                            <img src="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
+                                                 alt="Foto inspección"
+                                                 class="timeline-photo"
+                                                 loading="lazy">
+
+                                            <div class="mt-2 small text-muted">
+                                                <strong>Operador:</strong>
+                                                <?= htmlspecialchars($reg['usuario_nombre']) ?>
+                                                &nbsp;|&nbsp;
+                                                <strong>GPS real:</strong>
+                                                <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?>
+                                            </div>
+
+                                            <?php if ($reg['observaciones']): ?>
+                                                <p class="mt-2 mb-0 small">
+                                                    <?= nl2br(htmlspecialchars($reg['observaciones'])) ?>
+                                                </p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-info">
+                            No hay registros de inspección para esta infraestructura.
+                        </div>
+                    <?php endif; ?>
+
+                <?php elseif ($empresaId > 0): ?>
+                    <div class="alert alert-secondary">
+                        Selecciona una infraestructura del panel izquierdo para ver su línea de tiempo.
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-secondary">
+                        Selecciona una empresa para comenzar.
+                    </div>
+                <?php endif; ?>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

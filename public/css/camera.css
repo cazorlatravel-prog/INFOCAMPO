@@ -1,0 +1,299 @@
+/* ==========================================================
+   INFOCAMPO - Estilos de cámara / ghosting
+   ========================================================== */
+
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+}
+
+/* ----------------------------------------------------------
+   Contenedor de cámara
+   ---------------------------------------------------------- */
+#camera-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+#camera-feed {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+/* ----------------------------------------------------------
+   Ghost overlay (foto anterior superpuesta)
+   ---------------------------------------------------------- */
+#ghost-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 2;
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    display: none; /* se muestra cuando hay imagen */
+}
+
+#ghost-overlay.active {
+    display: block;
+}
+
+#ghost-overlay.off {
+    opacity: 0;
+}
+
+/* ----------------------------------------------------------
+   Canvas de captura (oculto)
+   ---------------------------------------------------------- */
+#capture-canvas {
+    display: none;
+}
+
+/* ----------------------------------------------------------
+   Indicador GPS
+   ---------------------------------------------------------- */
+#gps-indicator {
+    position: absolute;
+    top: 60px;
+    right: 16px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.55);
+    border-radius: 20px;
+    padding: 6px 14px;
+}
+
+#gps-circle {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #aaa;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 0 8px rgba(0,0,0,0.4);
+}
+
+#gps-circle.green  { background: #22c55e; box-shadow: 0 0 10px #22c55e88; }
+#gps-circle.yellow { background: #eab308; box-shadow: 0 0 10px #eab30888; }
+#gps-circle.red    { background: #ef4444; box-shadow: 0 0 10px #ef444488; }
+
+#gps-distance {
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 50px;
+    text-align: right;
+}
+
+/* ----------------------------------------------------------
+   Barra superior
+   ---------------------------------------------------------- */
+#top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+}
+
+#infra-code {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: rgba(255,255,255,0.15);
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+#current-time {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+/* ----------------------------------------------------------
+   Controles inferiores
+   ---------------------------------------------------------- */
+#controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 20px 16px 36px;
+    background: linear-gradient(0deg, rgba(0,0,0,0.65) 0%, transparent 100%);
+}
+
+.ctrl-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background 0.2s;
+}
+
+.ctrl-btn:active {
+    background: rgba(255,255,255,0.3);
+}
+
+.ctrl-btn--primary {
+    width: 72px;
+    height: 72px;
+    background: transparent;
+}
+
+/* Botón de obturador (shutter) */
+.shutter-ring {
+    width: 68px;
+    height: 68px;
+    border: 4px solid #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shutter-inner {
+    width: 56px;
+    height: 56px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s;
+}
+
+.ctrl-btn--primary:active .shutter-inner {
+    transform: scale(0.85);
+}
+
+#btn-ghost.active {
+    background: rgba(34, 197, 94, 0.4);
+}
+
+#inc-label {
+    font-size: 10px;
+    line-height: 1;
+}
+
+/* ----------------------------------------------------------
+   Preview (post-captura)
+   ---------------------------------------------------------- */
+#preview-container {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+}
+
+#preview-container.hidden {
+    display: none;
+}
+
+#preview-canvas {
+    flex: 1;
+    width: 100%;
+    object-fit: contain;
+}
+
+#preview-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 16px 32px;
+    background: rgba(0,0,0,0.85);
+    align-items: center;
+    justify-content: center;
+}
+
+#preview-controls .ctrl-btn {
+    width: auto;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 14px;
+}
+
+#tech-data-form {
+    flex: 1 1 100%;
+}
+
+#observaciones {
+    width: 100%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    color: #fff;
+    padding: 10px;
+    font-size: 14px;
+    resize: none;
+}
+
+#observaciones::placeholder {
+    color: rgba(255,255,255,0.4);
+}
+
+/* ----------------------------------------------------------
+   Upload status
+   ---------------------------------------------------------- */
+#upload-status {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    font-size: 16px;
+}
+
+#upload-status.hidden {
+    display: none;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

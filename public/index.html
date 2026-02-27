@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>INFOCAMPO - Cámara de Inspección</title>
+    <link rel="stylesheet" href="css/camera.css">
+</head>
+<body>
+    <!-- ===================================================
+         PANTALLA DE CÁMARA — Modo Ghosting
+         =================================================== -->
+    <div id="camera-container">
+
+        <!-- Video en vivo (cámara trasera) -->
+        <video id="camera-feed" autoplay playsinline></video>
+
+        <!-- Imagen fantasma superpuesta (foto anterior) -->
+        <img id="ghost-overlay"
+             src=""
+             alt="Foto anterior de referencia">
+
+        <!-- Canvas oculto para captura de frame -->
+        <canvas id="capture-canvas"></canvas>
+
+        <!-- Indicador GPS (Haversine) -->
+        <div id="gps-indicator">
+            <div id="gps-circle"></div>
+            <span id="gps-distance">-- m</span>
+        </div>
+
+        <!-- Barra superior de info -->
+        <div id="top-bar">
+            <span id="infra-code">--</span>
+            <span id="current-time">--:--</span>
+        </div>
+
+        <!-- Controles inferiores -->
+        <div id="controls">
+            <button id="btn-ghost" class="ctrl-btn" title="Modo Ghosting">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+            </button>
+
+            <button id="btn-capture" class="ctrl-btn ctrl-btn--primary" title="Capturar">
+                <div class="shutter-ring">
+                    <div class="shutter-inner"></div>
+                </div>
+            </button>
+
+            <button id="btn-incidencia" class="ctrl-btn" title="Nivel incidencia">
+                <span id="inc-label">BAJO</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================================================
+         PANTALLA POST-CAPTURA (preview + watermark)
+         =================================================== -->
+    <div id="preview-container" class="hidden">
+        <canvas id="preview-canvas"></canvas>
+
+        <div id="preview-controls">
+            <button id="btn-retake" class="ctrl-btn">Repetir</button>
+
+            <div id="tech-data-form">
+                <textarea id="observaciones" placeholder="Observaciones técnicas..." rows="2"></textarea>
+            </div>
+
+            <button id="btn-upload" class="ctrl-btn ctrl-btn--primary">Enviar</button>
+        </div>
+
+        <div id="upload-status" class="hidden">
+            <div class="spinner"></div>
+            <span>Subiendo...</span>
+        </div>
+    </div>
+
+    <!-- Config inyectada (en producción vendría del backend) -->
+    <script>
+        window.INFOCAMPO_CONFIG = {
+            uploadEndpoint: 'subir.php',
+            ghostImageEndpoint: 'api/ultima_foto.php',
+            infraId: new URLSearchParams(location.search).get('infra') || '1',
+            usuarioId: new URLSearchParams(location.search).get('user') || '1',
+            targetLat: parseFloat(new URLSearchParams(location.search).get('lat') || '37.3890531'),
+            targetLon: parseFloat(new URLSearchParams(location.search).get('lon') || '-5.9844589'),
+            infraCode: new URLSearchParams(location.search).get('code') || 'TORRE-0042',
+        };
+    </script>
+
+    <script src="js/haversine.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/watermark.js"></script>
+    <script src="js/upload.js"></script>
+</body>
+</html>
