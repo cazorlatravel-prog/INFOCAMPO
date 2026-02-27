@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ---------------------------------------------------------------
 // 1. Validar campos obligatorios
 // ---------------------------------------------------------------
-$requiredFields = ['infra_id', 'usuario_id', 'lat_real', 'lon_real', 'estado_incidencia'];
+$requiredFields = ['infra_id', 'usuario_id', 'lat_real', 'lon_real'];
 foreach ($requiredFields as $field) {
     if (!isset($_POST[$field]) || trim((string)$_POST[$field]) === '') {
         http_response_code(400);
@@ -68,16 +68,25 @@ $infraId     = (int) $_POST['infra_id'];
 $usuarioId   = (int) $_POST['usuario_id'];
 $latReal     = (float) $_POST['lat_real'];
 $lonReal     = (float) $_POST['lon_real'];
-$incidencia  = $_POST['estado_incidencia'];
+$incidencia  = $_POST['estado_incidencia'] ?? 'bajo';
 $observaciones = isset($_POST['observaciones']) ? trim((string)$_POST['observaciones']) : null;
 $datosTecnicos = isset($_POST['datos_tecnicos']) ? $_POST['datos_tecnicos'] : null;
+
+// Campos v3: tipo de foto, secuencia, nombre, unidad de obra
+$tipoFoto              = $_POST['tipo_foto'] ?? 'aleatorio';
+$secuenciaComparativa  = isset($_POST['secuencia_comparativa']) && $_POST['secuencia_comparativa'] !== '' ? (int) $_POST['secuencia_comparativa'] : null;
+$nombreArchivo         = isset($_POST['nombre_archivo']) ? trim((string) $_POST['nombre_archivo']) : null;
+$unidadObraId          = isset($_POST['unidad_obra_id']) && $_POST['unidad_obra_id'] !== '' ? (int) $_POST['unidad_obra_id'] : null;
 
 // Validar enum de incidencia
 $incidenciasPermitidas = ['bajo', 'medio', 'critico'];
 if (!in_array($incidencia, $incidenciasPermitidas, true)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Valor de incidencia no válido']);
-    exit;
+    $incidencia = 'bajo';
+}
+
+// Validar tipo de foto
+if (!in_array($tipoFoto, ['aleatorio', 'comparativo'], true)) {
+    $tipoFoto = 'aleatorio';
 }
 
 // Validar JSON de datos técnicos
@@ -101,9 +110,16 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 // 2. Subir imagen a Cloudinary
 // ---------------------------------------------------------------
 try {
+    // Determinar carpeta y public_id en Cloudinary
+    $folder = $tipoFoto === 'comparativo'
+        ? 'infocampo/comparativas'
+        : 'infocampo/aleatorias';
+    $publicId = $nombreArchivo ?: null;
+
     $cloudinaryUrl = CloudinaryHelper::upload(
         $_FILES['imagen']['tmp_name'],
-        'infocampo/inspecciones'
+        $folder,
+        $publicId
     );
 } catch (\Exception $e) {
     http_response_code(500);
@@ -118,15 +134,18 @@ try {
     $pdo = getDB();
 
     $sql = "INSERT INTO registros
-                (infra_id, usuario_id, fecha, lat_real, lon_real,
-                 url_cloudinary, datos_tecnicos, estado_incidencia, observaciones)
+                (infra_id, unidad_obra_id, usuario_id, fecha, lat_real, lon_real,
+                 url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
+                 tipo_foto, secuencia_comparativa, nombre_archivo)
             VALUES
-                (:infra_id, :usuario_id, NOW(), :lat_real, :lon_real,
-                 :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones)";
+                (:infra_id, :unidad_obra_id, :usuario_id, NOW(), :lat_real, :lon_real,
+                 :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
+                 :tipo_foto, :secuencia_comp, :nombre_archivo)";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         ':infra_id'          => $infraId,
+        ':unidad_obra_id'    => $unidadObraId,
         ':usuario_id'        => $usuarioId,
         ':lat_real'          => $latReal,
         ':lon_real'          => $lonReal,
@@ -134,6 +153,9 @@ try {
         ':datos_tecnicos'    => $datosTecnicos,
         ':estado_incidencia' => $incidencia,
         ':observaciones'     => $observaciones,
+        ':tipo_foto'         => $tipoFoto,
+        ':secuencia_comp'    => $secuenciaComparativa,
+        ':nombre_archivo'    => $nombreArchivo,
     ]);
 
     $registroId = (int) $pdo->lastInsertId();

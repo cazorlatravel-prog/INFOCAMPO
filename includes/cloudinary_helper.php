@@ -19,7 +19,7 @@ class CloudinaryHelper
      * @return string            URL pública (secure_url) de la imagen
      * @throws \RuntimeException Si la subida falla
      */
-    public static function upload(string $filePath, string $folder = 'infocampo'): string
+    public static function upload(string $filePath, string $folder = 'infocampo', ?string $publicId = null): string
     {
         $cloudName = CLOUDINARY_CLOUD_NAME;
         $apiKey    = CLOUDINARY_API_KEY;
@@ -38,6 +38,10 @@ class CloudinaryHelper
             'timestamp' => $timestamp,
         ];
 
+        if ($publicId !== null) {
+            $paramsToSign['public_id'] = $publicId;
+        }
+
         // Generar firma (signature) según API de Cloudinary
         ksort($paramsToSign);
         $signatureString = http_build_query($paramsToSign) . $apiSecret;
@@ -52,6 +56,10 @@ class CloudinaryHelper
             'api_key'   => $apiKey,
             'signature' => $signature,
         ];
+
+        if ($publicId !== null) {
+            $postFields['public_id'] = $publicId;
+        }
 
         $ch = curl_init();
         curl_setopt_array($ch, [

@@ -133,6 +133,16 @@ if ($infraId > 0) {
             background: #1e3a5f;
             border-color: #1e3a5f;
         }
+        .nav-admin {
+            background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px;
+        }
+        .nav-admin .nav-link {
+            color: #6b7280; padding: 12px 16px; font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-admin .nav-link:hover, .nav-admin .nav-link.active {
+            color: #1e3a5f; border-bottom-color: #1e3a5f;
+        }
     </style>
 </head>
 <body>
@@ -156,6 +166,18 @@ if ($infraId > 0) {
         <h1>INFOCAMPO &mdash; Panel de Administración</h1>
         <span class="small opacity-75"><?= date('d/m/Y H:i') ?></span>
     </div>
+
+    <!-- Navigation -->
+    <nav class="nav-admin">
+        <ul class="nav">
+            <li><a href="index.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link active">
+                <i class="bi bi-speedometer2"></i> Infraestructuras
+            </a></li>
+            <li><a href="unidades_obra.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link">
+                <i class="bi bi-tools"></i> Unidades de Obra
+            </a></li>
+        </ul>
+    </nav>
 
     <div class="container-fluid py-4">
         <div class="row g-4">
