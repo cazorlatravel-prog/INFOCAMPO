@@ -173,6 +173,9 @@ if (isset($_GET['edit'])) {
             <li><a href="unidades_obra.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link active">
                 <i class="bi bi-tools"></i> Unidades de Obra
             </a></li>
+            <li><a href="usuarios.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link">
+                <i class="bi bi-people"></i> Usuarios
+            </a></li>
         </ul>
     </nav>
 
