@@ -176,6 +176,7 @@ $ultimasEmpresas = $pdo->query(
         <ul class="nav flex-column mt-2">
             <li><a href="index.php" class="nav-link active"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
             <li><a href="empresas.php" class="nav-link"><i class="bi bi-building"></i> Empresas</a></li>
+            <li><a href="usuarios.php" class="nav-link"><i class="bi bi-people"></i> Usuarios</a></li>
             <li><a href="campos.php" class="nav-link"><i class="bi bi-ui-checks-grid"></i> Campos Formulario</a></li>
         </ul>
         <div class="mt-auto" style="position:absolute;bottom:0;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding:16px 20px;">

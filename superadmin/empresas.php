@@ -159,6 +159,7 @@ if (isset($_GET['edit'])) {
         <ul class="nav flex-column mt-2">
             <li><a href="index.php" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
             <li><a href="empresas.php" class="nav-link active"><i class="bi bi-building"></i> Empresas</a></li>
+            <li><a href="usuarios.php" class="nav-link"><i class="bi bi-people"></i> Usuarios</a></li>
             <li><a href="campos.php" class="nav-link"><i class="bi bi-ui-checks-grid"></i> Campos Formulario</a></li>
         </ul>
         <div style="position:absolute;bottom:0;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding:16px 20px;">
@@ -176,6 +177,14 @@ if (isset($_GET['edit'])) {
             </button>
         </div>
 
+        <?php
+        // Flash messages (e.g. from impersonation redirect)
+        if (!empty($_SESSION['flash_msg'])) {
+            $msg = $_SESSION['flash_msg'];
+            $msgType = $_SESSION['flash_type'] ?? 'info';
+            unset($_SESSION['flash_msg'], $_SESSION['flash_type']);
+        }
+        ?>
         <?php if ($msg): ?>
             <div class="alert alert-<?= $msgType ?> alert-dismissible fade show" role="alert">
                 <?= htmlspecialchars($msg) ?>
@@ -324,13 +333,25 @@ if (isset($_GET['edit'])) {
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-end">
-                                        <div class="d-flex gap-1 justify-content-end">
+                                        <div class="d-flex gap-1 justify-content-end flex-wrap">
                                             <a href="?edit=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-primary" title="Editar">
                                                 <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="usuarios.php?empresa_id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-dark" title="Gestionar usuarios">
+                                                <i class="bi bi-people"></i>
                                             </a>
                                             <a href="campos.php?empresa_id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Campos formulario">
                                                 <i class="bi bi-ui-checks-grid"></i>
                                             </a>
+                                            <!-- Acceder como Admin -->
+                                            <form method="post" action="impersonate.php" class="d-inline">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="empresa_id" value="<?= $emp['id'] ?>">
+                                                <input type="hidden" name="target_role" value="admin">
+                                                <button type="submit" class="btn btn-sm btn-outline-info" title="Acceder como Admin">
+                                                    <i class="bi bi-box-arrow-in-right"></i> Admin
+                                                </button>
+                                            </form>
                                             <form method="post" class="d-inline" onsubmit="return confirm('¿Cambiar estado de esta empresa?')">
                                                 <?= csrfField() ?>
                                                 <input type="hidden" name="action" value="toggle">

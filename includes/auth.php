@@ -152,3 +152,78 @@ function csrfField(): string
 {
     return '<input type="hidden" name="csrf_token" value="' . csrfToken() . '">';
 }
+
+/**
+ * Iniciar suplantación de usuario (impersonation).
+ * Solo disponible para superadmin.
+ */
+function startImpersonation(int $userId): bool
+{
+    if (($_SESSION['user_rol'] ?? '') !== 'superadmin') {
+        return false;
+    }
+
+    $pdo = getDB();
+    $stmt = $pdo->prepare(
+        "SELECT u.*, e.nombre AS empresa_nombre
+         FROM usuarios u
+         INNER JOIN empresas e ON u.empresa_id = e.id
+         WHERE u.id = :id
+         LIMIT 1"
+    );
+    $stmt->execute([':id' => $userId]);
+    $target = $stmt->fetch();
+
+    if (!$target) {
+        return false;
+    }
+
+    // Guardar sesión original del superadmin
+    $_SESSION['impersonating_from'] = [
+        'user_id'        => $_SESSION['user_id'],
+        'user_name'      => $_SESSION['user_name'],
+        'user_email'     => $_SESSION['user_email'],
+        'user_rol'       => $_SESSION['user_rol'],
+        'empresa_id'     => $_SESSION['empresa_id'],
+        'empresa_nombre' => $_SESSION['empresa_nombre'],
+    ];
+
+    // Cambiar a la sesión del usuario objetivo
+    $_SESSION['user_id']        = (int) $target['id'];
+    $_SESSION['user_name']      = $target['nombre'];
+    $_SESSION['user_email']     = $target['email'];
+    $_SESSION['user_rol']       = $target['rol'];
+    $_SESSION['empresa_id']     = (int) $target['empresa_id'];
+    $_SESSION['empresa_nombre'] = $target['empresa_nombre'];
+
+    return true;
+}
+
+/**
+ * Detener suplantación y volver al superadmin.
+ */
+function stopImpersonation(): bool
+{
+    if (!isImpersonating()) {
+        return false;
+    }
+
+    $original = $_SESSION['impersonating_from'];
+    $_SESSION['user_id']        = $original['user_id'];
+    $_SESSION['user_name']      = $original['user_name'];
+    $_SESSION['user_email']     = $original['user_email'];
+    $_SESSION['user_rol']       = $original['user_rol'];
+    $_SESSION['empresa_id']     = $original['empresa_id'];
+    $_SESSION['empresa_nombre'] = $original['empresa_nombre'];
+
+    unset($_SESSION['impersonating_from']);
+    return true;
+}
+
+/**
+ * Verificar si estamos en modo suplantación.
+ */
+function isImpersonating(): bool
+{
+    return isset($_SESSION['impersonating_from']);
+}

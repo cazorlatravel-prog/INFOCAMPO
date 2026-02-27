@@ -8,9 +8,12 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 $pdo = getDB();
+
+// Detectar si estamos en modo suplantación
+$impersonating = isImpersonating();
 
 // ---------------------------------------------------------------
 // Cargar empresas para el selector de filtro
@@ -24,6 +27,11 @@ $empresas = $pdo->query(
 // ---------------------------------------------------------------
 $empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : 0;
 $infraId   = isset($_GET['infra_id'])   ? (int) $_GET['infra_id']   : 0;
+
+// Si estamos suplantando y no se ha seleccionado empresa, usar la del usuario suplantado
+if ($impersonating && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
+    $empresaId = (int) $_SESSION['empresa_id'];
+}
 
 // ---------------------------------------------------------------
 // Cargar infraestructuras de la empresa seleccionada
@@ -75,6 +83,7 @@ if ($infraId > 0) {
     <title>INFOCAMPO - Panel de Administración</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
           rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         body { background: #f4f6f9; }
         .brand-bar {
@@ -127,6 +136,21 @@ if ($infraId > 0) {
     </style>
 </head>
 <body>
+    <?php if ($impersonating): ?>
+    <!-- Barra de suplantación -->
+    <div style="background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;font-size:0.9rem;position:sticky;top:0;z-index:9999;">
+        <div>
+            <i class="bi bi-eye" style="margin-right:6px;"></i>
+            Estás viendo como: <strong><?= htmlspecialchars($_SESSION['user_name']) ?></strong>
+            (<?= htmlspecialchars($_SESSION['user_rol']) ?> - <?= htmlspecialchars($_SESSION['empresa_nombre']) ?>)
+        </div>
+        <a href="/superadmin/impersonate.php?stop=1" class="btn btn-sm btn-light fw-semibold"
+           style="color:#92400e;">
+            <i class="bi bi-box-arrow-left"></i> Volver a Super Admin
+        </a>
+    </div>
+    <?php endif; ?>
+
     <!-- Header -->
     <div class="brand-bar d-flex align-items-center justify-content-between">
         <h1>INFOCAMPO &mdash; Panel de Administración</h1>
