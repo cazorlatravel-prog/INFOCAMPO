@@ -82,8 +82,8 @@ ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
 
 INSERT INTO usuarios (empresa_id, nombre, email, password, rol, activo)
 VALUES (9999, 'Super Administrador', 'superadmin@infocampo.app',
-        '$2y$12$LJ3m4ys3Gz8y5N9xKv.8XOdFmDkjQ4vBfE5J7g8yN2wRqH1sMzKXi',
+        '$2y$12$.H/lthGtzLS8IijNMp1ICOQgi7t7EzyJSbwbwUDs/yP5EjPGHJXYW',
         'superadmin', 1)
-ON DUPLICATE KEY UPDATE rol = 'superadmin';
+ON DUPLICATE KEY UPDATE password = VALUES(password), rol = 'superadmin';
 
 SET FOREIGN_KEY_CHECKS = 1;
