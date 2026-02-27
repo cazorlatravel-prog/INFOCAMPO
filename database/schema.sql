@@ -9,12 +9,13 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- -----------------------------------------------------------
 -- Base de datos
+-- En Hostinger la BD ya existe: u919343704_infocampo_saas
+-- Selecciónala en phpMyAdmin antes de importar este archivo
 -- -----------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS infocampo_saas
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE infocampo_saas;
+-- CREATE DATABASE IF NOT EXISTS infocampo_saas
+--     CHARACTER SET utf8mb4
+--     COLLATE utf8mb4_unicode_ci;
+-- USE infocampo_saas;
 
 -- -----------------------------------------------------------
 -- 1. EMPRESAS  (tenant principal del SaaS)
