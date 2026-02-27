@@ -12,8 +12,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 $pdo = getDB();
 
-// Detectar si estamos en modo suplantación
-$impersonating = isImpersonating();
+$currentPage = 'unidades_obra';
 
 // Obtener empresa_id (de la sesión si admin autenticado, o de la query si superadmin suplantando)
 $empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
@@ -123,61 +122,16 @@ if (isset($_GET['edit'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         body { background: #f4f6f9; }
-        .brand-bar {
-            background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
-            color: #fff; padding: 18px 24px;
-        }
-        .brand-bar h1 { font-size: 1.3rem; margin: 0; font-weight: 700; }
+        .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
         .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-radius: 12px; }
-        .form-section {
-            background: #fff; border-radius: 12px; padding: 24px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 20px;
-        }
-        .nav-admin {
-            background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px;
-        }
-        .nav-admin .nav-link {
-            color: #6b7280; padding: 12px 16px; font-size: 0.9rem;
-            border-bottom: 2px solid transparent;
-        }
-        .nav-admin .nav-link:hover, .nav-admin .nav-link.active {
-            color: #1e3a5f; border-bottom-color: #1e3a5f;
-        }
+        .form-section { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
+        .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
+        .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
     </style>
 </head>
 <body>
-    <?php if ($impersonating): ?>
-    <div style="background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;font-size:0.9rem;">
-        <div>
-            <i class="bi bi-eye"></i>
-            Viendo como: <strong><?= htmlspecialchars($_SESSION['user_name']) ?></strong>
-            (<?= htmlspecialchars($_SESSION['user_rol']) ?> - <?= htmlspecialchars($_SESSION['empresa_nombre']) ?>)
-        </div>
-        <a href="/superadmin/impersonate.php?stop=1" class="btn btn-sm btn-light fw-semibold" style="color:#92400e;">
-            <i class="bi bi-box-arrow-left"></i> Volver a Super Admin
-        </a>
-    </div>
-    <?php endif; ?>
-
-    <div class="brand-bar d-flex align-items-center justify-content-between">
-        <h1>INFOCAMPO &mdash; Panel de Administración</h1>
-        <span class="small opacity-75"><?= date('d/m/Y H:i') ?></span>
-    </div>
-
-    <!-- Navigation -->
-    <nav class="nav-admin">
-        <ul class="nav">
-            <li><a href="index.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link">
-                <i class="bi bi-speedometer2"></i> Infraestructuras
-            </a></li>
-            <li><a href="unidades_obra.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link active">
-                <i class="bi bi-tools"></i> Unidades de Obra
-            </a></li>
-            <li><a href="usuarios.php<?= $empresaId ? '?empresa_id=' . $empresaId : '' ?>" class="nav-link">
-                <i class="bi bi-people"></i> Usuarios
-            </a></li>
-        </ul>
-    </nav>
+    <?php include __DIR__ . '/includes/header.php'; ?>
 
     <div class="container-fluid py-4">
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
