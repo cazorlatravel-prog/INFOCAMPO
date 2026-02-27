@@ -37,7 +37,12 @@ function env(string $key, string $default = ''): string {
 define('DB_HOST', env('DB_HOST', 'localhost'));
 define('DB_NAME', env('DB_NAME', 'infocampo_saas'));
 define('DB_USER', env('DB_USER', 'root'));
-define('DB_PASS', env('DB_PASS', ''));
+// Aceptar DB_PASS o DB_PASSWORD (compatibilidad)
+$dbPass = env('DB_PASS');
+if ($dbPass === '') {
+    $dbPass = env('DB_PASSWORD');
+}
+define('DB_PASS', $dbPass);
 define('DB_CHARSET', 'utf8mb4');
 
 // -----------------------------------------------------------
