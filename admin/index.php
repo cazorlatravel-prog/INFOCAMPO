@@ -207,11 +207,17 @@ if ($infraId > 0) {
                                     <?php endif; ?>
                                 </p>
                             </div>
-                            <a href="generar_pdf.php?infra_id=<?= $infraId ?>"
-                               class="btn btn-outline-primary btn-sm"
-                               target="_blank">
-                                Generar Informe PDF
-                            </a>
+                            <div class="d-flex gap-2">
+                                <a href="descargar_fotos.php?infra_id=<?= $infraId ?>"
+                                   class="btn btn-outline-success btn-sm">
+                                    Descargar Fotos (ZIP)
+                                </a>
+                                <a href="generar_pdf.php?infra_id=<?= $infraId ?>"
+                                   class="btn btn-outline-primary btn-sm"
+                                   target="_blank">
+                                    Generar Informe PDF
+                                </a>
+                            </div>
                         </div>
                     </div>
 
@@ -242,17 +248,39 @@ if ($infraId > 0) {
                                                 </span>
                                             </div>
 
-                                            <img src="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
-                                                 alt="Foto inspección"
-                                                 class="timeline-photo"
-                                                 loading="lazy">
+                                            <a href="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
+                                               target="_blank" class="d-block position-relative">
+                                                <img src="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
+                                                     alt="Foto inspección"
+                                                     class="timeline-photo"
+                                                     loading="lazy">
+                                            </a>
 
-                                            <div class="mt-2 small text-muted">
-                                                <strong>Operador:</strong>
-                                                <?= htmlspecialchars($reg['usuario_nombre']) ?>
-                                                &nbsp;|&nbsp;
-                                                <strong>GPS real:</strong>
-                                                <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?>
+                                            <div class="mt-2 d-flex justify-content-between align-items-center">
+                                                <div class="small text-muted">
+                                                    <strong>Operador:</strong>
+                                                    <?= htmlspecialchars($reg['usuario_nombre']) ?>
+                                                    &nbsp;|&nbsp;
+                                                    <strong>GPS real:</strong>
+                                                    <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?>
+                                                </div>
+                                                <?php
+                                                // fl_attachment fuerza descarga directa desde Cloudinary
+                                                $downloadUrl = preg_replace(
+                                                    '#/upload/#',
+                                                    '/upload/fl_attachment/',
+                                                    $reg['url_cloudinary'],
+                                                    1
+                                                );
+                                                ?>
+                                                <a href="<?= htmlspecialchars($downloadUrl) ?>"
+                                                   class="btn btn-sm btn-outline-secondary"
+                                                   title="Descargar foto original">
+                                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                                        <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                                    </svg>
+                                                </a>
                                             </div>
 
                                             <?php if ($reg['observaciones']): ?>
