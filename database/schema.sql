@@ -20,7 +20,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- -----------------------------------------------------------
 -- 1. EMPRESAS  (tenant principal del SaaS)
 -- -----------------------------------------------------------
-CREATE TABLE empresas (
+CREATE TABLE IF NOT EXISTS empresas (
     id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     nombre          VARCHAR(200)    NOT NULL,
     plan_suscripcion ENUM('free','basic','professional','enterprise')
@@ -38,7 +38,7 @@ CREATE TABLE empresas (
 -- -----------------------------------------------------------
 -- 2. USUARIOS  (cada usuario pertenece a una empresa)
 -- -----------------------------------------------------------
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
     id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     empresa_id      INT UNSIGNED    NOT NULL,
     nombre          VARCHAR(150)    NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE usuarios (
 -- -----------------------------------------------------------
 -- 3. INFRAESTRUCTURAS  (cada infraestructura pertenece a una empresa)
 -- -----------------------------------------------------------
-CREATE TABLE infraestructuras (
+CREATE TABLE IF NOT EXISTS infraestructuras (
     id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     empresa_id      INT UNSIGNED    NOT NULL,
     nombre          VARCHAR(250)    NOT NULL,
@@ -88,7 +88,7 @@ CREATE TABLE infraestructuras (
 -- -----------------------------------------------------------
 -- 4. REGISTROS  (cada inspección / foto de campo)
 -- -----------------------------------------------------------
-CREATE TABLE registros (
+CREATE TABLE IF NOT EXISTS registros (
     id                  INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     infra_id            INT UNSIGNED    NOT NULL,
     usuario_id          INT UNSIGNED    NOT NULL,
@@ -149,16 +149,16 @@ FROM registros r
 -- -----------------------------------------------------------
 -- Datos de ejemplo (seed)
 -- -----------------------------------------------------------
-INSERT INTO empresas (nombre, plan_suscripcion, email_contacto) VALUES
+INSERT IGNORE INTO empresas (nombre, plan_suscripcion, email_contacto) VALUES
     ('Energía del Sur S.A.', 'professional', 'admin@energiasur.com'),
     ('Torres Norte SL',      'basic',        'info@torresnorte.es');
 
-INSERT INTO usuarios (empresa_id, nombre, email, password, rol) VALUES
+INSERT IGNORE INTO usuarios (empresa_id, nombre, email, password, rol) VALUES
     (1, 'Carlos Ruiz',   'carlos@energiasur.com',  '$2y$12$placeholder_hash_1', 'admin'),
     (1, 'Ana López',     'ana@energiasur.com',      '$2y$12$placeholder_hash_2', 'operador'),
     (2, 'Pedro García',  'pedro@torresnorte.es',    '$2y$12$placeholder_hash_3', 'admin');
 
-INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo) VALUES
+INSERT IGNORE INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo) VALUES
     (1, 'Torre Alta Tensión KM-42', 'TORRE-0042', 37.3890531, -5.9844589, 'torre_electrica'),
     (1, 'Subestación Río Verde',    'SUB-0012',   37.4012345, -5.9701234, 'subestacion'),
     (2, 'Poste Comunicaciones P-7', 'POSTE-0007', 43.2630126, -2.9349852, 'poste_telecom');
