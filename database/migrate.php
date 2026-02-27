@@ -13,8 +13,6 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-require_once __DIR__ . '/../includes/config.php';
-
 header('Content-Type: text/html; charset=utf-8');
 ?>
 <!DOCTYPE html>
@@ -27,6 +25,7 @@ header('Content-Type: text/html; charset=utf-8');
         .ok { color: #0f0; }
         .error { color: #f44; }
         .warn { color: #ff0; }
+        .info { color: #4fc3f7; }
         pre { background: #16213e; padding: 1rem; border-radius: 8px; overflow-x: auto; }
     </style>
 </head>
@@ -34,6 +33,40 @@ header('Content-Type: text/html; charset=utf-8');
 <h1>INFOCAMPO SaaS - Migración</h1>
 <pre>
 <?php
+// --- DEBUG: mostrar dónde busca los archivos ---
+$configPath = __DIR__ . '/../includes/config.php';
+$envPath    = realpath(__DIR__ . '/..') . '/.env';
+$envExists  = file_exists($envPath);
+
+echo "<span class='info'>[DEBUG]</span> migrate.php está en:  " . __DIR__ . "\n";
+echo "<span class='info'>[DEBUG]</span> Buscando config.php:  " . $configPath . "\n";
+echo "<span class='info'>[DEBUG]</span> config.php existe:     " . (file_exists($configPath) ? 'SÍ' : 'NO') . "\n";
+echo "<span class='info'>[DEBUG]</span> Buscando .env en:      " . $envPath . "\n";
+echo "<span class='info'>[DEBUG]</span> .env existe:           " . ($envExists ? 'SÍ' : 'NO') . "\n";
+
+if ($envExists) {
+    echo "<span class='ok'>[OK]</span> Archivo .env encontrado\n";
+} else {
+    echo "<span class='error'>[ERROR]</span> NO se encuentra .env en: $envPath\n";
+    echo "<span class='warn'>[AYUDA]</span> Crea el archivo .env en esa ruta con tus credenciales de BD\n";
+    // Listar archivos del directorio padre para ayudar
+    $parentDir = realpath(__DIR__ . '/..');
+    echo "\n<span class='info'>[DEBUG]</span> Archivos en $parentDir:\n";
+    $files = scandir($parentDir);
+    foreach ($files as $f) {
+        echo "  - $f\n";
+    }
+    echo "\n";
+}
+
+require_once $configPath;
+
+echo "\n<span class='info'>[DEBUG]</span> Valores cargados:\n";
+echo "  DB_HOST: " . DB_HOST . "\n";
+echo "  DB_NAME: " . DB_NAME . "\n";
+echo "  DB_USER: " . DB_USER . "\n";
+echo "  DB_PASS: " . (DB_PASS !== '' ? '****(configurada)' : '(vacía)') . "\n\n";
+
 try {
     echo "<span class='ok'>[OK]</span> Conectando a la base de datos...\n";
     $pdo = getDB();
