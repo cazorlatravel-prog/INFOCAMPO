@@ -138,6 +138,27 @@ try {
 
     $registroId = (int) $pdo->lastInsertId();
 
+    // ---------------------------------------------------------------
+    // 4. Guardar campos dinámicos (si existen)
+    // ---------------------------------------------------------------
+    $camposDinamicos = $_POST['campos'] ?? [];
+    if (is_array($camposDinamicos) && !empty($camposDinamicos)) {
+        $stmtCampo = $pdo->prepare(
+            "INSERT INTO valores_campo (registro_id, campo_id, valor)
+             VALUES (:registro_id, :campo_id, :valor)"
+        );
+        foreach ($camposDinamicos as $campoId => $valor) {
+            $campoId = (int) $campoId;
+            if ($campoId > 0) {
+                $stmtCampo->execute([
+                    ':registro_id' => $registroId,
+                    ':campo_id'    => $campoId,
+                    ':valor'       => is_string($valor) ? trim($valor) : (string) $valor,
+                ]);
+            }
+        }
+    }
+
     echo json_encode([
         'ok'          => true,
         'registro_id' => $registroId,
@@ -147,6 +168,5 @@ try {
 } catch (\PDOException $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error de base de datos']);
-    // En producción: loggear $e->getMessage()
     exit;
 }

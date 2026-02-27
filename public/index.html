@@ -66,6 +66,8 @@
 
             <div id="tech-data-form">
                 <textarea id="observaciones" placeholder="Observaciones técnicas..." rows="2"></textarea>
+                <!-- Campos dinámicos cargados desde la API -->
+                <div id="dynamic-fields"></div>
             </div>
 
             <button id="btn-upload" class="ctrl-btn ctrl-btn--primary">Enviar</button>
@@ -84,6 +86,7 @@
             ghostImageEndpoint: 'api/ultima_foto.php',
             infraId: new URLSearchParams(location.search).get('infra') || '1',
             usuarioId: new URLSearchParams(location.search).get('user') || '1',
+            empresaId: new URLSearchParams(location.search).get('empresa') || '1',
             targetLat: parseFloat(new URLSearchParams(location.search).get('lat') || '37.3890531'),
             targetLon: parseFloat(new URLSearchParams(location.search).get('lon') || '-5.9844589'),
             infraCode: new URLSearchParams(location.search).get('code') || 'TORRE-0042',
@@ -94,5 +97,13 @@
     <script src="js/camera.js"></script>
     <script src="js/watermark.js"></script>
     <script src="js/upload.js"></script>
+    <script>
+        // Cargar campos dinámicos de la empresa al iniciar
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.INFOCAMPO_CONFIG.empresaId) {
+                Upload.loadDynamicFields(window.INFOCAMPO_CONFIG.empresaId);
+            }
+        });
+    </script>
 </body>
 </html>

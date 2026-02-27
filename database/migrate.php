@@ -92,14 +92,19 @@ try {
     $pdo = getDB();
     echo "<span class='ok'>[OK]</span> Conexión establecida: " . DB_HOST . " / " . DB_NAME . "\n\n";
 
-    // Leer el archivo SQL
-    $sqlFile = __DIR__ . '/schema.sql';
-    if (!file_exists($sqlFile)) {
-        throw new Exception("No se encontró el archivo schema.sql en: $sqlFile");
+    // Leer archivos SQL (schema.sql + schema_v2.sql si existe)
+    $sqlFiles = ['schema.sql', 'schema_v2.sql'];
+    $sql = '';
+    foreach ($sqlFiles as $sf) {
+        $sqlFile = __DIR__ . '/' . $sf;
+        if (file_exists($sqlFile)) {
+            $sql .= "\n" . file_get_contents($sqlFile);
+            echo "<span class='ok'>[OK]</span> Archivo $sf leído (" . strlen(file_get_contents($sqlFile)) . " bytes)\n";
+        } else {
+            echo "<span class='warn'>[AVISO]</span> Archivo $sf no encontrado, se omite.\n";
+        }
     }
-
-    $sql = file_get_contents($sqlFile);
-    echo "<span class='ok'>[OK]</span> Archivo schema.sql leído (" . strlen($sql) . " bytes)\n\n";
+    echo "\n";
 
     // Verificar si las tablas ya existen
     $stmt = $pdo->query("SHOW TABLES");
@@ -146,6 +151,8 @@ try {
                 echo "<span class='ok'>[OK]</span> Vista creada: {$m[1]}\n";
             } elseif (preg_match('/INSERT\s+INTO\s+(\w+)/i', $stmt, $m)) {
                 echo "<span class='ok'>[OK]</span> Datos insertados en: {$m[1]}\n";
+            } elseif (preg_match('/ALTER\s+TABLE\s+(\w+)/i', $stmt, $m)) {
+                echo "<span class='ok'>[OK]</span> Tabla modificada: {$m[1]}\n";
             } elseif (preg_match('/SET\s+/i', $stmt)) {
                 echo "<span class='ok'>[OK]</span> SET ejecutado\n";
             } else {
