@@ -16,7 +16,7 @@ $_navUserName = $_SESSION['user_name'] ?? '';
 $_navUserRol = $_SESSION['user_rol'] ?? '';
 $currentPage = $currentPage ?? '';
 
-// Cargar contadores para badge de alertas (incidencias críticas últimas 24h)
+// Cargar contadores para badge de alertas (registros "durante" últimas 24h)
 $_alertCount = 0;
 if ($_navEmpresaId > 0) {
     try {
@@ -24,7 +24,7 @@ if ($_navEmpresaId > 0) {
             "SELECT COUNT(*) FROM registros r
              INNER JOIN infraestructuras i ON r.infra_id = i.id
              WHERE i.empresa_id = :emp_id
-               AND r.estado_incidencia = 'critico'
+               AND r.estado_incidencia = 'durante'
                AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
         );
         $stmtAlert->execute([':emp_id' => $_navEmpresaId]);
@@ -78,7 +78,7 @@ if ($_navEmpresaId > 0) {
         <?php endif; ?>
 
         <?php if ($_alertCount > 0): ?>
-            <a href="index.php?empresa_id=<?= $_navEmpresaId ?>" class="position-relative" style="color:#fff;text-decoration:none;" title="Incidencias críticas (24h)">
+            <a href="index.php?empresa_id=<?= $_navEmpresaId ?>" class="position-relative" style="color:#fff;text-decoration:none;" title="En progreso (24h)">
                 <i class="bi bi-bell-fill" style="font-size:1.1rem;"></i>
                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.6rem;">
                     <?= $_alertCount ?>

@@ -179,9 +179,9 @@ if ($infra) {
         .visit-card.selected-right { border-color: #8b5cf6; }
 
         .badge-estado { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: 700; }
-        .badge-estado.bajo { background: #dcfce7; color: #166534; }
-        .badge-estado.medio { background: #fef9c3; color: #854d0e; }
-        .badge-estado.critico { background: #fee2e2; color: #dc2626; }
+        .badge-estado.antes { background: #dbeafe; color: #1e40af; }
+        .badge-estado.durante { background: #fef9c3; color: #854d0e; }
+        .badge-estado.despues { background: #dcfce7; color: #166534; }
 
         .side-by-side {
             display: grid;

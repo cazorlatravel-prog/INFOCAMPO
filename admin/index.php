@@ -45,7 +45,7 @@ if ($empresaId > 0) {
     $stmt = $pdo->prepare(
         "SELECT i.id, i.nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica, i.tipo,
                 (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id) AS total_registros,
-                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id AND r.estado_incidencia = 'critico') AS criticas,
+                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id AND r.estado_incidencia = 'durante') AS criticas,
                 (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
          FROM infraestructuras i
          WHERE i.empresa_id = :empresa_id AND i.activa = 1
@@ -77,7 +77,7 @@ if ($infraId > 0) {
             WHERE r.infra_id = :infra_id";
     $params = [':infra_id' => $infraId];
 
-    if ($filtroEstado !== '' && in_array($filtroEstado, ['bajo', 'medio', 'critico'], true)) {
+    if ($filtroEstado !== '' && in_array($filtroEstado, ['antes', 'durante', 'despues'], true)) {
         $sql .= " AND r.estado_incidencia = :estado";
         $params[':estado'] = $filtroEstado;
     }
@@ -140,9 +140,9 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
             width: 14px; height: 14px; border-radius: 50%;
             border: 3px solid #fff;
         }
-        .timeline-dot.bajo    { background: #22c55e; box-shadow: 0 0 0 2px #22c55e; }
-        .timeline-dot.medio   { background: #eab308; box-shadow: 0 0 0 2px #eab308; }
-        .timeline-dot.critico { background: #ef4444; box-shadow: 0 0 0 2px #ef4444; }
+        .timeline-dot.antes    { background: #3b82f6; box-shadow: 0 0 0 2px #3b82f6; }
+        .timeline-dot.durante  { background: #f59e0b; box-shadow: 0 0 0 2px #f59e0b; }
+        .timeline-dot.despues  { background: #22c55e; box-shadow: 0 0 0 2px #22c55e; }
         .timeline-photo {
             max-width: 100%; border-radius: 8px; margin-top: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -197,9 +197,9 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
             text-transform: uppercase;
             font-weight: 700;
         }
-        .gallery-item-info .badge-sm.bajo { background: #dcfce7; color: #166534; }
-        .gallery-item-info .badge-sm.medio { background: #fef9c3; color: #854d0e; }
-        .gallery-item-info .badge-sm.critico { background: #fee2e2; color: #dc2626; }
+        .gallery-item-info .badge-sm.antes { background: #dbeafe; color: #1e40af; }
+        .gallery-item-info .badge-sm.durante { background: #fef9c3; color: #854d0e; }
+        .gallery-item-info .badge-sm.despues { background: #dcfce7; color: #166534; }
 
         /* Lightbox */
         .lightbox-overlay {
@@ -303,7 +303,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                             <?php foreach ($infraestructuras as $inf): ?>
                                 <?php
                                 $statusColor = match($inf['ultimo_estado']) {
-                                    'critico' => '#ef4444', 'medio' => '#eab308', 'bajo' => '#22c55e', default => '#d1d5db',
+                                    'antes' => '#3b82f6', 'durante' => '#f59e0b', 'despues' => '#22c55e', default => '#d1d5db',
                                 };
                                 ?>
                                 <a href="?empresa_id=<?= $empresaId ?>&infra_id=<?= $inf['id'] ?>"
@@ -379,12 +379,12 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                        value="<?= htmlspecialchars($filtroFechaHasta) ?>">
                             </div>
                             <div class="col-md-2">
-                                <div class="filter-label">Estado</div>
+                                <div class="filter-label">Situación</div>
                                 <select name="estado" class="form-select form-select-sm">
                                     <option value="">Todos</option>
-                                    <option value="bajo" <?= $filtroEstado === 'bajo' ? 'selected' : '' ?>>Bajo</option>
-                                    <option value="medio" <?= $filtroEstado === 'medio' ? 'selected' : '' ?>>Medio</option>
-                                    <option value="critico" <?= $filtroEstado === 'critico' ? 'selected' : '' ?>>Critico</option>
+                                    <option value="antes" <?= $filtroEstado === 'antes' ? 'selected' : '' ?>>Antes</option>
+                                    <option value="durante" <?= $filtroEstado === 'durante' ? 'selected' : '' ?>>Durante</option>
+                                    <option value="despues" <?= $filtroEstado === 'despues' ? 'selected' : '' ?>>Después</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -467,8 +467,8 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                                     <small class="text-muted"><i class="bi bi-person"></i> <?= htmlspecialchars($reg['usuario_nombre']) ?></small>
                                                     <?php
                                                     $badgeClass = match($reg['estado_incidencia']) {
-                                                        'bajo' => 'bg-success', 'medio' => 'bg-warning text-dark',
-                                                        'critico' => 'bg-danger', default => 'bg-secondary',
+                                                        'antes' => 'bg-primary', 'durante' => 'bg-warning text-dark',
+                                                        'despues' => 'bg-success', default => 'bg-secondary',
                                                     };
                                                     ?>
                                                     <span class="badge <?= $badgeClass ?> badge-inc"><?= strtoupper($reg['estado_incidencia']) ?></span>

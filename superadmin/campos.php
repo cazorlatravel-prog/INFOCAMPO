@@ -429,11 +429,11 @@ $tiposCampo = [
 
                         <!-- Campos fijos (siempre presentes) -->
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold text-muted">Nivel de incidencia</label>
+                            <label class="form-label small fw-semibold text-muted">Situación</label>
                             <select class="form-select form-select-sm" disabled>
-                                <option>BAJO</option>
-                                <option>MEDIO</option>
-                                <option>CRITICO</option>
+                                <option>ANTES</option>
+                                <option>DURANTE</option>
+                                <option>DESPUÉS</option>
                             </select>
                         </div>
                         <div class="mb-3">

@@ -277,6 +277,12 @@ if ($initials === '') $initials = 'OP';
             <span id="cam-seq-label">W1</span>
         </div>
 
+        <div class="cam-situacion">
+            <button type="button" id="btn-situacion" class="cam-situacion-btn" title="Cambiar situación">
+                <i class="bi bi-flag"></i> <span id="situacion-label">ANTES</span>
+            </button>
+        </div>
+
         <div class="cam-controls">
             <div class="cam-controls-left">
                 <button type="button" id="btn-ghost-toggle" class="cam-ctrl hidden" title="Toggle Ghost">

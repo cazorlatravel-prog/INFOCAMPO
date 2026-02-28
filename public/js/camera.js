@@ -18,8 +18,8 @@ const Camera = (() => {
     const previewContainer = document.getElementById('preview-container');
 
     // ---- Estado ----
-    const niveles = ['bajo', 'medio', 'critico'];
-    const nivelesUI = ['BAJO', 'MEDIO', 'CRÍTICO'];
+    const niveles = ['antes', 'durante', 'despues'];
+    const nivelesUI = ['ANTES', 'DURANTE', 'DESPUÉS'];
     let nivelIdx = 0;
     let ghostActive = false;
     let currentPosition = { lat: null, lon: null };
@@ -160,7 +160,7 @@ const Camera = (() => {
         // Capturar
         btnCapture.addEventListener('click', captureFrame);
 
-        // Ciclar nivel de incidencia
+        // Ciclar situación (antes/durante/después)
         btnIncidencia.addEventListener('click', () => {
             nivelIdx = (nivelIdx + 1) % niveles.length;
             incLabel.textContent = nivelesUI[nivelIdx];

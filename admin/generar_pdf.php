@@ -77,9 +77,9 @@ foreach ($comparativas as $r) {
 }
 
 // ---------------------------------------------------------------
-// Conteo de incidencias
+// Conteo de situaciones
 // ---------------------------------------------------------------
-$conteo = ['bajo' => 0, 'medio' => 0, 'critico' => 0];
+$conteo = ['antes' => 0, 'durante' => 0, 'despues' => 0];
 foreach ($registros as $r) {
     $conteo[$r['estado_incidencia']]++;
 }
@@ -263,9 +263,9 @@ $totalAlea       = count($aleatorias);
     table.data td { vertical-align: middle; }
 
     /* Badges */
-    .badge-bajo    { color: #166534; font-weight: bold; }
-    .badge-medio   { color: #854d0e; font-weight: bold; }
-    .badge-critico { color: #dc2626; font-weight: bold; }
+    .badge-antes    { color: #1e40af; font-weight: bold; }
+    .badge-durante  { color: #854d0e; font-weight: bold; }
+    .badge-despues  { color: #166534; font-weight: bold; }
     .badge-comp    { color: #6d28d9; font-weight: bold; }
     .badge-alea    { color: #1d4ed8; font-weight: bold; }
 
@@ -381,7 +381,7 @@ $totalAlea       = count($aleatorias);
         }
 
         /* Badges también */
-        .badge-bajo, .badge-medio, .badge-critico,
+        .badge-antes, .badge-durante, .badge-despues,
         .badge-comp, .badge-alea {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -498,9 +498,9 @@ $totalAlea       = count($aleatorias);
                     <th>Total</th>
                     <th>Comparativas</th>
                     <th>Aleatorias</th>
-                    <th>Bajo</th>
-                    <th>Medio</th>
-                    <th>Crítico</th>
+                    <th>Antes</th>
+                    <th>Durante</th>
+                    <th>Después</th>
                 </tr>
             </thead>
             <tbody>
@@ -508,9 +508,9 @@ $totalAlea       = count($aleatorias);
                     <td><strong><?= $totalRegistros ?></strong></td>
                     <td class="badge-comp"><?= $totalComp ?></td>
                     <td class="badge-alea"><?= $totalAlea ?></td>
-                    <td class="badge-bajo"><?= $conteo['bajo'] ?></td>
-                    <td class="badge-medio"><?= $conteo['medio'] ?></td>
-                    <td class="badge-critico"><?= $conteo['critico'] ?></td>
+                    <td class="badge-antes"><?= $conteo['antes'] ?></td>
+                    <td class="badge-durante"><?= $conteo['durante'] ?></td>
+                    <td class="badge-despues"><?= $conteo['despues'] ?></td>
                 </tr>
             </tbody>
         </table>
@@ -531,7 +531,7 @@ $totalAlea       = count($aleatorias);
                     <th>Operador</th>
                     <th>Tipo</th>
                     <th>GPS Real</th>
-                    <th>Incidencia</th>
+                    <th>Situación</th>
                     <th>U. Obra</th>
                     <th style="text-align:left">Observaciones</th>
                 </tr>

@@ -30,7 +30,11 @@
         countAleatorias: 0,
         countComparativas: 0,
         prevPhotos: [], // fotos comparativas de visita anterior
+        situacionIdx: 0, // 0=antes, 1=durante, 2=despues
     };
+
+    const SITUACIONES = ['antes', 'durante', 'despues'];
+    const SITUACIONES_UI = ['ANTES', 'DURANTE', 'DESPUÉS'];
 
     // ===================================================================
     // DOM REFS
@@ -77,6 +81,8 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
+    const btnSituacion   = $('#btn-situacion');
+    const situacionLabel = $('#situacion-label');
 
     // Preview
     const previewCanvas  = $('#preview-canvas');
@@ -842,7 +848,7 @@
             usuario_id: CFG.usuarioId,
             lat_real: state.gps.lat || 0,
             lon_real: state.gps.lon || 0,
-            estado_incidencia: 'bajo',
+            estado_incidencia: SITUACIONES[state.situacionIdx],
             tipo_foto: state.currentMode,
             nombre_archivo: filename,
             observaciones: $('#observaciones-general').value || '',
@@ -1233,6 +1239,15 @@
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
 
+        // Situación toggle
+        if (btnSituacion) {
+            btnSituacion.addEventListener('click', () => {
+                state.situacionIdx = (state.situacionIdx + 1) % SITUACIONES.length;
+                situacionLabel.textContent = SITUACIONES_UI[state.situacionIdx];
+                btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[state.situacionIdx];
+            });
+        }
+
         // Ghost toggle
         btnGhostToggle.addEventListener('click', () => {
             if (!state.ghostUrl) return;
@@ -1409,7 +1424,7 @@
 
             const bounds = [];
             const stateColors = {
-                'bajo': '#22c55e', 'medio': '#eab308', 'critico': '#ef4444',
+                'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e',
             };
 
             Object.values(allInfras).forEach(infra => {
@@ -1420,7 +1435,7 @@
 
                 if (hasPhotos) {
                     // Visited: colored circle with photo count
-                    const lastState = infra.registros[0]?.estado_incidencia || 'bajo';
+                    const lastState = infra.registros[0]?.estado_incidencia || 'antes';
                     const color = stateColors[lastState] || '#9ca3af';
                     const numPhotos = infra.registros.length;
 

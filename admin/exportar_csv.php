@@ -111,7 +111,7 @@ if ($tipo === 'infraestructuras') {
     }
 
     $estado = $_GET['estado'] ?? '';
-    if ($estado !== '' && in_array($estado, ['bajo', 'medio', 'critico'], true)) {
+    if ($estado !== '' && in_array($estado, ['antes', 'durante', 'despues'], true)) {
         $sql .= " AND r.estado_incidencia = :estado";
         $params[':estado'] = $estado;
     }
