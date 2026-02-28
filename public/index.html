@@ -2,107 +2,924 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>INFOCAMPO - Cámara de Inspección</title>
-    <link rel="stylesheet" href="css/camera.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INFOCAMPO - Inspección de Infraestructuras en Campo</title>
+    <meta name="description" content="Plataforma SaaS de inspección de infraestructuras en campo con fotos geolocalizadas, comparativas y generación de informes.">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        /* =========================================================
+           INFOCAMPO Landing Page
+           Modern, clean, mobile-first design
+           ========================================================= */
+        :root {
+            --bg-primary: #0a0f1e;
+            --bg-card: #111827;
+            --bg-glass: rgba(17, 24, 39, 0.6);
+            --accent: #3b82f6;
+            --accent-light: #60a5fa;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --purple: #a855f7;
+            --green: #22c55e;
+            --amber: #f59e0b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.06);
+            --radius: 16px;
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ---- Background animated grid ---- */
+        .bg-grid {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        .bg-glow {
+            position: fixed; z-index: 0; pointer-events: none;
+            width: 600px; height: 600px; border-radius: 50%;
+            filter: blur(120px); opacity: 0.15;
+        }
+
+        .bg-glow--blue { top: -200px; right: -150px; background: var(--accent); }
+        .bg-glow--purple { bottom: -200px; left: -150px; background: var(--purple); }
+
+        /* ---- Container ---- */
+        .container {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 0 20px;
+            position: relative; z-index: 1;
+        }
+
+        /* ---- NAV ---- */
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            padding: 14px 0;
+            background: rgba(10, 15, 30, 0.8);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            transition: background 0.3s;
+        }
+
+        .nav .container {
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .nav-brand {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 1.2rem; font-weight: 800; letter-spacing: 1px;
+            color: #fff; text-decoration: none;
+        }
+
+        .nav-brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+        }
+
+        .nav-links { display: flex; gap: 6px; }
+
+        .nav-link {
+            padding: 8px 16px;
+            border-radius: 10px;
+            font-size: 0.8rem; font-weight: 600;
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover { color: #fff; background: rgba(255,255,255,0.06); }
+
+        .nav-link--cta {
+            background: var(--accent);
+            color: #fff !important;
+        }
+
+        .nav-link--cta:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        /* ---- HERO ---- */
+        .hero {
+            min-height: 100vh;
+            display: flex; align-items: center;
+            padding: 100px 0 60px;
+        }
+
+        .hero-inner {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(59,130,246,0.1);
+            border: 1px solid rgba(59,130,246,0.2);
+            border-radius: 30px;
+            padding: 6px 16px;
+            font-size: 0.75rem; font-weight: 600;
+            color: var(--accent-light);
+            margin-bottom: 20px;
+        }
+
+        .hero-badge-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+            50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+        }
+
+        .hero h1 {
+            font-size: 3.2rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 .gradient-text {
+            background: linear-gradient(135deg, var(--accent-light), var(--purple));
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-desc {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            max-width: 480px;
+            margin-bottom: 32px;
+        }
+
+        .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 0.9rem; font-weight: 700;
+            text-decoration: none;
+            transition: all 0.25s;
+            border: none; cursor: pointer;
+        }
+
+        .btn--primary {
+            background: linear-gradient(135deg, var(--accent), #2563eb);
+            color: #fff;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn--primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(59,130,246,0.35);
+        }
+
+        .btn--outline {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .btn--outline:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.25);
+        }
+
+        /* Hero visual mockup */
+        .hero-visual {
+            position: relative;
+            display: flex; justify-content: center;
+        }
+
+        .phone-mockup {
+            width: 280px;
+            background: var(--bg-card);
+            border-radius: 32px;
+            border: 2px solid rgba(255,255,255,0.08);
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+            position: relative;
+            z-index: 2;
+        }
+
+        .phone-notch {
+            width: 120px; height: 28px;
+            background: #000; border-radius: 0 0 16px 16px;
+            margin: 0 auto;
+        }
+
+        .phone-screen { padding: 16px; }
+
+        .phone-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .phone-brand { font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; }
+        .phone-status {
+            display: flex; align-items: center; gap: 4px;
+            font-size: 0.6rem; font-weight: 600;
+            color: var(--green);
+        }
+        .phone-status-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green);
+        }
+
+        .phone-field {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+
+        .phone-field-label {
+            font-size: 0.55rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .phone-field-value {
+            font-size: 0.75rem; font-weight: 600;
+        }
+
+        .phone-field--selected {
+            border-color: rgba(34,197,94,0.3);
+            background: rgba(34,197,94,0.08);
+        }
+
+        .phone-field--selected .phone-field-value { color: #86efac; }
+
+        .phone-btn-row { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+        .phone-btn {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 0.7rem; font-weight: 700;
+        }
+
+        .phone-btn-icon {
+            width: 30px; height: 30px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        .phone-btn--blue { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); }
+        .phone-btn--blue .phone-btn-icon { background: rgba(59,130,246,0.2); color: #60a5fa; }
+
+        .phone-btn--purple { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.2); }
+        .phone-btn--purple .phone-btn-icon { background: rgba(168,85,247,0.2); color: #c084fc; }
+
+        /* Floating cards around phone */
+        .float-card {
+            position: absolute;
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 18px;
+            font-size: 0.75rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 3;
+        }
+
+        .float-card--gps {
+            top: 20%; right: -30px;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .float-card--offline {
+            bottom: 25%; left: -40px;
+            animation: float 6s ease-in-out infinite 1.5s;
+        }
+
+        .float-card-icon {
+            font-size: 1.2rem; margin-bottom: 6px;
+        }
+
+        .float-card-label {
+            font-weight: 700; margin-bottom: 2px;
+        }
+
+        .float-card-value {
+            font-size: 0.65rem; color: var(--text-muted);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* ---- FEATURES ---- */
+        .section {
+            padding: 100px 0;
+        }
+
+        .section-label {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 0.75rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1.5px;
+            color: var(--accent-light);
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 2.2rem; font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .section-desc {
+            color: var(--text-muted);
+            max-width: 560px;
+            font-size: 1rem;
+            margin-bottom: 48px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(59,130,246,0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+
+        .feature-card:hover::before { opacity: 1; }
+
+        .feature-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+        }
+
+        .feature-icon--blue { background: rgba(59,130,246,0.15); color: #60a5fa; }
+        .feature-icon--purple { background: rgba(168,85,247,0.15); color: #c084fc; }
+        .feature-icon--green { background: rgba(34,197,94,0.15); color: #4ade80; }
+        .feature-icon--amber { background: rgba(245,158,11,0.15); color: #fbbf24; }
+        .feature-icon--red { background: rgba(239,68,68,0.15); color: #f87171; }
+        .feature-icon--teal { background: rgba(20,184,166,0.15); color: #2dd4bf; }
+
+        .feature-card h3 {
+            font-size: 1rem; font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ---- HOW IT WORKS ---- */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            counter-reset: step;
+        }
+
+        .step-card {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            border: 2px solid rgba(59,130,246,0.3);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 1.2rem; font-weight: 800;
+            color: var(--accent-light);
+            position: relative;
+        }
+
+        .step-number::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            border: 1px solid rgba(59,130,246,0.1);
+        }
+
+        .step-card h4 {
+            font-size: 0.95rem; font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .step-card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Line between steps */
+        .step-card:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            top: 28px;
+            left: calc(50% + 36px);
+            width: calc(100% - 72px);
+            height: 1px;
+            background: linear-gradient(90deg, rgba(59,130,246,0.3), rgba(59,130,246,0.05));
+        }
+
+        /* ---- ACCESS CARDS (Login Links) ---- */
+        .access-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .access-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 36px 28px;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .access-card::after {
+            content: '';
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 3px;
+            transition: opacity 0.3s;
+            opacity: 0;
+        }
+
+        .access-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+
+        .access-card:hover::after { opacity: 1; }
+
+        .access-card--operator::after { background: linear-gradient(90deg, var(--accent), var(--accent-light)); }
+        .access-card--admin::after { background: linear-gradient(90deg, var(--purple), #c084fc); }
+        .access-card--super::after { background: linear-gradient(90deg, var(--amber), #fbbf24); }
+
+        .access-icon {
+            width: 72px; height: 72px;
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.8rem;
+            margin: 0 auto 20px;
+        }
+
+        .access-card--operator .access-icon { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .access-card--admin .access-icon { background: rgba(168,85,247,0.12); color: #c084fc; }
+        .access-card--super .access-icon { background: rgba(245,158,11,0.12); color: #fbbf24; }
+
+        .access-card h3 {
+            font-size: 1.15rem; font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .access-card p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            min-height: 40px;
+        }
+
+        .access-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 28px;
+            border-radius: 12px;
+            font-size: 0.85rem; font-weight: 700;
+            text-decoration: none;
+            transition: all 0.25s;
+        }
+
+        .access-card--operator .access-btn {
+            background: rgba(59,130,246,0.15);
+            color: var(--accent-light);
+            border: 1px solid rgba(59,130,246,0.25);
+        }
+        .access-card--operator .access-btn:hover {
+            background: var(--accent); color: #fff;
+            box-shadow: 0 6px 20px var(--accent-glow);
+        }
+
+        .access-card--admin .access-btn {
+            background: rgba(168,85,247,0.15);
+            color: #c084fc;
+            border: 1px solid rgba(168,85,247,0.25);
+        }
+        .access-card--admin .access-btn:hover {
+            background: var(--purple); color: #fff;
+            box-shadow: 0 6px 20px rgba(168,85,247,0.3);
+        }
+
+        .access-card--super .access-btn {
+            background: rgba(245,158,11,0.15);
+            color: #fbbf24;
+            border: 1px solid rgba(245,158,11,0.25);
+        }
+        .access-card--super .access-btn:hover {
+            background: var(--amber); color: #000;
+            box-shadow: 0 6px 20px rgba(245,158,11,0.3);
+        }
+
+        /* ---- STATS ---- */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 60px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stat { text-align: center; }
+
+        .stat-value {
+            font-size: 2.4rem; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-light), var(--purple));
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            font-size: 0.8rem; color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ---- FOOTER ---- */
+        .footer {
+            padding: 40px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .footer-brand {
+            font-size: 1rem; font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .footer-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ---- MOBILE ---- */
+        @media (max-width: 900px) {
+            .hero-inner {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 40px;
+            }
+
+            .hero h1 { font-size: 2.4rem; }
+            .hero-desc { margin: 0 auto 32px; }
+            .hero-actions { justify-content: center; }
+
+            .features-grid { grid-template-columns: 1fr 1fr; }
+            .steps-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+            .step-card:not(:last-child)::before { display: none; }
+
+            .access-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+            .stats-bar { grid-template-columns: 1fr 1fr; gap: 32px; }
+        }
+
+        @media (max-width: 600px) {
+            .hero { padding: 80px 0 40px; }
+            .hero h1 { font-size: 1.9rem; }
+            .hero-desc { font-size: 0.95rem; }
+            .section { padding: 60px 0; }
+            .section-title { font-size: 1.6rem; }
+
+            .features-grid { grid-template-columns: 1fr; }
+            .steps-grid { grid-template-columns: 1fr; }
+
+            .phone-mockup { width: 220px; }
+            .float-card { display: none; }
+
+            .nav-links .nav-link:not(.nav-link--cta) { display: none; }
+
+            .stat-value { font-size: 1.8rem; }
+        }
+    </style>
 </head>
 <body>
-    <!-- ===================================================
-         PANTALLA DE CÁMARA — Modo Ghosting
-         =================================================== -->
-    <div id="camera-container">
 
-        <!-- Video en vivo (cámara trasera) -->
-        <video id="camera-feed" autoplay playsinline></video>
+    <!-- Background effects -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow--blue"></div>
+    <div class="bg-glow bg-glow--purple"></div>
 
-        <!-- Imagen fantasma superpuesta (foto anterior) -->
-        <img id="ghost-overlay"
-             src=""
-             alt="Foto anterior de referencia">
-
-        <!-- Canvas oculto para captura de frame -->
-        <canvas id="capture-canvas"></canvas>
-
-        <!-- Indicador GPS (Haversine) -->
-        <div id="gps-indicator">
-            <div id="gps-circle"></div>
-            <span id="gps-distance">-- m</span>
-        </div>
-
-        <!-- Barra superior de info -->
-        <div id="top-bar">
-            <span id="infra-code">--</span>
-            <span id="current-time">--:--</span>
-        </div>
-
-        <!-- Controles inferiores -->
-        <div id="controls">
-            <button id="btn-ghost" class="ctrl-btn" title="Modo Ghosting">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
-            </button>
-
-            <button id="btn-capture" class="ctrl-btn ctrl-btn--primary" title="Capturar">
-                <div class="shutter-ring">
-                    <div class="shutter-inner"></div>
-                </div>
-            </button>
-
-            <button id="btn-incidencia" class="ctrl-btn" title="Nivel incidencia">
-                <span id="inc-label">BAJO</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- ===================================================
-         PANTALLA POST-CAPTURA (preview + watermark)
-         =================================================== -->
-    <div id="preview-container" class="hidden">
-        <canvas id="preview-canvas"></canvas>
-
-        <div id="preview-controls">
-            <button id="btn-retake" class="ctrl-btn">Repetir</button>
-
-            <div id="tech-data-form">
-                <textarea id="observaciones" placeholder="Observaciones técnicas..." rows="2"></textarea>
-                <!-- Campos dinámicos cargados desde la API -->
-                <div id="dynamic-fields"></div>
+    <!-- ===== NAV ===== -->
+    <nav class="nav">
+        <div class="container">
+            <a href="#" class="nav-brand">
+                <div class="nav-brand-icon"><i class="bi bi-geo-alt-fill"></i></div>
+                INFOCAMPO
+            </a>
+            <div class="nav-links">
+                <a href="#funciones" class="nav-link">Funciones</a>
+                <a href="#como-funciona" class="nav-link">Proceso</a>
+                <a href="#acceso" class="nav-link nav-link--cta">
+                    <i class="bi bi-box-arrow-in-right"></i> Acceder
+                </a>
             </div>
-
-            <button id="btn-upload" class="ctrl-btn ctrl-btn--primary">Enviar</button>
         </div>
+    </nav>
 
-        <div id="upload-status" class="hidden">
-            <div class="spinner"></div>
-            <span>Subiendo...</span>
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-inner">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <div class="hero-badge-dot"></div>
+                        Plataforma SaaS de Inspecciones en Campo
+                    </div>
+                    <h1>
+                        Inspecciones de campo<br>
+                        <span class="gradient-text">inteligentes y geolocalizadas</span>
+                    </h1>
+                    <p class="hero-desc">
+                        Captura fotos con coordenadas ETRS89, compara el estado de infraestructuras
+                        con ghosting visual, genera informes automáticos y trabaja incluso sin
+                        conexión a Internet.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="#acceso" class="btn btn--primary">
+                            <i class="bi bi-rocket-takeoff"></i> Comenzar
+                        </a>
+                        <a href="#funciones" class="btn btn--outline">
+                            <i class="bi bi-play-circle"></i> Ver funciones
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Phone mockup -->
+                <div class="hero-visual">
+                    <div class="phone-mockup">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <div class="phone-header">
+                                <span class="phone-brand">INFOCAMPO</span>
+                                <span class="phone-status"><span class="phone-status-dot"></span> ETRS89</span>
+                            </div>
+                            <div class="phone-field phone-field--selected">
+                                <div class="phone-field-label">Infraestructura</div>
+                                <div class="phone-field-value">TORRE-0042</div>
+                            </div>
+                            <div class="phone-field">
+                                <div class="phone-field-label">Unidad de Obra</div>
+                                <div class="phone-field-value" style="color:var(--text-muted);">Cimentación</div>
+                            </div>
+                            <div class="phone-btn-row">
+                                <div class="phone-btn phone-btn--blue">
+                                    <div class="phone-btn-icon"><i class="bi bi-camera"></i></div>
+                                    <span>Fotos Aleatorias</span>
+                                </div>
+                                <div class="phone-btn phone-btn--purple">
+                                    <div class="phone-btn-icon"><i class="bi bi-layers"></i></div>
+                                    <span>Fotos Comparativas</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Floating cards -->
+                    <div class="float-card float-card--gps">
+                        <div class="float-card-icon" style="color: var(--green);"><i class="bi bi-crosshair"></i></div>
+                        <div class="float-card-label">GPS Activo</div>
+                        <div class="float-card-value">40.4168° N, 3.7038° W</div>
+                    </div>
+                    <div class="float-card float-card--offline">
+                        <div class="float-card-icon" style="color: var(--amber);"><i class="bi bi-cloud-arrow-down"></i></div>
+                        <div class="float-card-label">Modo Offline</div>
+                        <div class="float-card-value">3 fotos precargadas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FEATURES ===== -->
+    <section class="section" id="funciones">
+        <div class="container">
+            <div class="section-label"><i class="bi bi-stars"></i> Funcionalidades</div>
+            <h2 class="section-title">Todo lo que necesitas para inspecciones en campo</h2>
+            <p class="section-desc">
+                Herramientas diseñadas para operadores de campo, administradores de empresa
+                y supervisores de infraestructuras.
+            </p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon feature-icon--blue"><i class="bi bi-camera-fill"></i></div>
+                    <h3>Fotos con Watermark GPS</h3>
+                    <p>Cada captura incluye coordenadas ETRS89, fecha/hora, mini-mapa y nombre de infraestructura directamente en la imagen.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon feature-icon--purple"><i class="bi bi-layers-fill"></i></div>
+                    <h3>Ghosting Comparativo</h3>
+                    <p>Superpón la foto anterior al 50% de opacidad para capturar la misma perspectiva y comparar la evolución temporal.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon feature-icon--green"><i class="bi bi-map-fill"></i></div>
+                    <h3>Mapa Interactivo</h3>
+                    <p>Visualiza todas las inspecciones en un mapa con Leaflet/OpenStreetMap. Filtra por operario, infraestructura o nivel de incidencia.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon feature-icon--amber"><i class="bi bi-cloud-slash-fill"></i></div>
+                    <h3>Modo Offline</h3>
+                    <p>Trabaja sin cobertura: las fotos se guardan localmente con IndexedDB y se sincronizan automáticamente al recuperar conexión.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon feature-icon--red"><i class="bi bi-file-earmark-pdf-fill"></i></div>
+                    <h3>Informes PDF</h3>
+                    <p>Genera informes profesionales con fotos comparativas lado a lado, tablas de incidencias y datos técnicos de cada infraestructura.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon feature-icon--teal"><i class="bi bi-building-fill"></i></div>
+                    <h3>Multi-empresa (SaaS)</h3>
+                    <p>Arquitectura multi-tenant con aislamiento por empresa. Cada compañía gestiona sus propios operarios, infraestructuras y datos.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== HOW IT WORKS ===== -->
+    <section class="section" id="como-funciona" style="background: rgba(255,255,255,0.01);">
+        <div class="container">
+            <div class="section-label"><i class="bi bi-arrow-right-circle"></i> Proceso</div>
+            <h2 class="section-title">Inspecciones en 4 pasos</h2>
+            <p class="section-desc">
+                Flujo simplificado desde el campo hasta el informe final.
+            </p>
+
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h4>Selecciona Infraestructura</h4>
+                    <p>Busca o crea la infraestructura y selecciona la unidad de obra a inspeccionar.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h4>Captura Fotos</h4>
+                    <p>Toma fotos aleatorias o comparativas con ghosting. El watermark GPS se aplica automáticamente.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h4>Sincronización</h4>
+                    <p>Las fotos se suben a la nube (Cloudinary) automáticamente. Sin red, se guardan localmente.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h4>Informes y Mapas</h4>
+                    <p>El administrador accede al timeline, mapas y genera informes PDF comparativos.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== STATS ===== -->
+    <div class="container">
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-value">ETRS89</div>
+                <div class="stat-label">Sistema de coordenadas</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">100%</div>
+                <div class="stat-label">Funcional offline</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">PDF</div>
+                <div class="stat-label">Informes automáticos</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">SaaS</div>
+                <div class="stat-label">Multi-empresa</div>
+            </div>
         </div>
     </div>
 
-    <!-- Config inyectada (en producción vendría del backend) -->
-    <script>
-        window.INFOCAMPO_CONFIG = {
-            uploadEndpoint: 'subir.php',
-            ghostImageEndpoint: 'api/ultima_foto.php',
-            infraId: new URLSearchParams(location.search).get('infra') || '1',
-            usuarioId: new URLSearchParams(location.search).get('user') || '1',
-            empresaId: new URLSearchParams(location.search).get('empresa') || '1',
-            targetLat: parseFloat(new URLSearchParams(location.search).get('lat') || '37.3890531'),
-            targetLon: parseFloat(new URLSearchParams(location.search).get('lon') || '-5.9844589'),
-            infraCode: new URLSearchParams(location.search).get('code') || 'TORRE-0042',
-        };
-    </script>
+    <!-- ===== ACCESS SECTION ===== -->
+    <section class="section" id="acceso">
+        <div class="container">
+            <div class="section-label"><i class="bi bi-person-check"></i> Acceso</div>
+            <h2 class="section-title">Elige tu perfil de acceso</h2>
+            <p class="section-desc">
+                Tres niveles de acceso adaptados a cada rol dentro de la organización.
+            </p>
 
-    <script src="js/haversine.js"></script>
-    <script src="js/camera.js"></script>
-    <script src="js/watermark.js"></script>
-    <script src="js/upload.js"></script>
+            <div class="access-grid">
+                <!-- Operador -->
+                <div class="access-card access-card--operator">
+                    <div class="access-icon"><i class="bi bi-phone-fill"></i></div>
+                    <h3>Operador de Campo</h3>
+                    <p>Interfaz móvil para captura de fotos con GPS, ghosting comparativo y modo offline.</p>
+                    <a href="operador.php" class="access-btn">
+                        <i class="bi bi-camera"></i> Acceder como Operador
+                    </a>
+                </div>
+
+                <!-- Admin -->
+                <div class="access-card access-card--admin">
+                    <div class="access-icon"><i class="bi bi-speedometer2"></i></div>
+                    <h3>Administrador de Empresa</h3>
+                    <p>Dashboard, timeline de inspecciones, mapa de operarios, gestión de infraestructuras e informes.</p>
+                    <a href="../admin/login.php" class="access-btn">
+                        <i class="bi bi-box-arrow-in-right"></i> Panel de Administración
+                    </a>
+                </div>
+
+                <!-- Superadmin -->
+                <div class="access-card access-card--super">
+                    <div class="access-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                    <h3>Super Administrador</h3>
+                    <p>Gestión global de empresas, licencias, usuarios y configuración de la plataforma.</p>
+                    <a href="../superadmin/index.php" class="access-btn">
+                        <i class="bi bi-gear"></i> Panel Super Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-brand">
+                <i class="bi bi-geo-alt-fill"></i> INFOCAMPO
+            </div>
+            <p class="footer-text">
+                Plataforma SaaS de inspección de infraestructuras en campo
+            </p>
+        </div>
+    </footer>
+
+    <!-- Smooth scroll for anchor links -->
     <script>
-        // Cargar campos dinámicos de la empresa al iniciar
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.INFOCAMPO_CONFIG.empresaId) {
-                Upload.loadDynamicFields(window.INFOCAMPO_CONFIG.empresaId);
-            }
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
         });
     </script>
 </body>
