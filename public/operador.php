@@ -34,6 +34,13 @@ if ($empresaId > 0) {
     $row = $stmt->fetch();
     if ($row) $empresaName = $row['nombre'];
 }
+
+// Obtener iniciales del usuario
+$initials = '';
+$nameParts = explode(' ', trim($userName));
+foreach (array_slice($nameParts, 0, 2) as $part) {
+    $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -52,47 +59,73 @@ if ($empresaId > 0) {
     <div id="screen-ficha" class="screen active">
         <div class="ficha-header">
             <div class="ficha-brand">
-                <strong>FotoGPS.app</strong>
-                <span><?= htmlspecialchars($empresaName) ?></span>
+                <div class="brand-logo"><i class="bi bi-geo-alt-fill"></i></div>
+                <div class="brand-info">
+                    <strong>FotoGPS.app</strong>
+                    <span><?= htmlspecialchars($empresaName) ?></span>
+                </div>
             </div>
             <div class="ficha-header-right">
-                <div id="offline-indicator" class="offline-indicator online">
-                    <div id="offline-dot" class="offline-dot online"></div>
-                    <span id="offline-text">En línea</span>
+                <div id="offline-indicator" class="status-pill online">
+                    <div id="offline-dot" class="status-dot online"></div>
+                    <span id="offline-text">En linea</span>
                 </div>
-                <div class="ficha-user">
-                    <i class="bi bi-person-circle"></i>
-                    <span><?= htmlspecialchars($userName) ?></span>
+                <div class="ficha-avatar" title="<?= htmlspecialchars($userName) ?>">
+                    <?= $initials ?>
                 </div>
             </div>
         </div>
 
         <div class="ficha-body">
+            <!-- GPS Status Card -->
+            <div class="gps-card" id="gps-card">
+                <div class="gps-card-icon">
+                    <i class="bi bi-crosshair"></i>
+                </div>
+                <div class="gps-card-info">
+                    <span class="gps-card-label">Ubicacion GPS</span>
+                    <span class="gps-card-coords" id="gps-coords">Obteniendo...</span>
+                </div>
+                <div class="gps-card-status" id="gps-status-icon">
+                    <div class="gps-spinner"></div>
+                </div>
+            </div>
+
             <!-- Filtros provincia / municipio -->
-            <div class="ficha-field">
-                <label><i class="bi bi-pin-map"></i> Ubicación</label>
+            <div class="field-card">
+                <div class="field-card-header">
+                    <i class="bi bi-pin-map"></i>
+                    <span>Ubicacion</span>
+                </div>
                 <div class="filter-row">
-                    <select id="filter-provincia" class="filter-select">
-                        <option value="">-- Todas las provincias --</option>
+                    <select id="filter-provincia" class="field-select">
+                        <option value="">Todas las provincias</option>
                     </select>
-                    <select id="filter-municipio" class="filter-select" disabled>
-                        <option value="">-- Todos los municipios --</option>
+                    <select id="filter-municipio" class="field-select" disabled>
+                        <option value="">Todos los municipios</option>
                     </select>
                 </div>
             </div>
 
             <!-- Infraestructura -->
-            <div class="ficha-field">
-                <label><i class="bi bi-geo-alt"></i> Infraestructura</label>
+            <div class="field-card">
+                <div class="field-card-header">
+                    <i class="bi bi-geo-alt"></i>
+                    <span>Infraestructura</span>
+                </div>
                 <div class="search-container">
+                    <i class="bi bi-search search-icon"></i>
                     <input type="text" id="infra-search" placeholder="Buscar o escribir nombre..."
-                           autocomplete="off" spellcheck="false">
+                           autocomplete="off" spellcheck="false" class="field-input field-input--search">
                     <div id="infra-results" class="search-results hidden"></div>
                 </div>
                 <input type="hidden" id="infra-id" value="">
                 <div id="infra-selected" class="selected-badge hidden">
-                    <span id="infra-selected-name"></span>
-                    <button type="button" id="infra-clear" class="clear-btn"><i class="bi bi-x"></i></button>
+                    <div class="selected-badge-info">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span id="infra-selected-name"></span>
+                    </div>
+                    <button type="button" id="infra-clear" class="clear-btn"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <!-- Precache indicator + button -->
                 <div id="precache-indicator" class="precache-indicator hidden">
@@ -104,62 +137,70 @@ if ($empresaId > 0) {
             </div>
 
             <!-- Unidad de obra -->
-            <div class="ficha-field">
-                <label><i class="bi bi-tools"></i> Unidad de Obra</label>
-                <select id="unidad-obra">
-                    <option value="">-- Seleccionar unidad de obra --</option>
+            <div class="field-card">
+                <div class="field-card-header">
+                    <i class="bi bi-tools"></i>
+                    <span>Unidad de Obra</span>
+                </div>
+                <select id="unidad-obra" class="field-select">
+                    <option value="">Seleccionar unidad de obra</option>
                 </select>
             </div>
 
-            <!-- Fecha -->
-            <div class="ficha-field">
-                <label><i class="bi bi-calendar3"></i> Fecha</label>
+            <!-- Fecha y Observaciones -->
+            <div class="field-card">
+                <div class="field-card-header">
+                    <i class="bi bi-calendar3"></i>
+                    <span>Fecha</span>
+                </div>
                 <div class="fecha-display" id="fecha-display"></div>
             </div>
 
-            <!-- Observaciones generales -->
-            <div class="ficha-field">
-                <label><i class="bi bi-chat-text"></i> Observaciones</label>
-                <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2"></textarea>
+            <div class="field-card">
+                <div class="field-card-header">
+                    <i class="bi bi-chat-text"></i>
+                    <span>Observaciones</span>
+                </div>
+                <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="field-textarea"></textarea>
             </div>
 
             <!-- Aviso: seleccionar infraestructura -->
             <div id="hint-select-infra" class="hint-box">
                 <i class="bi bi-info-circle"></i>
-                <span>Busca o crea una infraestructura arriba para habilitar las fotos</span>
+                <span>Busca o crea una infraestructura para habilitar las fotos</span>
             </div>
 
             <!-- Botones de fotos -->
             <div class="foto-buttons">
-                <button type="button" id="btn-fotos-aleatorias" class="foto-btn foto-btn--aleatorio" disabled>
-                    <div class="foto-btn-icon"><i class="bi bi-camera"></i></div>
-                    <div class="foto-btn-text">
+                <button type="button" id="btn-fotos-aleatorias" class="action-card action-card--blue" disabled>
+                    <div class="action-card-icon"><i class="bi bi-camera-fill"></i></div>
+                    <div class="action-card-content">
                         <strong>Fotos Aleatorias</strong>
                         <small>Fotos libres con coordenadas ETRS89</small>
                     </div>
-                    <span class="foto-count" id="count-aleatorias">0</span>
+                    <div class="action-card-badge" id="count-aleatorias">0</div>
                 </button>
 
-                <button type="button" id="btn-fotos-comparativas" class="foto-btn foto-btn--comparativo" disabled>
-                    <div class="foto-btn-icon"><i class="bi bi-layers"></i></div>
-                    <div class="foto-btn-text">
+                <button type="button" id="btn-fotos-comparativas" class="action-card action-card--purple" disabled>
+                    <div class="action-card-icon"><i class="bi bi-layers-fill"></i></div>
+                    <div class="action-card-content">
                         <strong>Fotos Comparativas</strong>
                         <small>Ghosting con foto anterior al 50%</small>
                     </div>
-                    <span class="foto-count" id="count-comparativas">0</span>
+                    <div class="action-card-badge" id="count-comparativas">0</div>
                 </button>
 
-                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa">
-                    <div class="foto-btn-icon"><i class="bi bi-map"></i></div>
-                    <div class="foto-btn-text">
+                <button type="button" id="btn-ver-mapa" class="action-card action-card--green">
+                    <div class="action-card-icon"><i class="bi bi-map-fill"></i></div>
+                    <div class="action-card-content">
                         <strong>Ver Mapa de Visitas</strong>
-                        <small>Ubicación de fotos anteriores</small>
+                        <small>Ubicacion de fotos anteriores</small>
                     </div>
-                    <span class="foto-count"><i class="bi bi-chevron-right"></i></span>
+                    <div class="action-card-arrow"><i class="bi bi-chevron-right"></i></div>
                 </button>
             </div>
 
-            <!-- Barra de sincronización offline -->
+            <!-- Barra de sincronizacion offline -->
             <div id="sync-bar" class="sync-bar hidden">
                 <div class="sync-bar-info">
                     <i class="bi bi-cloud-arrow-up"></i>
@@ -176,19 +217,21 @@ if ($empresaId > 0) {
                 </div>
             </div>
 
-            <!-- Galería de fotos tomadas -->
+            <!-- Galeria de fotos tomadas -->
             <div id="gallery-section" class="hidden">
-                <h3 class="gallery-title"><i class="bi bi-images"></i> Fotos de esta visita</h3>
+                <div class="gallery-header">
+                    <i class="bi bi-images"></i>
+                    <span>Fotos de esta visita</span>
+                </div>
                 <div id="gallery-grid" class="gallery-grid"></div>
             </div>
         </div>
     </div>
 
     <!-- ========================================================
-         PANTALLA 2: CÁMARA
+         PANTALLA 2: CAMARA
          ======================================================== -->
     <div id="screen-camera" class="screen">
-        <!-- Barra superior -->
         <div class="cam-topbar">
             <button type="button" id="btn-cam-back" class="cam-btn-back">
                 <i class="bi bi-arrow-left"></i>
@@ -200,27 +243,19 @@ if ($empresaId > 0) {
             <span id="cam-time">--:--</span>
         </div>
 
-        <!-- GPS Indicator -->
         <div class="cam-gps">
             <div class="cam-gps-dot" id="cam-gps-dot"></div>
             <span id="cam-gps-text">ETRS89: --</span>
         </div>
 
-        <!-- Video feed -->
         <video id="cam-video" autoplay playsinline></video>
-
-        <!-- Ghost overlay (comparative mode) -->
         <img id="cam-ghost" src="" alt="" class="cam-ghost">
-
-        <!-- Canvas de captura (oculto) -->
         <canvas id="cam-capture" class="hidden-canvas"></canvas>
 
-        <!-- Contador de fotos comparativas -->
         <div id="cam-seq-counter" class="cam-seq hidden">
             <span id="cam-seq-label">W1</span>
         </div>
 
-        <!-- Controles inferiores -->
         <div class="cam-controls">
             <div class="cam-controls-left">
                 <button type="button" id="btn-ghost-toggle" class="cam-ctrl hidden" title="Toggle Ghost">
@@ -272,16 +307,13 @@ if ($empresaId > 0) {
         </div>
         <div id="op-map" class="op-map"></div>
 
-        <!-- Panel lateral de detalle -->
         <div id="mapa-detail-panel" class="mapa-detail-panel hidden">
             <div class="mapa-detail-header">
                 <button type="button" id="btn-close-detail" class="modal-close"><i class="bi bi-x-lg"></i></button>
                 <h4 id="detail-infra-name">--</h4>
                 <code id="detail-infra-code">--</code>
             </div>
-            <div class="mapa-detail-body" id="mapa-detail-body">
-                <!-- Se rellena dinámicamente -->
-            </div>
+            <div class="mapa-detail-body" id="mapa-detail-body"></div>
             <div class="mapa-detail-actions">
                 <button type="button" id="btn-detail-aleatorio" class="mapa-action-btn mapa-action--aleatorio">
                     <i class="bi bi-camera"></i> Nueva Foto Aleatoria
@@ -293,17 +325,12 @@ if ($empresaId > 0) {
         </div>
     </div>
 
-    <!-- ========================================================
-         OVERLAY: Subiendo foto
-         ======================================================== -->
+    <!-- Overlays & Modals -->
     <div id="upload-overlay" class="overlay hidden">
         <div class="spinner"></div>
         <span>Subiendo foto...</span>
     </div>
 
-    <!-- ========================================================
-         MODAL: Seleccionar foto anterior para ghosting
-         ======================================================== -->
     <div id="modal-prev-photos" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -321,9 +348,6 @@ if ($empresaId > 0) {
         </div>
     </div>
 
-    <!-- ========================================================
-         MODAL: Precargando fotos
-         ======================================================== -->
     <div id="precache-modal" class="modal-overlay hidden">
         <div class="modal-content precache-modal-content">
             <div class="modal-header">
@@ -339,9 +363,6 @@ if ($empresaId > 0) {
         </div>
     </div>
 
-    <!-- ========================================================
-         NOTIFICACIÓN: Resultado de sincronización
-         ======================================================== -->
     <div id="sync-notification" class="sync-notification hidden">
         <span class="sync-notif-text"></span>
         <button type="button" id="sync-notif-close" class="sync-notif-close"><i class="bi bi-x"></i></button>
