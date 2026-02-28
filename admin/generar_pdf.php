@@ -17,7 +17,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/config.php';
-require_once __DIR__ . '/../vendor/dompdf/autoload.inc.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
