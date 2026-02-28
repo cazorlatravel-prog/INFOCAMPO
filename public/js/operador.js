@@ -90,8 +90,11 @@
     const mapaDetailBody  = $('#mapa-detail-body');
     const detailInfraName = $('#detail-infra-name');
     const detailInfraCode = $('#detail-infra-code');
+    const detailInfraDistance = $('#detail-infra-distance');
     const btnMapaBack     = $('#btn-mapa-back');
+    const btnMapaVolver   = $('#btn-mapa-volver');
     const btnCloseDetail  = $('#btn-close-detail');
+    const btnDetailNavegar     = $('#btn-detail-navegar');
     const btnDetailAleatorio   = $('#btn-detail-aleatorio');
     const btnDetailComparativo = $('#btn-detail-comparativo');
 
@@ -524,7 +527,12 @@
         try {
             if (!state.stream) {
                 state.stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1080 },
+                        height: { ideal: 1440 },
+                        aspectRatio: { ideal: 3 / 4 },
+                    },
                     audio: false,
                 });
             }
@@ -645,11 +653,27 @@
     async function captureFrame() {
         const vw = camVideo.videoWidth;
         const vh = camVideo.videoHeight;
-        camCapture.width = vw;
-        camCapture.height = vh;
+
+        // Force 3:4 portrait crop from center of video frame
+        let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
+        const targetRatio = 3 / 4; // width / height
+        const videoRatio = vw / vh;
+
+        if (videoRatio > targetRatio) {
+            // Video is wider than 3:4 — crop sides
+            srcW = Math.round(vh * targetRatio);
+            srcX = Math.round((vw - srcW) / 2);
+        } else if (videoRatio < targetRatio) {
+            // Video is taller than 3:4 — crop top/bottom
+            srcH = Math.round(vw / targetRatio);
+            srcY = Math.round((vh - srcH) / 2);
+        }
+
+        camCapture.width = srcW;
+        camCapture.height = srcH;
 
         const ctx = camCapture.getContext('2d');
-        ctx.drawImage(camVideo, 0, 0, vw, vh);
+        ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
         camVideo.pause();
 
@@ -892,12 +916,31 @@
 
         // 2. Info text block — bottom-right
         // Lines: Empresa, Infraestructura, Fecha, Coordenadas
-        const fontSize = Math.max(13, Math.round(h * 0.018));
+        const fontSize = Math.max(14, Math.round(h * 0.02));
         const lineHeight = fontSize * 1.5;
         const numLines = 4;
         const padding = 16;
         const blockHeight = lineHeight * numLines + padding * 2;
-        const blockWidth = Math.max(280, Math.round(w * 0.35));
+
+        // Prepare text lines first to measure widths
+        const empresaStr = meta.empresaName || '';
+        const infraStr = meta.infraName || '';
+        const dateStr = formatDateMadrid();
+        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
+        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
+        const coordStr = `ETRS89: ${latStr}, ${lonStr}`;
+
+        // Measure max text width to auto-size block
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        const boldWidths = [ctx.measureText(empresaStr).width];
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
+        const normalWidths = [
+            ctx.measureText(infraStr).width,
+            ctx.measureText(dateStr).width,
+            ctx.measureText(coordStr).width,
+        ];
+        const maxTextWidth = Math.max(...boldWidths, ...normalWidths);
+        const blockWidth = Math.min(w - 24, maxTextWidth + padding * 2);
 
         // Semi-transparent background block (bottom-right)
         const bx = w - blockWidth - 12;
@@ -915,29 +958,25 @@
         let textY = by + padding;
 
         // Line 1: Nombre Empresa
-        const empresaStr = meta.empresaName || '';
         ctx.fillText(empresaStr, textX, textY);
         textY += lineHeight;
 
         // Line 2: Infraestructura
         ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(meta.infraName || '', textX, textY);
+        ctx.fillText(infraStr, textX, textY);
         textY += lineHeight;
 
         // Line 3: Fecha
-        const dateStr = formatDateMadrid();
         ctx.fillText(dateStr, textX, textY);
         textY += lineHeight;
 
         // Line 4: Coordenadas
-        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
-        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
-        ctx.fillText(`ETRS89: ${latStr}, ${lonStr}`, textX, textY);
+        ctx.fillText(coordStr, textX, textY);
 
         // Reset text align
         ctx.textAlign = 'start';
 
-        // 3. Mini-map OSM (top-left, 1/8 of image)
+        // 3. Mini-map OSM (top-left, 1/6 of image)
         await drawMiniMap(ctx, w, h, meta.lat, meta.lon);
 
         // Save blob for later
@@ -947,8 +986,8 @@
     async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
         if (lat == null || lon == null) return;
 
-        // 1/8 of image size, positioned top-left, flush to corner
-        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 8);
+        // 1/6 of image size, positioned top-left, flush to corner
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 6);
         const x = 0;
         const y = 0;
 
@@ -1097,7 +1136,9 @@
 
         // Map events
         btnMapaBack.addEventListener('click', closeMapScreen);
+        btnMapaVolver.addEventListener('click', closeMapScreen);
         btnCloseDetail.addEventListener('click', () => mapaDetailPanel.classList.add('hidden'));
+        btnDetailNavegar.addEventListener('click', navigateToInfra);
         btnDetailAleatorio.addEventListener('click', () => startVisitFromMap('aleatorio'));
         btnDetailComparativo.addEventListener('click', () => startVisitFromMap('comparativo'));
 
@@ -1152,7 +1193,8 @@
     // ===================================================================
     let leafletMap = null;
     let mapMarkers = [];
-    let mapSelectedInfra = null; // { id, nombre, codigo }
+    let mapSelectedInfra = null; // { id, nombre, codigo, lat, lon, registros }
+    let mapUserMarker = null;
 
     async function openMapScreen() {
         showScreen('mapa');
@@ -1175,6 +1217,9 @@
             }
         }
 
+        // Show user position on map
+        updateUserPositionOnMap();
+
         // Load data
         await loadMapData();
     }
@@ -1183,33 +1228,96 @@
         showScreen('ficha');
     }
 
+    function updateUserPositionOnMap() {
+        if (!leafletMap || !state.gps.lat || !state.gps.lon) return;
+
+        const userIcon = L.divIcon({
+            className: 'user-location-marker',
+            html: `<div style="width:16px;height:16px;border-radius:50%;background:#4285f4;
+                    border:3px solid #fff;box-shadow:0 0 0 2px rgba(66,133,244,0.3),0 2px 6px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8],
+        });
+
+        if (mapUserMarker) {
+            mapUserMarker.setLatLng([state.gps.lat, state.gps.lon]);
+        } else {
+            mapUserMarker = L.marker([state.gps.lat, state.gps.lon], {
+                icon: userIcon, zIndexOffset: 1000,
+            }).addTo(leafletMap);
+            mapUserMarker.bindTooltip('Tu ubicación', { direction: 'top', offset: [0, -10] });
+        }
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const toRad = (d) => d * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function formatDistance(meters) {
+        if (meters < 1000) return Math.round(meters) + ' m';
+        return (meters / 1000).toFixed(1) + ' km';
+    }
+
     async function loadMapData() {
         try {
-            const url = `${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=500`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (!data.ok) return;
+            // Load registros AND all infrastructures in parallel
+            const [regRes, infraRes] = await Promise.all([
+                fetch(`${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=500`).then(r => r.json()),
+                fetch(`${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&q=`).then(r => r.json()),
+            ]);
 
             // Clear old markers
             mapMarkers.forEach(m => leafletMap.removeLayer(m));
             mapMarkers = [];
 
-            // Group by infrastructure
+            // Build visited infra map from registros
             const byInfra = {};
-            data.registros.forEach(r => {
-                if (!byInfra[r.infra_id]) {
-                    byInfra[r.infra_id] = {
-                        id: r.infra_id,
-                        nombre: r.infra_nombre,
-                        codigo: r.codigo_unico,
-                        tipo: r.infra_tipo,
-                        lat: parseFloat(r.lat_teorica),
-                        lon: parseFloat(r.lon_teorica),
-                        registros: [],
-                    };
-                }
-                byInfra[r.infra_id].registros.push(r);
+            if (regRes.ok && regRes.registros) {
+                regRes.registros.forEach(r => {
+                    if (!byInfra[r.infra_id]) {
+                        byInfra[r.infra_id] = {
+                            id: r.infra_id,
+                            nombre: r.infra_nombre,
+                            codigo: r.codigo_unico,
+                            tipo: r.infra_tipo,
+                            lat: parseFloat(r.lat_teorica),
+                            lon: parseFloat(r.lon_teorica),
+                            registros: [],
+                        };
+                    }
+                    byInfra[r.infra_id].registros.push(r);
+                });
+            }
+
+            // Build full infra list (including never-visited ones)
+            const allInfras = {};
+            if (infraRes.ok && infraRes.infraestructuras) {
+                infraRes.infraestructuras.forEach(inf => {
+                    const id = inf.id;
+                    if (byInfra[id]) {
+                        allInfras[id] = byInfra[id];
+                    } else {
+                        allInfras[id] = {
+                            id: id,
+                            nombre: inf.nombre,
+                            codigo: inf.codigo_unico,
+                            tipo: inf.tipo,
+                            lat: parseFloat(inf.lat_teorica),
+                            lon: parseFloat(inf.lon_teorica),
+                            registros: [],
+                        };
+                    }
+                });
+            }
+            // Also add visited ones that may not have been returned by infra search
+            Object.keys(byInfra).forEach(id => {
+                if (!allInfras[id]) allInfras[id] = byInfra[id];
             });
 
             const bounds = [];
@@ -1217,76 +1325,79 @@
                 'bajo': '#22c55e', 'medio': '#eab308', 'critico': '#ef4444',
             };
 
-            Object.values(byInfra).forEach(infra => {
+            Object.values(allInfras).forEach(infra => {
                 if (!infra.lat || !infra.lon) return;
                 bounds.push([infra.lat, infra.lon]);
 
-                // Latest state
-                const lastState = infra.registros[0]?.estado_incidencia || 'bajo';
-                const color = stateColors[lastState] || '#9ca3af';
-                const numPhotos = infra.registros.length;
-                const numComp = infra.registros.filter(r => r.tipo_foto === 'comparativo').length;
+                const hasPhotos = infra.registros.length > 0;
 
-                const icon = L.divIcon({
-                    className: 'op-marker',
-                    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};
-                            border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.4);
-                            display:flex;align-items:center;justify-content:center;
-                            font-size:10px;font-weight:800;color:#fff;">${numPhotos}</div>`,
-                    iconSize: [28, 28],
-                    iconAnchor: [14, 14],
-                });
+                if (hasPhotos) {
+                    // Visited: colored circle with photo count
+                    const lastState = infra.registros[0]?.estado_incidencia || 'bajo';
+                    const color = stateColors[lastState] || '#9ca3af';
+                    const numPhotos = infra.registros.length;
 
-                const marker = L.marker([infra.lat, infra.lon], { icon }).addTo(leafletMap);
-                marker.on('click', () => showInfraDetail(infra));
-                mapMarkers.push(marker);
+                    const icon = L.divIcon({
+                        className: 'op-marker',
+                        html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};
+                                border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.4);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:11px;font-weight:800;color:#fff;">${numPhotos}</div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                    });
+
+                    const marker = L.marker([infra.lat, infra.lon], { icon }).addTo(leafletMap);
+                    marker.on('click', () => showInfraDetail(infra));
+                    mapMarkers.push(marker);
+                } else {
+                    // Not visited: gray pin icon
+                    const icon = L.divIcon({
+                        className: 'op-marker-unvisited',
+                        html: `<div style="width:28px;height:28px;border-radius:50%;background:#9ca3af;
+                                border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.3);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:13px;color:#fff;">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 0a5 5 0 0 0-5 5c0 4.5 5 11 5 11s5-6.5 5-11a5 5 0 0 0-5-5zm0 7.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+                                </svg>
+                            </div>`,
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14],
+                    });
+
+                    const marker = L.marker([infra.lat, infra.lon], { icon, zIndexOffset: -50 }).addTo(leafletMap);
+                    marker.on('click', () => showInfraDetail(infra));
+
+                    // Show name on hover
+                    let tooltipText = escHtml(infra.nombre);
+                    if (state.gps.lat && state.gps.lon) {
+                        const dist = haversineDistance(state.gps.lat, state.gps.lon, infra.lat, infra.lon);
+                        tooltipText += `<br><span style="color:#4285f4;">${formatDistance(dist)}</span>`;
+                    }
+                    marker.bindTooltip(tooltipText, { direction: 'top', offset: [0, -10] });
+
+                    mapMarkers.push(marker);
+                }
             });
 
-            // Also add markers for individual photo locations (smaller dots)
-            data.registros.forEach(r => {
-                const lat = parseFloat(r.lat_real);
-                const lon = parseFloat(r.lon_real);
-                if (!lat || !lon) return;
-
-                const isComp = r.tipo_foto === 'comparativo';
-                const dotColor = isComp ? 'rgba(168,85,247,0.7)' : 'rgba(59,130,246,0.5)';
-                const dotSize = 10;
-
-                const icon = L.divIcon({
-                    className: 'photo-dot',
-                    html: `<div style="width:${dotSize}px;height:${dotSize}px;border-radius:50%;
-                            background:${dotColor};border:1px solid rgba(255,255,255,0.5);"></div>`,
-                    iconSize: [dotSize, dotSize],
-                    iconAnchor: [dotSize/2, dotSize/2],
-                });
-
-                const m = L.marker([lat, lon], { icon, zIndexOffset: -100 }).addTo(leafletMap);
-                m.bindTooltip(
-                    `<span style="font-size:0.75rem;">${escHtml(r.infra_nombre)}<br>${r.fecha}</span>`,
-                    { direction: 'top', offset: [0, -6] }
-                );
-                m.on('click', () => {
-                    const infra = byInfra[r.infra_id];
-                    if (infra) showInfraDetail(infra);
-                });
-                mapMarkers.push(m);
-            });
+            // Add user position to bounds
+            if (state.gps.lat && state.gps.lon) {
+                bounds.push([state.gps.lat, state.gps.lon]);
+            }
 
             // Fit bounds
             if (bounds.length > 0) {
-                leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
             }
 
             // Update subtitle
             const sub = $('#mapa-subtitle');
             if (sub) {
-                const totalInfra = Object.keys(byInfra).length;
-                const totalReg = data.registros.length;
-                if (totalReg === 0) {
-                    sub.textContent = 'Aún no hay fotos registradas';
-                } else {
-                    sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
-                }
+                const totalInfra = Object.keys(allInfras).length;
+                const visitedCount = Object.values(allInfras).filter(i => i.registros.length > 0).length;
+                const totalReg = regRes.ok ? (regRes.registros?.length || 0) : 0;
+                sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${visitedCount} visitada${visitedCount !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
             }
 
         } catch (err) {
@@ -1300,6 +1411,15 @@
         mapSelectedInfra = infra;
         detailInfraName.textContent = infra.nombre;
         detailInfraCode.textContent = infra.codigo;
+
+        // Show distance from user
+        if (state.gps.lat && state.gps.lon && infra.lat && infra.lon) {
+            const dist = haversineDistance(state.gps.lat, state.gps.lon, infra.lat, infra.lon);
+            detailInfraDistance.textContent = `📍 A ${formatDistance(dist)} de tu ubicación`;
+            detailInfraDistance.classList.remove('hidden');
+        } else {
+            detailInfraDistance.classList.add('hidden');
+        }
 
         // Build detail body
         let html = '';
@@ -1327,7 +1447,7 @@
         }
 
         if (regs.length === 0) {
-            html = '<div class="mapa-detail-meta" style="text-align:center;padding:20px;">Sin fotos registradas</div>';
+            html = '<div class="mapa-detail-meta" style="text-align:center;padding:16px;">Sin fotos — Infraestructura no visitada</div>';
         }
 
         mapaDetailBody.innerHTML = html;
@@ -1337,6 +1457,18 @@
         if (infra.lat && infra.lon) {
             leafletMap.setView([infra.lat, infra.lon], 16, { animate: true });
         }
+    }
+
+    function navigateToInfra() {
+        if (!mapSelectedInfra || !mapSelectedInfra.lat || !mapSelectedInfra.lon) return;
+
+        const lat = mapSelectedInfra.lat;
+        const lon = mapSelectedInfra.lon;
+        const name = encodeURIComponent(mapSelectedInfra.nombre);
+
+        // Open Google Maps navigation (works on Android and iOS)
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`;
+        window.open(url, '_blank');
     }
 
     function buildPhotoCard(r) {

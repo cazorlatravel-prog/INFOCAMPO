@@ -996,7 +996,40 @@ select.input-field {
     position: absolute;
     inset: 0;
     top: 60px;
+    bottom: 70px;
     z-index: 1;
+}
+
+/* Botón Volver rojo fijo abajo */
+.mapa-volver-btn {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #dc3545;
+    color: #ffffff;
+    border: none;
+    padding: 18px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: 0.3px;
+    transition: background 0.15s;
+    min-height: 60px;
+}
+
+.mapa-volver-btn:hover,
+.mapa-volver-btn:active {
+    background: #c82333;
+}
+
+.mapa-volver-btn i {
+    font-size: 1.25rem;
 }
 
 /* Detail panel */
@@ -1154,6 +1187,25 @@ select.input-field {
     border: 1.5px solid #d8ccf8;
 }
 .mapa-action--comparativo:hover { background: #e8e0ff; }
+
+.mapa-action--navegar {
+    background: #dc3545;
+    color: #ffffff;
+    border: 1.5px solid #dc3545;
+    flex: 1.2;
+}
+.mapa-action--navegar:hover { background: #c82333; }
+
+.detail-distance {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #4285f4;
+    background: #e8f0fe;
+    padding: 4px 10px;
+    border-radius: 8px;
+}
 
 
 /* ==========================================================

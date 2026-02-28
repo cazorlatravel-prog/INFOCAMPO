@@ -26,12 +26,36 @@ const Watermark = (() => {
         ctx.drawImage(sourceCanvas, 0, 0);
 
         // 2. Bloque de info abajo-derecha
-        const fontSize = Math.max(13, Math.round(h * 0.018));
+        const fontSize = Math.max(14, Math.round(h * 0.02));
         const lineHeight = fontSize * 1.5;
         const numLines = 4;
         const padding = 16;
         const blockHeight = lineHeight * numLines + padding * 2;
-        const blockWidth = Math.max(280, Math.round(w * 0.35));
+
+        // Prepare text lines to measure widths
+        const empresaStr = meta.empresaName || '';
+        const infraStr = meta.infraName || meta.code || '';
+        const dateStr = meta.fecha.toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid',
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+        });
+        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
+        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
+        const coordStr = `ETRS89: ${latStr}, ${lonStr}`;
+
+        // Measure max text width to auto-size block
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        const boldWidths = [ctx.measureText(empresaStr).width];
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
+        const normalWidths = [
+            ctx.measureText(infraStr).width,
+            ctx.measureText(dateStr).width,
+            ctx.measureText(coordStr).width,
+        ];
+        const maxTextWidth = Math.max(...boldWidths, ...normalWidths);
+        const blockWidth = Math.min(w - 24, maxTextWidth + padding * 2);
 
         const bx = w - blockWidth - 12;
         const by = h - blockHeight - 12;
@@ -59,28 +83,20 @@ const Watermark = (() => {
 
         // Line 1: Empresa
         ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(meta.empresaName || '', textX, textY);
+        ctx.fillText(empresaStr, textX, textY);
         textY += lineHeight;
 
         // Line 2: Infraestructura
         ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(meta.infraName || meta.code || '', textX, textY);
+        ctx.fillText(infraStr, textX, textY);
         textY += lineHeight;
 
         // Line 3: Fecha
-        const dateStr = meta.fecha.toLocaleString('es-ES', {
-            timeZone: 'Europe/Madrid',
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-            hour12: false,
-        });
         ctx.fillText(dateStr, textX, textY);
         textY += lineHeight;
 
         // Line 4: Coordenadas
-        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
-        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
-        ctx.fillText(`ETRS89: ${latStr}, ${lonStr}`, textX, textY);
+        ctx.fillText(coordStr, textX, textY);
 
         ctx.textAlign = 'start';
 
@@ -92,12 +108,12 @@ const Watermark = (() => {
     }
 
     /**
-     * Dibuja un tile estático de OpenStreetMap en la esquina superior izquierda (1/8 de imagen).
+     * Dibuja un tile estático de OpenStreetMap en la esquina superior izquierda (1/6 de imagen).
      */
     async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
         if (lat == null || lon == null) return;
 
-        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 8);
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 6);
         const x = 0;
         const y = 0;
 
