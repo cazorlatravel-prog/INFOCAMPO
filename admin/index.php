@@ -344,6 +344,10 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2">
+                                    <a href="comparador.php?empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?>"
+                                       class="btn btn-outline-info btn-sm" title="Comparar fotos entre visitas">
+                                        <i class="bi bi-images"></i> Comparar
+                                    </a>
                                     <a href="exportar_csv.php?tipo=registros&empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?><?= $filtroEstado ? '&estado=' . urlencode($filtroEstado) : '' ?><?= $filtroFechaDesde ? '&fecha_desde=' . urlencode($filtroFechaDesde) : '' ?><?= $filtroFechaHasta ? '&fecha_hasta=' . urlencode($filtroFechaHasta) : '' ?>"
                                        class="btn btn-outline-secondary btn-sm" title="Exportar inspecciones a CSV">
                                         <i class="bi bi-file-earmark-spreadsheet"></i> CSV

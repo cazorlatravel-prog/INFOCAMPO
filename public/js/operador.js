@@ -265,7 +265,34 @@
 
         notification.querySelector('.sync-notif-text').textContent = msg;
         notification.classList.remove('hidden');
-        setTimeout(() => notification.classList.add('hidden'), 5000);
+
+        // Si hay fallos, mostrar alerta persistente de no borrar fotos
+        if (fail > 0) {
+            showUploadFailAlert(fail);
+            // No auto-ocultar para que el operador lo vea
+            setTimeout(() => notification.classList.add('hidden'), 10000);
+        } else {
+            setTimeout(() => notification.classList.add('hidden'), 5000);
+        }
+    }
+
+    function showUploadFailAlert(failCount) {
+        // Crear o actualizar alerta persistente
+        let alert = $('#upload-fail-alert');
+        if (!alert) {
+            alert = document.createElement('div');
+            alert.id = 'upload-fail-alert';
+            alert.className = 'upload-fail-alert';
+            document.body.appendChild(alert);
+        }
+        alert.innerHTML =
+            '<div class="ufa-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>' +
+            '<div class="ufa-content">' +
+            '<strong>' + failCount + ' foto' + (failCount > 1 ? 's' : '') + ' no se ' + (failCount > 1 ? 'pudieron' : 'pudo') + ' subir</strong>' +
+            '<div class="ufa-detail">NO borres las fotos de tu galería. Se reintentará automáticamente. Tu administrador ha sido notificado.</div>' +
+            '</div>' +
+            '<button class="ufa-close" onclick="this.parentElement.classList.add(\'hidden\')"><i class="bi bi-x"></i></button>';
+        alert.classList.remove('hidden');
     }
 
     function registerServiceWorker() {

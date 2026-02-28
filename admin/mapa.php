@@ -152,6 +152,64 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         .map-filter-bar label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; margin-bottom: 0; }
         .filter-group { display: flex; flex-direction: column; gap: 2px; }
 
+        /* Responsive: mobile filter drawer */
+        .filter-toggle-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #1e3a5f;
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            #map { height: calc(100vh - 130px); min-height: 300px; }
+            .map-filter-bar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1100;
+                background: #fff;
+                padding: 20px;
+                flex-direction: column;
+                align-items: stretch;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .map-filter-bar.open {
+                transform: translateX(0);
+            }
+            .map-filter-bar .filter-group { width: 100%; }
+            .map-filter-bar .form-select, .map-filter-bar .form-control { width: 100% !important; }
+            .filter-toggle-btn { display: flex; align-items: center; justify-content: center; }
+            .map-stats-bar { flex-wrap: wrap; gap: 10px; padding: 6px 12px; }
+            .stat-pill { font-size: 0.72rem; }
+            .filter-close-btn {
+                display: flex;
+                align-self: flex-end;
+                background: none;
+                border: none;
+                font-size: 1.4rem;
+                color: #6b7280;
+                cursor: pointer;
+                margin-bottom: 10px;
+            }
+        }
+        @media (min-width: 769px) {
+            .filter-close-btn { display: none; }
+        }
+
         .map-stats-bar {
             background: #fff; padding: 8px 20px;
             border-bottom: 1px solid #e5e7eb;
@@ -206,8 +264,14 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
     <?php if ($empresaId > 0 && !empty($registros)): ?>
 
+    <!-- Mobile filter toggle -->
+    <button class="filter-toggle-btn" id="btn-filter-toggle" onclick="toggleFilterDrawer()">
+        <i class="bi bi-funnel-fill"></i>
+    </button>
+
     <!-- Filter bar -->
-    <div class="map-filter-bar">
+    <div class="map-filter-bar" id="filter-drawer">
+        <button class="filter-close-btn" onclick="toggleFilterDrawer()"><i class="bi bi-x-lg"></i> Cerrar filtros</button>
         <div class="filter-group">
             <label>Empresa</label>
             <form method="get" id="form-empresa">
@@ -728,6 +792,12 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         };
     })();
     <?php endif; ?>
+
+    // Filter drawer toggle (mobile)
+    window.toggleFilterDrawer = function() {
+        var drawer = document.getElementById('filter-drawer');
+        if (drawer) drawer.classList.toggle('open');
+    };
     </script>
 </body>
 </html>

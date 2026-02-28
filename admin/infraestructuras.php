@@ -143,7 +143,11 @@ if ($empresaId > 0) {
     if ($row) $empresaNombre = $row['nombre'];
 
     $stmt = $pdo->prepare(
-        "SELECT i.*, (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id) AS num_registros
+        "SELECT i.*,
+                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id) AS num_registros,
+                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id AND r.estado_incidencia = 'critico') AS num_criticas,
+                (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado,
+                (SELECT r3.fecha FROM registros r3 WHERE r3.infra_id = i.id ORDER BY r3.fecha DESC LIMIT 1) AS ultima_inspeccion
          FROM infraestructuras i
          WHERE i.empresa_id = :emp_id
          ORDER BY i.activa DESC, i.nombre ASC"
@@ -184,8 +188,20 @@ if (isset($_GET['edit'])) {
         }
         .infra-card:hover { transform: translateX(2px); }
         .infra-card.inactive { opacity: 0.5; border-left-color: #d1d5db; }
+        .infra-card.status-critico { border-left-color: #ef4444; }
+        .infra-card.status-medio { border-left-color: #eab308; }
+        .infra-card.status-bajo { border-left-color: #22c55e; }
+        .infra-card.status-none { border-left-color: #d1d5db; }
         .tipo-badge { font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; background: #e0e7ff; color: #4338ca; }
         .coord-text { font-size: 0.75rem; color: #6b7280; font-family: monospace; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .status-dot.bajo { background: #22c55e; }
+        .status-dot.medio { background: #eab308; }
+        .status-dot.critico { background: #ef4444; animation: pulse-critical 2s infinite; }
+        .status-dot.none { background: #d1d5db; }
+        @keyframes pulse-critical { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); } }
+        .critical-badge { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; background: #fee2e2; color: #dc2626; font-weight: 700; }
+        .time-ago { font-size: 0.7rem; color: #9ca3af; }
     </style>
 </head>
 <body>
@@ -319,10 +335,17 @@ if (isset($_GET['edit'])) {
 
         <!-- Lista de infraestructuras -->
         <?php foreach ($infraestructuras as $inf): ?>
-            <div class="infra-card <?= $inf['activa'] ? '' : 'inactive' ?>">
+            <?php
+            $lastStatus = $inf['ultimo_estado'] ?? 'none';
+            $statusClass = $inf['activa'] ? 'status-' . $lastStatus : 'inactive';
+            $ultimaFecha = $inf['ultima_inspeccion'] ?? null;
+            $diasSinInspeccion = $ultimaFecha ? (int)((time() - strtotime($ultimaFecha)) / 86400) : null;
+            ?>
+            <div class="infra-card <?= $statusClass ?>">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                     <div class="flex-grow-1">
                         <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="status-dot <?= $lastStatus ?>" title="Último estado: <?= $lastStatus === 'none' ? 'sin inspecciones' : $lastStatus ?>"></span>
                             <strong><?= htmlspecialchars($inf['nombre']) ?></strong>
                             <code class="small" style="color:#2d6a9f;"><?= htmlspecialchars($inf['codigo_unico']) ?></code>
                             <?php if ($inf['tipo']): ?>
@@ -331,8 +354,11 @@ if (isset($_GET['edit'])) {
                             <?php if (!$inf['activa']): ?>
                                 <span class="badge bg-danger" style="font-size:0.65rem;">Inactiva</span>
                             <?php endif; ?>
+                            <?php if ((int)($inf['num_criticas'] ?? 0) > 0): ?>
+                                <span class="critical-badge"><i class="bi bi-exclamation-triangle-fill"></i> <?= $inf['num_criticas'] ?> crítica<?= $inf['num_criticas'] > 1 ? 's' : '' ?></span>
+                            <?php endif; ?>
                         </div>
-                        <div class="d-flex gap-3 flex-wrap">
+                        <div class="d-flex gap-3 flex-wrap align-items-center">
                             <?php if (!empty($inf['provincia']) || !empty($inf['municipio'])): ?>
                                 <span class="small text-muted">
                                     <i class="bi bi-pin-map"></i>
@@ -346,6 +372,22 @@ if (isset($_GET['edit'])) {
                             <span class="small text-muted">
                                 <i class="bi bi-camera"></i> <?= $inf['num_registros'] ?> inspecciones
                             </span>
+                            <?php if ($ultimaFecha): ?>
+                                <span class="time-ago" title="<?= date('d/m/Y H:i', strtotime($ultimaFecha)) ?>">
+                                    <i class="bi bi-clock"></i>
+                                    <?php if ($diasSinInspeccion === 0): ?>
+                                        Hoy
+                                    <?php elseif ($diasSinInspeccion === 1): ?>
+                                        Ayer
+                                    <?php elseif ($diasSinInspeccion < 30): ?>
+                                        Hace <?= $diasSinInspeccion ?> días
+                                    <?php else: ?>
+                                        <?= date('d/m/Y', strtotime($ultimaFecha)) ?>
+                                    <?php endif; ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="time-ago"><i class="bi bi-clock"></i> Sin inspecciones</span>
+                            <?php endif; ?>
                             <?php if ($inf['descripcion']): ?>
                                 <span class="small text-muted">
                                     <?= htmlspecialchars(mb_substr($inf['descripcion'], 0, 60)) ?>
