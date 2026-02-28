@@ -187,6 +187,9 @@ $ultimasEmpresas = $pdo->query(
                     <div class="small" style="opacity:0.5;font-size:0.7rem;"><?= htmlspecialchars($user['email']) ?></div>
                 </div>
             </div>
+            <a href="perfil.php" class="btn btn-sm btn-outline-light w-100 mb-2" style="font-size:0.8rem;">
+                <i class="bi bi-person-gear"></i> Mi Perfil
+            </a>
             <a href="logout.php" class="btn btn-sm btn-outline-light w-100" style="opacity:0.6;font-size:0.8rem;">
                 <i class="bi bi-box-arrow-left"></i> Cerrar sesión
             </a>

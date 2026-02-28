@@ -29,8 +29,13 @@
         photos: [], // { url, type, seq, name }
         countAleatorias: 0,
         countComparativas: 0,
+        countTotal: 0, // contador global por infraestructura
         prevPhotos: [], // fotos comparativas de visita anterior
+        situacionIdx: 0, // 0=antes, 1=durante, 2=despues
     };
+
+    const SITUACIONES = ['antes', 'durante', 'despues'];
+    const SITUACIONES_UI = ['ANTES', 'DURANTE', 'DESPUÉS'];
 
     // ===================================================================
     // DOM REFS
@@ -77,6 +82,8 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
+    const btnSituacion   = $('#btn-situacion');
+    const situacionLabel = $('#situacion-label');
 
     // Preview
     const previewCanvas  = $('#preview-canvas');
@@ -490,6 +497,12 @@
         state.infraId = id;
         state.infraName = name;
         state.infraCode = code || name;
+        // Reiniciar contadores al cambiar de infraestructura
+        state.countAleatorias = 0;
+        state.countComparativas = 0;
+        state.countTotal = 0;
+        state.seqComparativa = 0;
+        state.photos = [];
         infraIdInput.value = id;
         infraSearch.classList.add('hidden');
         infraResults.classList.add('hidden');
@@ -764,18 +777,21 @@
 
         camVideo.pause();
 
-        // Generate filename: InfrastructureName_AL001 or InfrastructureName_COMP001
-        let filename = '';
+        // Generate filename: NombreInfra_ALE_ANT_001 or NombreInfra_COMP_DUR_002
+        const sitCodes = { antes: 'ANT', durante: 'DUR', despues: 'DES' };
+        const sitCode = sitCodes[SITUACIONES[state.situacionIdx]] || 'ANT';
+        const modeCode = state.currentMode === 'comparativo' ? 'COMP' : 'ALE';
+
+        state.countTotal++;
         if (state.currentMode === 'comparativo') {
             state.seqComparativa++;
             state.countComparativas++;
-            const seqNum = String(state.countComparativas).padStart(3, '0');
-            filename = `${sanitizeFilename(state.infraName)}_COMP${seqNum}`;
         } else {
             state.countAleatorias++;
-            const seqNum = String(state.countAleatorias).padStart(3, '0');
-            filename = `${sanitizeFilename(state.infraName)}_AL${seqNum}`;
         }
+
+        const seqNum = String(state.countTotal).padStart(3, '0');
+        const filename = `${sanitizeFilename(state.infraName)}_${modeCode}_${sitCode}_${seqNum}`;
 
         // Apply watermark directly on previewCanvas (used for blob generation)
         await applyWatermark(camCapture, previewCanvas, {
@@ -784,6 +800,7 @@
             infraName: state.infraName,
             infraCode: state.infraCode,
             empresaName: CFG.empresaName,
+            situacion: SITUACIONES_UI[state.situacionIdx],
             filename: filename,
             mode: state.currentMode,
             seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
@@ -842,7 +859,7 @@
             usuario_id: CFG.usuarioId,
             lat_real: state.gps.lat || 0,
             lon_real: state.gps.lon || 0,
-            estado_incidencia: 'bajo',
+            estado_incidencia: SITUACIONES[state.situacionIdx],
             tipo_foto: state.currentMode,
             nombre_archivo: filename,
             observaciones: $('#observaciones-general').value || '',
@@ -1002,16 +1019,17 @@
         ctx.drawImage(sourceCanvas, 0, 0);
 
         // 2. Info text block — bottom-right
-        // Lines: Empresa, Infraestructura, Fecha, Coordenadas
+        // Lines: Empresa, Infraestructura, Situación, Fecha, Coordenadas
         const fontSize = Math.max(14, Math.round(h * 0.02));
         const lineHeight = fontSize * 1.5;
-        const numLines = 4;
+        const numLines = 5;
         const padding = 16;
         const blockHeight = lineHeight * numLines + padding * 2;
 
         // Prepare text lines first to measure widths
         const empresaStr = meta.empresaName || '';
         const infraStr = meta.infraName || '';
+        const situacionStr = meta.situacion ? `Situación: ${meta.situacion}` : '';
         const dateStr = formatDateMadrid();
         const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
         const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
@@ -1019,7 +1037,7 @@
 
         // Measure max text width to auto-size block
         ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        const boldWidths = [ctx.measureText(empresaStr).width];
+        const boldWidths = [ctx.measureText(empresaStr).width, ctx.measureText(situacionStr).width];
         ctx.font = `${fontSize}px -apple-system, sans-serif`;
         const normalWidths = [
             ctx.measureText(infraStr).width,
@@ -1053,11 +1071,17 @@
         ctx.fillText(infraStr, textX, textY);
         textY += lineHeight;
 
-        // Line 3: Fecha
+        // Line 3: Situación
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        ctx.fillText(situacionStr, textX, textY);
+        textY += lineHeight;
+
+        // Line 4: Fecha
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
         ctx.fillText(dateStr, textX, textY);
         textY += lineHeight;
 
-        // Line 4: Coordenadas
+        // Line 5: Coordenadas
         ctx.fillText(coordStr, textX, textY);
 
         // Reset text align
@@ -1232,6 +1256,15 @@
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
+
+        // Situación toggle
+        if (btnSituacion) {
+            btnSituacion.addEventListener('click', () => {
+                state.situacionIdx = (state.situacionIdx + 1) % SITUACIONES.length;
+                situacionLabel.textContent = SITUACIONES_UI[state.situacionIdx];
+                btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[state.situacionIdx];
+            });
+        }
 
         // Ghost toggle
         btnGhostToggle.addEventListener('click', () => {
@@ -1409,7 +1442,7 @@
 
             const bounds = [];
             const stateColors = {
-                'bajo': '#22c55e', 'medio': '#eab308', 'critico': '#ef4444',
+                'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e',
             };
 
             Object.values(allInfras).forEach(infra => {
@@ -1420,7 +1453,7 @@
 
                 if (hasPhotos) {
                     // Visited: colored circle with photo count
-                    const lastState = infra.registros[0]?.estado_incidencia || 'bajo';
+                    const lastState = infra.registros[0]?.estado_incidencia || 'antes';
                     const color = stateColors[lastState] || '#9ca3af';
                     const numPhotos = infra.registros.length;
 

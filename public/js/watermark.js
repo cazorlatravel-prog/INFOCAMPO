@@ -11,7 +11,7 @@ const Watermark = (() => {
      * en el canvas de preview con marca de agua.
      *
      * @param {HTMLCanvasElement} sourceCanvas  Canvas con la foto original
-     * @param {Object} meta  { lat, lon, code, fecha, empresaName, infraName }
+     * @param {Object} meta  { lat, lon, code, fecha, empresaName, infraName, situacion }
      */
     async function process(sourceCanvas, meta) {
         const w = sourceCanvas.width;
@@ -28,13 +28,14 @@ const Watermark = (() => {
         // 2. Bloque de info abajo-derecha
         const fontSize = Math.max(14, Math.round(h * 0.02));
         const lineHeight = fontSize * 1.5;
-        const numLines = 4;
+        const numLines = 5;
         const padding = 16;
         const blockHeight = lineHeight * numLines + padding * 2;
 
         // Prepare text lines to measure widths
         const empresaStr = meta.empresaName || '';
         const infraStr = meta.infraName || meta.code || '';
+        const situacionStr = meta.situacion ? `Situación: ${meta.situacion}` : '';
         const dateStr = meta.fecha.toLocaleString('es-ES', {
             timeZone: 'Europe/Madrid',
             day: '2-digit', month: '2-digit', year: 'numeric',
@@ -47,7 +48,7 @@ const Watermark = (() => {
 
         // Measure max text width to auto-size block
         ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        const boldWidths = [ctx.measureText(empresaStr).width];
+        const boldWidths = [ctx.measureText(empresaStr).width, ctx.measureText(situacionStr).width];
         ctx.font = `${fontSize}px -apple-system, sans-serif`;
         const normalWidths = [
             ctx.measureText(infraStr).width,
@@ -91,11 +92,17 @@ const Watermark = (() => {
         ctx.fillText(infraStr, textX, textY);
         textY += lineHeight;
 
-        // Line 3: Fecha
+        // Line 3: Situación
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        ctx.fillText(situacionStr, textX, textY);
+        textY += lineHeight;
+
+        // Line 4: Fecha
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
         ctx.fillText(dateStr, textX, textY);
         textY += lineHeight;
 
-        // Line 4: Coordenadas
+        // Line 5: Coordenadas
         ctx.fillText(coordStr, textX, textY);
 
         ctx.textAlign = 'start';

@@ -277,7 +277,7 @@
         formData.append('usuario_id', fd.usuario_id);
         formData.append('lat_real', fd.lat_real);
         formData.append('lon_real', fd.lon_real);
-        formData.append('estado_incidencia', fd.estado_incidencia || 'bajo');
+        formData.append('estado_incidencia', fd.estado_incidencia || 'antes');
         formData.append('tipo_foto', fd.tipo_foto || 'aleatorio');
         formData.append('nombre_archivo', fd.nombre_archivo || '');
         formData.append('observaciones', fd.observaciones || '');

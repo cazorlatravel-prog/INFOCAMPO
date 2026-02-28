@@ -77,11 +77,11 @@ if ($empresaId > 0) {
     $stmt->execute([':id' => $empresaId]);
     $stats['operadores'] = (int) $stmt->fetchColumn();
 
-    // Incidencias críticas 24h
+    // Registros "durante" (en progreso) últimas 24h
     $stmt = $pdo->prepare(
         "SELECT COUNT(*) FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.estado_incidencia = 'critico'
+         WHERE i.empresa_id = :id AND r.estado_incidencia = 'durante'
            AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
     );
     $stmt->execute([':id' => $empresaId]);
@@ -108,7 +108,7 @@ if ($empresaId > 0) {
     // Actividad diaria últimos 14 días
     $stmt = $pdo->prepare(
         "SELECT DATE(r.fecha) AS dia, COUNT(*) AS total,
-                SUM(r.estado_incidencia = 'critico') AS criticas
+                SUM(r.estado_incidencia = 'durante') AS criticas
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 14 DAY)
@@ -131,13 +131,13 @@ if ($empresaId > 0) {
     $stmt->execute([':id' => $empresaId]);
     $ultimosRegistros = $stmt->fetchAll();
 
-    // Incidencias críticas recientes
+    // Registros recientes "durante" (en progreso)
     $stmt = $pdo->prepare(
         "SELECT r.*, i.nombre AS infra_nombre, i.codigo_unico, u.nombre AS usuario_nombre
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          INNER JOIN usuarios u ON r.usuario_id = u.id
-         WHERE i.empresa_id = :id AND r.estado_incidencia = 'critico'
+         WHERE i.empresa_id = :id AND r.estado_incidencia = 'durante'
          ORDER BY r.fecha DESC
          LIMIT 5"
     );
@@ -244,13 +244,13 @@ for ($i = 13; $i >= 0; $i--) {
             width: 10px; height: 10px; border-radius: 50%;
             margin-top: 6px; flex-shrink: 0;
         }
-        .activity-dot.bajo { background: #22c55e; }
-        .activity-dot.medio { background: #eab308; }
-        .activity-dot.critico { background: #ef4444; }
+        .activity-dot.antes { background: #3b82f6; }
+        .activity-dot.durante { background: #f59e0b; }
+        .activity-dot.despues { background: #22c55e; }
         .badge-inc { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
         .critica-card {
-            background: linear-gradient(135deg, #fef2f2, #fff1f2);
-            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #eff6ff, #f0f7ff);
+            border-left: 4px solid #3b82f6;
             border-radius: 10px;
             padding: 14px 18px;
             margin-bottom: 10px;
@@ -321,14 +321,14 @@ for ($i = 13; $i >= 0; $i--) {
                 </div>
             </div>
             <div class="col-xl-3 col-md-6">
-                <div class="stat-card" <?= $stats['criticas_24h'] > 0 ? 'style="border:2px solid #fca5a5;"' : '' ?>>
+                <div class="stat-card" <?= $stats['criticas_24h'] > 0 ? 'style="border:2px solid #93c5fd;"' : '' ?>>
                     <div class="d-flex align-items-center gap-3 mb-2">
-                        <div class="stat-icon" style="background:#fee2e2;color:#dc2626;">
-                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        <div class="stat-icon" style="background:#dbeafe;color:#2563eb;">
+                            <i class="bi bi-clock-history"></i>
                         </div>
                         <div>
                             <div class="stat-value"><?= $stats['criticas_24h'] ?></div>
-                            <div class="stat-label">Alertas Criticas (24h)</div>
+                            <div class="stat-label">En Progreso (24h)</div>
                         </div>
                     </div>
                 </div>
@@ -419,7 +419,7 @@ for ($i = 13; $i >= 0; $i--) {
                                             </div>
                                             <?php
                                             $badgeClass = match($reg['estado_incidencia']) {
-                                                'bajo' => 'bg-success', 'medio' => 'bg-warning text-dark', 'critico' => 'bg-danger', default => 'bg-secondary',
+                                                'antes' => 'bg-primary', 'durante' => 'bg-warning text-dark', 'despues' => 'bg-success', default => 'bg-secondary',
                                             };
                                             ?>
                                             <span class="badge <?= $badgeClass ?> badge-inc"><?= strtoupper($reg['estado_incidencia']) ?></span>
@@ -442,12 +442,12 @@ for ($i = 13; $i >= 0; $i--) {
                 <div class="card mb-4">
                     <div class="card-body">
                         <h6 class="card-title mb-3">
-                            <i class="bi bi-exclamation-triangle text-danger me-2"></i>Incidencias Críticas
+                            <i class="bi bi-clock-history text-primary me-2"></i>En Progreso (Durante)
                         </h6>
                         <?php if (empty($incidenciasCriticas)): ?>
                             <div class="text-center py-3">
                                 <i class="bi bi-check-circle text-success" style="font-size:2rem;"></i>
-                                <p class="text-muted small mt-2 mb-0">Sin incidencias críticas recientes</p>
+                                <p class="text-muted small mt-2 mb-0">Sin registros en progreso recientes</p>
                             </div>
                         <?php else: ?>
                             <?php foreach ($incidenciasCriticas as $crit): ?>

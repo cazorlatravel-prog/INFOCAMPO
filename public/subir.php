@@ -8,7 +8,7 @@
  *   - usuario_id   : ID del usuario operador
  *   - lat_real     : latitud GPS real
  *   - lon_real     : longitud GPS real
- *   - estado_incidencia : bajo | medio | critico
+ *   - estado_incidencia : antes | durante | despues
  *   - datos_tecnicos    : JSON string
  *   - observaciones     : texto libre
  *
@@ -68,7 +68,7 @@ $infraId     = (int) $_POST['infra_id'];
 $usuarioId   = (int) $_POST['usuario_id'];
 $latReal     = (float) $_POST['lat_real'];
 $lonReal     = (float) $_POST['lon_real'];
-$incidencia  = $_POST['estado_incidencia'] ?? 'bajo';
+$incidencia  = $_POST['estado_incidencia'] ?? 'antes';
 $observaciones = isset($_POST['observaciones']) ? trim((string)$_POST['observaciones']) : null;
 $datosTecnicos = isset($_POST['datos_tecnicos']) ? $_POST['datos_tecnicos'] : null;
 
@@ -78,10 +78,10 @@ $secuenciaComparativa  = isset($_POST['secuencia_comparativa']) && $_POST['secue
 $nombreArchivo         = isset($_POST['nombre_archivo']) ? trim((string) $_POST['nombre_archivo']) : null;
 $unidadObraId          = isset($_POST['unidad_obra_id']) && $_POST['unidad_obra_id'] !== '' ? (int) $_POST['unidad_obra_id'] : null;
 
-// Validar enum de incidencia
-$incidenciasPermitidas = ['bajo', 'medio', 'critico'];
-if (!in_array($incidencia, $incidenciasPermitidas, true)) {
-    $incidencia = 'bajo';
+// Validar enum de situación
+$situacionesPermitidas = ['antes', 'durante', 'despues'];
+if (!in_array($incidencia, $situacionesPermitidas, true)) {
+    $incidencia = 'antes';
 }
 
 // Validar tipo de foto

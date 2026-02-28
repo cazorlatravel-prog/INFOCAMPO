@@ -119,7 +119,7 @@ foreach ($registros as $r) {
 // Stats
 $totalFotos = count($registros);
 $totalComp = count(array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') === 'comparativo'));
-$totalCriticas = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'critico'));
+$totalCriticas = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'durante'));
 $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 ?>
 <!DOCTYPE html>
@@ -235,9 +235,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         .popup-photo .popup-actions { margin-top: 6px; display: flex; gap: 4px; }
         .popup-photo .popup-actions a { font-size: 0.7rem; }
         .popup-badge { display: inline-block; font-size: 0.6rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
-        .popup-badge.bajo { background: #dcfce7; color: #166534; }
-        .popup-badge.medio { background: #fef9c3; color: #854d0e; }
-        .popup-badge.critico { background: #fee2e2; color: #dc2626; }
+        .popup-badge.antes { background: #dbeafe; color: #1e40af; }
+        .popup-badge.durante { background: #fef9c3; color: #854d0e; }
+        .popup-badge.despues { background: #dcfce7; color: #166534; }
         .popup-badge.aleatorio { background: #dbeafe; color: #1d4ed8; }
         .popup-badge.comparativo { background: #ede9fe; color: #6d28d9; }
 
@@ -320,12 +320,12 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             </select>
         </div>
         <div class="filter-group">
-            <label>Estado</label>
+            <label>Situación</label>
             <select id="filter-estado" class="form-select" style="width:110px;">
                 <option value="">Todos</option>
-                <option value="bajo">Bajo</option>
-                <option value="medio">Medio</option>
-                <option value="critico">Critico</option>
+                <option value="antes">Antes</option>
+                <option value="durante">Durante</option>
+                <option value="despues">Después</option>
             </select>
         </div>
         <div class="filter-group">
@@ -356,7 +356,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div class="stat-pill"><strong id="stat-fotos"><?= $totalFotos ?></strong> fotos</div>
         <div class="stat-pill"><strong id="stat-infras"><?= $totalInfras ?></strong> infraestructuras</div>
         <div class="stat-pill" style="color:#7c3aed;"><strong id="stat-comp"><?= $totalComp ?></strong> comparativas</div>
-        <div class="stat-pill" style="color:#dc2626;"><strong id="stat-criticas"><?= $totalCriticas ?></strong> criticas</div>
+        <div class="stat-pill" style="color:#f59e0b;"><strong id="stat-criticas"><?= $totalCriticas ?></strong> durante</div>
     </div>
 
     <!-- Map -->
@@ -399,7 +399,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         var map = L.map('map');
         var clusterGroup = null;
 
-        var stateColors = { 'bajo': '#22c55e', 'medio': '#eab308', 'critico': '#ef4444' };
+        var stateColors = { 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e' };
 
         // Tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -491,7 +491,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             document.getElementById('stat-fotos').textContent = data.length;
             document.getElementById('stat-infras').textContent = Object.keys(infras).length;
             document.getElementById('stat-comp').textContent = data.filter(function(r) { return r.tipo === 'comparativo'; }).length;
-            document.getElementById('stat-criticas').textContent = data.filter(function(r) { return r.estado === 'critico'; }).length;
+            document.getElementById('stat-criticas').textContent = data.filter(function(r) { return r.estado === 'durante'; }).length;
         }
 
         function applyFilters() {
