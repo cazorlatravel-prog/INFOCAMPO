@@ -398,6 +398,27 @@ if ($initials === '') $initials = 'OP';
         <button type="button" id="sync-notif-close" class="sync-notif-close"><i class="bi bi-x"></i></button>
     </div>
 
+    <!-- Banner persistente de cola offline -->
+    <div id="offline-queue-banner" class="offline-queue-banner hidden">
+        <div class="oq-banner-left">
+            <div class="oq-banner-icon">
+                <i class="bi bi-cloud-arrow-up"></i>
+            </div>
+            <div class="oq-banner-info">
+                <strong id="oq-banner-count">0</strong> <span id="oq-banner-label">fotos pendientes</span>
+                <div id="oq-banner-status" class="oq-banner-status">Esperando conexión...</div>
+            </div>
+        </div>
+        <div class="oq-banner-right">
+            <div id="oq-banner-progress" class="oq-banner-progress" style="display:none;">
+                <div id="oq-banner-progress-fill" class="oq-banner-progress-fill"></div>
+            </div>
+            <button type="button" id="oq-banner-sync" class="oq-banner-btn" onclick="InfocampoOffline.syncQueue()" title="Sincronizar ahora">
+                <i class="bi bi-arrow-repeat"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- Config -->
     <script>
         window.INFOCAMPO = {

@@ -143,6 +143,20 @@
                     dot.className = 'offline-dot offline';
                     text.textContent = 'Sin conexión';
                 }
+
+                // Actualizar banner de cola offline
+                const banner = $('#offline-queue-banner');
+                if (banner && !banner.classList.contains('hidden')) {
+                    const statusEl = $('#oq-banner-status');
+                    if (!online) {
+                        banner.classList.add('offline-mode');
+                        banner.classList.remove('syncing');
+                        if (statusEl) statusEl.textContent = 'Sin conexión — se subirán al reconectar';
+                    } else {
+                        banner.classList.remove('offline-mode');
+                        if (statusEl) statusEl.textContent = 'Conexión disponible — listo para sincronizar';
+                    }
+                }
             },
             onQueueChange: (count) => {
                 const badge = $('#sync-queue-badge');
@@ -156,12 +170,50 @@
                     const syncCount = $('#sync-count');
                     if (syncCount) syncCount.textContent = count;
                 }
+
+                // Actualizar banner persistente de cola
+                const banner = $('#offline-queue-banner');
+                const countEl = $('#oq-banner-count');
+                const labelEl = $('#oq-banner-label');
+                const statusEl = $('#oq-banner-status');
+                if (banner) {
+                    if (count > 0) {
+                        banner.classList.remove('hidden');
+                        if (countEl) countEl.textContent = count;
+                        if (labelEl) labelEl.textContent = count === 1 ? 'foto pendiente' : 'fotos pendientes';
+                        if (statusEl && !navigator.onLine) {
+                            statusEl.textContent = 'Sin conexión — se subirán al reconectar';
+                            banner.classList.add('offline-mode');
+                        } else if (statusEl) {
+                            statusEl.textContent = 'Listo para sincronizar';
+                            banner.classList.remove('offline-mode');
+                        }
+                    } else {
+                        banner.classList.add('hidden');
+                        banner.classList.remove('syncing', 'offline-mode');
+                    }
+                }
             },
             onSyncProgress: ({ synced, total, current }) => {
                 const bar = $('#sync-progress-bar');
                 const text = $('#sync-progress-text');
                 if (bar) bar.style.width = ((synced / total) * 100) + '%';
                 if (text) text.textContent = `Subiendo ${synced + 1}/${total}: ${current}`;
+
+                // Actualizar banner con progreso
+                const banner = $('#offline-queue-banner');
+                const progressWrap = $('#oq-banner-progress');
+                const progressFill = $('#oq-banner-progress-fill');
+                const statusEl = $('#oq-banner-status');
+                const btnSync = $('#oq-banner-sync');
+                if (banner) {
+                    banner.classList.add('syncing');
+                    banner.classList.remove('offline-mode');
+                }
+                if (progressWrap) progressWrap.style.display = 'block';
+                if (progressFill) progressFill.style.width = ((synced / total) * 100) + '%';
+                if (statusEl) statusEl.textContent = `Subiendo ${synced + 1} de ${total}...`;
+                if (btnSync) btnSync.classList.add('spinning');
             },
             onSyncComplete: (results) => {
                 const ok = results.filter(r => r.ok).length;
@@ -170,6 +222,14 @@
                 if (bar) bar.style.width = '100%';
 
                 showSyncNotification(ok, fail);
+
+                // Limpiar banner de progreso
+                const banner = $('#offline-queue-banner');
+                const progressWrap = $('#oq-banner-progress');
+                const btnSync = $('#oq-banner-sync');
+                if (banner) banner.classList.remove('syncing');
+                if (progressWrap) progressWrap.style.display = 'none';
+                if (btnSync) btnSync.classList.remove('spinning');
 
                 // Reload gallery with synced photos
                 results.forEach(r => {

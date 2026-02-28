@@ -7,7 +7,7 @@
  *   - Fallback page when completely offline
  */
 
-const CACHE_NAME = 'infocampo-v5';
+const CACHE_NAME = 'infocampo-v6';
 const STATIC_ASSETS = [
     'css/operador.css',
     'js/operador.js',

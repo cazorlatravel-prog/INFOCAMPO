@@ -71,6 +71,27 @@ if ($empresaId > 0) {
     $registros = $stmt->fetchAll();
 }
 
+// Preparar datos de infraestructuras con coordenadas teóricas para drag & drop
+$jsInfras = [];
+if ($empresaId > 0) {
+    $stmtInfra = $pdo->prepare(
+        "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo
+         FROM infraestructuras
+         WHERE empresa_id = :emp AND activa = 1 AND lat_teorica IS NOT NULL AND lon_teorica IS NOT NULL"
+    );
+    $stmtInfra->execute([':emp' => $empresaId]);
+    foreach ($stmtInfra->fetchAll() as $inf) {
+        $jsInfras[] = [
+            'id' => (int) $inf['id'],
+            'nombre' => $inf['nombre'],
+            'codigo' => $inf['codigo_unico'],
+            'lat' => (float) $inf['lat_teorica'],
+            'lon' => (float) $inf['lon_teorica'],
+            'tipo' => $inf['tipo'] ?? '',
+        ];
+    }
+}
+
 // Preparar datos para JS
 $jsRegistros = [];
 foreach ($registros as $r) {
@@ -162,6 +183,15 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         .popup-badge.aleatorio { background: #dbeafe; color: #1d4ed8; }
         .popup-badge.comparativo { background: #ede9fe; color: #6d28d9; }
 
+        /* Drag toast */
+        .drag-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #1e3a5f; color: #fff; padding: 10px 20px; border-radius: 10px;
+            font-size: 0.85rem; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
         /* Cluster override */
         .marker-cluster-small { background-color: rgba(45,106,159,0.3); }
         .marker-cluster-small div { background-color: rgba(45,106,159,0.7); color: #fff; }
@@ -233,6 +263,12 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 <option value="medio">Medio</option>
                 <option value="critico">Critico</option>
             </select>
+        </div>
+        <div class="filter-group">
+            <label>Infraestructuras</label>
+            <button class="btn btn-sm btn-outline-primary" id="btn-toggle-infra-markers" onclick="toggleInfraMarkers()" title="Mostrar/ocultar posiciones teóricas de infraestructuras (arrastrables)">
+                <i class="bi bi-pin-map"></i> Posiciones
+            </button>
         </div>
         <div class="filter-group">
             <label>Capa KML</label>
@@ -429,6 +465,123 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
         // Initial render
         renderMarkers(allData);
+
+        // ---------------------------------------------------------------
+        // Infraestructura Markers - Drag & Drop para reubicar
+        // ---------------------------------------------------------------
+        var infraData = <?= json_encode($jsInfras, JSON_UNESCAPED_UNICODE) ?>;
+        var csrfToken = '<?= csrfToken() ?>';
+        var infraLayerGroup = null;
+        var infraMarkersVisible = false;
+
+        window.toggleInfraMarkers = function() {
+            var btn = document.getElementById('btn-toggle-infra-markers');
+            if (infraMarkersVisible) {
+                // Hide
+                if (infraLayerGroup) map.removeLayer(infraLayerGroup);
+                infraMarkersVisible = false;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-primary');
+            } else {
+                // Show
+                renderInfraMarkers();
+                infraMarkersVisible = true;
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-primary');
+            }
+        };
+
+        function renderInfraMarkers() {
+            if (infraLayerGroup) map.removeLayer(infraLayerGroup);
+            infraLayerGroup = L.layerGroup().addTo(map);
+
+            infraData.forEach(function(inf) {
+                if (!inf.lat || !inf.lon) return;
+
+                var icon = L.divIcon({
+                    className: 'infra-drag-marker',
+                    html: '<div style="width:20px;height:20px;border-radius:4px;background:#1e3a5f;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;cursor:grab;">' +
+                          '<i class="bi bi-arrows-move" style="color:#fff;font-size:10px;"></i></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10],
+                });
+
+                var marker = L.marker([inf.lat, inf.lon], {
+                    icon: icon,
+                    draggable: true,
+                    title: inf.nombre + ' (' + inf.codigo + ') - Arrastra para reubicar',
+                });
+
+                marker.bindPopup(
+                    '<div style="min-width:180px;">' +
+                    '<strong>' + inf.nombre + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
+                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + inf.tipo + '</span>' : '') +
+                    '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
+                    '<br><small style="color:#059669;"><i class="bi bi-arrows-move"></i> Arrastra para reubicar</small>' +
+                    '</div>'
+                );
+
+                marker.on('dragend', function(e) {
+                    var newLatLng = e.target.getLatLng();
+                    updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
+                });
+
+                marker.addTo(infraLayerGroup);
+            });
+        }
+
+        async function updateInfraCoords(infraId, nombre, lat, lon, marker) {
+            var formData = new FormData();
+            formData.append('infra_id', infraId);
+            formData.append('lat', lat.toFixed(7));
+            formData.append('lon', lon.toFixed(7));
+            formData.append('empresa_id', empresaId);
+            formData.append('csrf_token', csrfToken);
+
+            try {
+                var resp = await fetch('api/actualizar_coordenadas.php', {
+                    method: 'POST',
+                    body: formData,
+                });
+                var data = await resp.json();
+
+                if (data.ok) {
+                    // Actualizar datos locales
+                    infraData.forEach(function(inf) {
+                        if (inf.id === infraId) { inf.lat = lat; inf.lon = lon; }
+                    });
+
+                    // Actualizar popup
+                    marker.setPopupContent(
+                        '<div style="min-width:180px;">' +
+                        '<strong>' + nombre + '</strong><br>' +
+                        '<small class="text-muted"><i class="bi bi-geo-alt"></i> ' + lat.toFixed(7) + ', ' + lon.toFixed(7) + '</small>' +
+                        '<br><span style="color:#059669;font-size:0.75rem;"><i class="bi bi-check-circle"></i> Ubicación guardada</span>' +
+                        '</div>'
+                    );
+
+                    showDragToast(nombre + ' reubicada correctamente', 'success');
+                } else {
+                    showDragToast('Error: ' + (data.error || 'No se pudo guardar'), 'error');
+                }
+            } catch (err) {
+                showDragToast('Error de conexión al guardar', 'error');
+            }
+        }
+
+        function showDragToast(message, type) {
+            var existing = document.querySelector('.drag-toast');
+            if (existing) existing.remove();
+
+            var toast = document.createElement('div');
+            toast.className = 'drag-toast';
+            toast.style.background = type === 'success' ? '#059669' : '#dc2626';
+            toast.innerHTML = '<i class="bi bi-' + (type === 'success' ? 'check-circle' : 'x-circle') + ' me-1"></i>' + message;
+            document.body.appendChild(toast);
+
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
 
         // ---------------------------------------------------------------
         // KML Overlay - Visualización de capas KML en el mapa

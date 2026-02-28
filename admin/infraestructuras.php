@@ -206,6 +206,9 @@ if (isset($_GET['edit'])) {
                     </select>
                 </form>
                 <?php if ($empresaId > 0): ?>
+                    <a href="exportar_csv.php?tipo=infraestructuras&empresa_id=<?= $empresaId ?>" class="btn btn-outline-secondary btn-sm" title="Exportar a CSV/Excel">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+                    </a>
                     <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalKml">
                         <i class="bi bi-file-earmark-arrow-up"></i> Importar KML
                     </button>
