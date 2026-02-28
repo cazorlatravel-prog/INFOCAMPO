@@ -524,7 +524,12 @@
         try {
             if (!state.stream) {
                 state.stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1080 },
+                        height: { ideal: 1440 },
+                        aspectRatio: { ideal: 3 / 4 },
+                    },
                     audio: false,
                 });
             }
@@ -645,11 +650,27 @@
     async function captureFrame() {
         const vw = camVideo.videoWidth;
         const vh = camVideo.videoHeight;
-        camCapture.width = vw;
-        camCapture.height = vh;
+
+        // Force 3:4 portrait crop from center of video frame
+        let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
+        const targetRatio = 3 / 4; // width / height
+        const videoRatio = vw / vh;
+
+        if (videoRatio > targetRatio) {
+            // Video is wider than 3:4 — crop sides
+            srcW = Math.round(vh * targetRatio);
+            srcX = Math.round((vw - srcW) / 2);
+        } else if (videoRatio < targetRatio) {
+            // Video is taller than 3:4 — crop top/bottom
+            srcH = Math.round(vw / targetRatio);
+            srcY = Math.round((vh - srcH) / 2);
+        }
+
+        camCapture.width = srcW;
+        camCapture.height = srcH;
 
         const ctx = camCapture.getContext('2d');
-        ctx.drawImage(camVideo, 0, 0, vw, vh);
+        ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
         camVideo.pause();
 
@@ -892,12 +913,31 @@
 
         // 2. Info text block — bottom-right
         // Lines: Empresa, Infraestructura, Fecha, Coordenadas
-        const fontSize = Math.max(13, Math.round(h * 0.018));
+        const fontSize = Math.max(14, Math.round(h * 0.02));
         const lineHeight = fontSize * 1.5;
         const numLines = 4;
         const padding = 16;
         const blockHeight = lineHeight * numLines + padding * 2;
-        const blockWidth = Math.max(280, Math.round(w * 0.35));
+
+        // Prepare text lines first to measure widths
+        const empresaStr = meta.empresaName || '';
+        const infraStr = meta.infraName || '';
+        const dateStr = formatDateMadrid();
+        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
+        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
+        const coordStr = `ETRS89: ${latStr}, ${lonStr}`;
+
+        // Measure max text width to auto-size block
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        const boldWidths = [ctx.measureText(empresaStr).width];
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
+        const normalWidths = [
+            ctx.measureText(infraStr).width,
+            ctx.measureText(dateStr).width,
+            ctx.measureText(coordStr).width,
+        ];
+        const maxTextWidth = Math.max(...boldWidths, ...normalWidths);
+        const blockWidth = Math.min(w - 24, maxTextWidth + padding * 2);
 
         // Semi-transparent background block (bottom-right)
         const bx = w - blockWidth - 12;
@@ -915,29 +955,25 @@
         let textY = by + padding;
 
         // Line 1: Nombre Empresa
-        const empresaStr = meta.empresaName || '';
         ctx.fillText(empresaStr, textX, textY);
         textY += lineHeight;
 
         // Line 2: Infraestructura
         ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(meta.infraName || '', textX, textY);
+        ctx.fillText(infraStr, textX, textY);
         textY += lineHeight;
 
         // Line 3: Fecha
-        const dateStr = formatDateMadrid();
         ctx.fillText(dateStr, textX, textY);
         textY += lineHeight;
 
         // Line 4: Coordenadas
-        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
-        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
-        ctx.fillText(`ETRS89: ${latStr}, ${lonStr}`, textX, textY);
+        ctx.fillText(coordStr, textX, textY);
 
         // Reset text align
         ctx.textAlign = 'start';
 
-        // 3. Mini-map OSM (top-left, 1/8 of image)
+        // 3. Mini-map OSM (top-left, 1/6 of image)
         await drawMiniMap(ctx, w, h, meta.lat, meta.lon);
 
         // Save blob for later
@@ -947,8 +983,8 @@
     async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
         if (lat == null || lon == null) return;
 
-        // 1/8 of image size, positioned top-left, flush to corner
-        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 8);
+        // 1/6 of image size, positioned top-left, flush to corner
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 6);
         const x = 0;
         const y = 0;
 
