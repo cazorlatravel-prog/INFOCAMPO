@@ -93,7 +93,7 @@ try {
     echo "<span class='ok'>[OK]</span> Conexión establecida: " . DB_HOST . " / " . DB_NAME . "\n\n";
 
     // Leer archivos SQL (schema.sql + schema_v2.sql si existe)
-    $sqlFiles = ['schema.sql', 'schema_v2.sql', 'schema_v3.sql', 'schema_v4.sql', 'schema_v5.sql', 'schema_v6.sql'];
+    $sqlFiles = ['schema.sql', 'schema_v2.sql', 'schema_v3.sql', 'schema_v4.sql', 'schema_v5.sql', 'schema_v6.sql', 'schema_v7.sql'];
     $sql = '';
     foreach ($sqlFiles as $sf) {
         $sqlFile = __DIR__ . '/' . $sf;

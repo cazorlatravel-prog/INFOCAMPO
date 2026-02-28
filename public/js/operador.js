@@ -1315,6 +1315,9 @@
     let mapMarkers = [];
     let mapSelectedInfra = null; // { id, nombre, codigo, lat, lon, registros }
     let mapUserMarker = null;
+    let mapKmlLayers = []; // KML layer groups
+    let mapActiveBaseLayer = null;
+    const mapBaseLayers = {};
 
     async function openMapScreen() {
         showScreen('mapa');
@@ -1324,10 +1327,44 @@
         if (!leafletMap) {
             leafletMap = L.map('op-map', { zoomControl: false });
             L.control.zoom({ position: 'topright' }).addTo(leafletMap);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OSM',
-                maxZoom: 19,
-            }).addTo(leafletMap);
+
+            // Base layers
+            mapBaseLayers.osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OSM', maxZoom: 19,
+            });
+            mapBaseLayers.ortofoto = L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
+                layers: 'ortofoto_2020', format: 'image/png', transparent: false,
+                attribution: '&copy; Junta de Andalucía', maxZoom: 20,
+            });
+            mapBaseLayers.topografico = L.tileLayer.wms('https://www.ideandalucia.es/wms/mta10r_2001-2013?', {
+                layers: 'mta10r_2001-2013', format: 'image/png', transparent: false,
+                attribution: '&copy; IDEAndalucía', maxZoom: 20,
+            });
+
+            mapActiveBaseLayer = mapBaseLayers.osm;
+            mapActiveBaseLayer.addTo(leafletMap);
+
+            // Layer switcher control (top-left)
+            const layerControl = L.control({ position: 'topleft' });
+            layerControl.onAdd = function() {
+                const div = L.DomUtil.create('div', 'op-layer-switcher');
+                div.innerHTML =
+                    '<select id="op-base-layer-select" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;">' +
+                    '<option value="osm">Mapa</option>' +
+                    '<option value="ortofoto">Ortofoto</option>' +
+                    '<option value="topografico">Topográfico</option>' +
+                    '</select>';
+                L.DomEvent.disableClickPropagation(div);
+                return div;
+            };
+            layerControl.addTo(leafletMap);
+
+            document.getElementById('op-base-layer-select').addEventListener('change', function() {
+                if (mapActiveBaseLayer) leafletMap.removeLayer(mapActiveBaseLayer);
+                mapActiveBaseLayer = mapBaseLayers[this.value] || mapBaseLayers.osm;
+                mapActiveBaseLayer.addTo(leafletMap);
+                mapActiveBaseLayer.bringToBack();
+            });
 
             // Set initial view to current GPS or Spain center
             if (state.gps.lat && state.gps.lon) {
@@ -1520,11 +1557,110 @@
                 sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${visitedCount} visitada${visitedCount !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
             }
 
+            // Load KML layers from DB
+            loadMapKmlLayers();
+
         } catch (err) {
             console.warn('Error loading map data:', err);
             const sub = $('#mapa-subtitle');
             if (sub) sub.textContent = 'Error al cargar datos del mapa';
         }
+    }
+
+    async function loadMapKmlLayers() {
+        if (!CFG.endpoints.capasKml) return;
+        try {
+            // Remove old KML layers
+            mapKmlLayers.forEach(lg => leafletMap.removeLayer(lg));
+            mapKmlLayers = [];
+
+            const res = await fetch(`${CFG.endpoints.capasKml}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (!data.ok || !data.capas || data.capas.length === 0) return;
+
+            data.capas.forEach(capa => {
+                const group = L.layerGroup().addTo(leafletMap);
+                mapKmlLayers.push(group);
+                renderKmlToLayer(capa.contenido_kml, group, capa.color || '#8b5cf6');
+            });
+        } catch (err) {
+            console.warn('Error loading KML layers:', err);
+        }
+    }
+
+    function renderKmlToLayer(kmlText, layerGroup, color) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+        const placemarks = xmlDoc.querySelectorAll('Placemark');
+
+        placemarks.forEach(pm => {
+            const nameEl = pm.querySelector('name');
+            const nombre = nameEl ? nameEl.textContent.trim() : '';
+            const descEl = pm.querySelector('description');
+            const desc = descEl ? descEl.textContent.trim() : '';
+
+            let popupContent = '<div style="max-width:220px;">';
+            if (nombre) popupContent += `<strong style="color:${color};">${nombre}</strong><br>`;
+            if (desc) popupContent += `<small>${desc.substring(0, 120)}</small><br>`;
+            popupContent += `<span style="display:inline-block;font-size:0.6rem;font-weight:700;padding:1px 6px;border-radius:4px;background:${color};color:#fff;">KML</span>`;
+            popupContent += '</div>';
+
+            // Points
+            const pointEl = pm.querySelector('Point coordinates');
+            if (pointEl) {
+                const coords = pointEl.textContent.trim().split(',');
+                if (coords.length >= 2) {
+                    const lat = parseFloat(coords[1]);
+                    const lon = parseFloat(coords[0]);
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        const icon = L.divIcon({
+                            className: 'kml-marker',
+                            html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                            iconSize: [12, 12],
+                            iconAnchor: [6, 6],
+                        });
+                        L.marker([lat, lon], { icon, zIndexOffset: -100 })
+                            .bindPopup(popupContent)
+                            .addTo(layerGroup);
+                    }
+                }
+            }
+
+            // LineStrings
+            const lineEl = pm.querySelector('LineString coordinates');
+            if (lineEl) {
+                const lineCoords = parseKmlCoords(lineEl.textContent);
+                if (lineCoords.length > 0) {
+                    L.polyline(lineCoords, { color, weight: 3, opacity: 0.8 })
+                        .bindPopup(popupContent)
+                        .addTo(layerGroup);
+                }
+            }
+
+            // Polygons
+            const polyEl = pm.querySelector('Polygon outerBoundaryIs LinearRing coordinates');
+            if (polyEl) {
+                const polyCoords = parseKmlCoords(polyEl.textContent);
+                if (polyCoords.length > 0) {
+                    L.polygon(polyCoords, { color, fillColor: color, fillOpacity: 0.15, weight: 2 })
+                        .bindPopup(popupContent)
+                        .addTo(layerGroup);
+                }
+            }
+        });
+    }
+
+    function parseKmlCoords(text) {
+        const coords = [];
+        text.trim().split(/\s+/).forEach(t => {
+            const parts = t.split(',');
+            if (parts.length >= 2) {
+                const lon = parseFloat(parts[0]);
+                const lat = parseFloat(parts[1]);
+                if (!isNaN(lat) && !isNaN(lon)) coords.push([lat, lon]);
+            }
+        });
+        return coords;
     }
 
     function showInfraDetail(infra) {

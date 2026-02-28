@@ -71,13 +71,17 @@ if ($empresaId > 0) {
     $registros = $stmt->fetchAll();
 }
 
-// Preparar datos de infraestructuras con coordenadas teóricas para drag & drop
+// Preparar datos de infraestructuras con coordenadas teóricas y conteo de fotos
 $jsInfras = [];
 if ($empresaId > 0) {
     $stmtInfra = $pdo->prepare(
-        "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo
-         FROM infraestructuras
-         WHERE empresa_id = :emp AND activa = 1 AND lat_teorica IS NOT NULL AND lon_teorica IS NOT NULL"
+        "SELECT i.id, i.nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica, i.tipo,
+                COUNT(r.id) AS num_fotos,
+                (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
+         FROM infraestructuras i
+         LEFT JOIN registros r ON r.infra_id = i.id
+         WHERE i.empresa_id = :emp AND i.activa = 1 AND i.lat_teorica IS NOT NULL AND i.lon_teorica IS NOT NULL
+         GROUP BY i.id"
     );
     $stmtInfra->execute([':emp' => $empresaId]);
     foreach ($stmtInfra->fetchAll() as $inf) {
@@ -88,8 +92,20 @@ if ($empresaId > 0) {
             'lat' => (float) $inf['lat_teorica'],
             'lon' => (float) $inf['lon_teorica'],
             'tipo' => $inf['tipo'] ?? '',
+            'num_fotos' => (int) $inf['num_fotos'],
+            'ultimo_estado' => $inf['ultimo_estado'] ?? '',
         ];
     }
+}
+
+// Cargar capas KML guardadas
+$jsCapasKml = [];
+if ($empresaId > 0) {
+    $stmtKml = $pdo->prepare(
+        "SELECT id, nombre, contenido_kml, color FROM capas_kml WHERE empresa_id = :emp AND activa = 1 ORDER BY created_at DESC"
+    );
+    $stmtKml->execute([':emp' => $empresaId]);
+    $jsCapasKml = $stmtKml->fetchAll();
 }
 
 // Preparar datos para JS
@@ -330,18 +346,38 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         </div>
         <div class="filter-group">
             <label>Infraestructuras</label>
-            <button class="btn btn-sm btn-outline-primary" id="btn-toggle-infra-markers" onclick="toggleInfraMarkers()" title="Mostrar/ocultar posiciones teóricas de infraestructuras (arrastrables)">
-                <i class="bi bi-pin-map"></i> Posiciones
-            </button>
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-primary" id="btn-toggle-infra-markers" onclick="toggleInfraMarkers()" title="Mostrar/ocultar marcadores de infraestructuras">
+                    <i class="bi bi-geo-alt-fill"></i> Infras
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="btn-toggle-drag-markers" onclick="toggleDragMarkers()" title="Mostrar marcadores arrastrables para reubicar">
+                    <i class="bi bi-arrows-move"></i>
+                </button>
+            </div>
         </div>
         <div class="filter-group">
-            <label>Capa KML</label>
-            <div class="d-flex gap-1">
-                <input type="file" id="kml-overlay-input" accept=".kml" class="form-control" style="font-size:0.8rem;height:34px;width:180px;">
-                <button class="btn btn-sm btn-outline-danger" id="btn-remove-kml" onclick="removeKmlLayer()" style="display:none;" title="Quitar capa KML">
+            <label>Capas KML</label>
+            <div class="d-flex gap-1 align-items-center">
+                <input type="file" id="kml-overlay-input" accept=".kml" class="form-control" style="font-size:0.8rem;height:34px;width:160px;">
+                <button class="btn btn-sm btn-outline-success" id="btn-save-kml" onclick="saveKmlToDb()" style="display:none;" title="Guardar capa KML en la base de datos">
+                    <i class="bi bi-cloud-upload"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" id="btn-remove-kml" onclick="removeKmlLayer()" style="display:none;" title="Quitar capa KML del mapa">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
+        </div>
+        <div class="filter-group" id="saved-kml-group" style="display:none;">
+            <label>KML Guardados</label>
+            <div id="saved-kml-list" class="d-flex gap-1 flex-wrap"></div>
+        </div>
+        <div class="filter-group">
+            <label>Mapa Base</label>
+            <select id="filter-base-layer" class="form-select" style="width:160px;" onchange="switchBaseLayer(this.value)">
+                <option value="osm">OpenStreetMap</option>
+                <option value="ortofoto">Ortofoto Andalucía 2020</option>
+                <option value="topografico">Topográfico Andalucía</option>
+            </select>
         </div>
         <div class="filter-group" style="margin-left:auto;">
             <label>&nbsp;</label>
@@ -401,10 +437,35 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
         var stateColors = { 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e' };
 
-        // Tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
-        }).addTo(map);
+        // Base layers
+        var baseLayers = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+            }),
+            ortofoto: L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
+                layers: 'ortofoto_2020',
+                format: 'image/png',
+                transparent: false,
+                attribution: '&copy; Junta de Andalucía - Ortofoto 2020',
+                maxZoom: 20,
+            }),
+            topografico: L.tileLayer.wms('https://www.ideandalucia.es/wms/mta10r_2001-2013?', {
+                layers: 'mta10r_2001-2013',
+                format: 'image/png',
+                transparent: false,
+                attribution: '&copy; IDEAndalucía - MTA 1:10.000',
+                maxZoom: 20,
+            }),
+        };
+        var activeBaseLayer = baseLayers.osm;
+        activeBaseLayer.addTo(map);
+
+        window.switchBaseLayer = function(key) {
+            if (activeBaseLayer) map.removeLayer(activeBaseLayer);
+            activeBaseLayer = baseLayers[key] || baseLayers.osm;
+            activeBaseLayer.addTo(map);
+            activeBaseLayer.bringToBack();
+        };
 
         // Legend
         var legend = L.control({ position: 'bottomright' });
@@ -412,12 +473,13 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             var div = L.DomUtil.create('div', 'map-legend');
             div.innerHTML =
                 '<strong style="font-size:0.8rem;">Leyenda</strong><br>' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#22c55e;"></div> Bajo</div>' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#eab308;"></div> Medio</div>' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#ef4444;"></div> Critico</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#3b82f6;"></div> Infra: Antes</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#f59e0b;"></div> Infra: Durante</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#22c55e;"></div> Infra: Después</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#9ca3af;"></div> Infra: Sin visitar</div>' +
                 '<hr style="margin:4px 0;">' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#3b82f6;width:8px;height:8px;"></div> Aleatoria</div>' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Comparativa</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#3b82f6;width:8px;height:8px;"></div> Foto aleatoria</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Foto comparativa</div>' +
                 '<div class="legend-row"><div class="legend-dot" style="background:#8b5cf6;"></div> Capa KML</div>';
             return div;
         };
@@ -531,33 +593,109 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         renderMarkers(allData);
 
         // ---------------------------------------------------------------
-        // Infraestructura Markers - Drag & Drop para reubicar
+        // Infraestructura Circle Markers (como en el operador)
         // ---------------------------------------------------------------
         var infraData = <?= json_encode($jsInfras, JSON_UNESCAPED_UNICODE) ?>;
         var csrfToken = '<?= csrfToken() ?>';
-        var infraLayerGroup = null;
-        var infraMarkersVisible = false;
+        var infraCircleGroup = null;
+        var infraCirclesVisible = true;
+        var infraDragGroup = null;
+        var infraDragVisible = false;
+
+        var infraStateColors = { 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e' };
+
+        function renderInfraCircles() {
+            if (infraCircleGroup) map.removeLayer(infraCircleGroup);
+            infraCircleGroup = L.layerGroup().addTo(map);
+
+            infraData.forEach(function(inf) {
+                if (!inf.lat || !inf.lon) return;
+
+                var hasPhotos = inf.num_fotos > 0;
+                var icon;
+
+                if (hasPhotos) {
+                    var color = infraStateColors[inf.ultimo_estado] || '#9ca3af';
+                    icon = L.divIcon({
+                        className: 'infra-circle-marker',
+                        html: '<div style="width:32px;height:32px;border-radius:50%;background:' + color + ';' +
+                              'border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.4);' +
+                              'display:flex;align-items:center;justify-content:center;' +
+                              'font-size:11px;font-weight:800;color:#fff;">' + inf.num_fotos + '</div>',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                    });
+                } else {
+                    icon = L.divIcon({
+                        className: 'infra-circle-marker-unvisited',
+                        html: '<div style="width:28px;height:28px;border-radius:50%;background:#9ca3af;' +
+                              'border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.3);' +
+                              'display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;">' +
+                              '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">' +
+                              '<path d="M8 0a5 5 0 0 0-5 5c0 4.5 5 11 5 11s5-6.5 5-11a5 5 0 0 0-5-5zm0 7.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>' +
+                              '</svg></div>',
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14],
+                    });
+                }
+
+                var popupHtml = '<div style="min-width:200px;">' +
+                    '<strong>' + inf.nombre + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
+                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + inf.tipo + '</span>' : '') +
+                    '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
+                    '<br><small><i class="bi bi-camera"></i> ' + inf.num_fotos + ' foto' + (inf.num_fotos !== 1 ? 's' : '') + '</small>' +
+                    '<div style="margin-top:6px;">' +
+                    '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + inf.id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;"><i class="bi bi-clock-history"></i> Timeline</a> ' +
+                    '<a href="generar_pdf.php?infra_id=' + inf.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;"><i class="bi bi-file-pdf"></i> PDF</a>' +
+                    '</div></div>';
+
+                var marker = L.marker([inf.lat, inf.lon], { icon: icon, zIndexOffset: hasPhotos ? 100 : -50 });
+                marker.bindPopup(popupHtml, { maxWidth: 280 });
+                marker.bindTooltip(inf.nombre, { direction: 'top', offset: [0, -16] });
+                marker.addTo(infraCircleGroup);
+            });
+        }
+
+        // Show infra circles by default
+        renderInfraCircles();
 
         window.toggleInfraMarkers = function() {
             var btn = document.getElementById('btn-toggle-infra-markers');
-            if (infraMarkersVisible) {
-                // Hide
-                if (infraLayerGroup) map.removeLayer(infraLayerGroup);
-                infraMarkersVisible = false;
+            if (infraCirclesVisible) {
+                if (infraCircleGroup) map.removeLayer(infraCircleGroup);
+                infraCirclesVisible = false;
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-outline-primary');
             } else {
-                // Show
-                renderInfraMarkers();
-                infraMarkersVisible = true;
+                renderInfraCircles();
+                infraCirclesVisible = true;
                 btn.classList.remove('btn-outline-primary');
                 btn.classList.add('btn-primary');
             }
         };
 
-        function renderInfraMarkers() {
-            if (infraLayerGroup) map.removeLayer(infraLayerGroup);
-            infraLayerGroup = L.layerGroup().addTo(map);
+        // ---------------------------------------------------------------
+        // Drag markers para reubicar infraestructuras
+        // ---------------------------------------------------------------
+        window.toggleDragMarkers = function() {
+            var btn = document.getElementById('btn-toggle-drag-markers');
+            if (infraDragVisible) {
+                if (infraDragGroup) map.removeLayer(infraDragGroup);
+                infraDragVisible = false;
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-outline-secondary');
+            } else {
+                renderDragMarkers();
+                infraDragVisible = true;
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-secondary');
+            }
+        };
+
+        function renderDragMarkers() {
+            if (infraDragGroup) map.removeLayer(infraDragGroup);
+            infraDragGroup = L.layerGroup().addTo(map);
 
             infraData.forEach(function(inf) {
                 if (!inf.lat || !inf.lon) return;
@@ -580,7 +718,6 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '<div style="min-width:180px;">' +
                     '<strong>' + inf.nombre + '</strong><br>' +
                     '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
-                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + inf.tipo + '</span>' : '') +
                     '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
                     '<br><small style="color:#059669;"><i class="bi bi-arrows-move"></i> Arrastra para reubicar</small>' +
                     '</div>'
@@ -591,7 +728,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
                 });
 
-                marker.addTo(infraLayerGroup);
+                marker.addTo(infraDragGroup);
             });
         }
 
@@ -611,12 +748,10 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 var data = await resp.json();
 
                 if (data.ok) {
-                    // Actualizar datos locales
                     infraData.forEach(function(inf) {
                         if (inf.id === infraId) { inf.lat = lat; inf.lon = lon; }
                     });
 
-                    // Actualizar popup
                     marker.setPopupContent(
                         '<div style="min-width:180px;">' +
                         '<strong>' + nombre + '</strong><br>' +
@@ -626,6 +761,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     );
 
                     showDragToast(nombre + ' reubicada correctamente', 'success');
+
+                    // Refresh circle markers to update position
+                    if (infraCirclesVisible) renderInfraCircles();
                 } else {
                     showDragToast('Error: ' + (data.error || 'No se pudo guardar'), 'error');
                 }
@@ -648,36 +786,40 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         }
 
         // ---------------------------------------------------------------
-        // KML Overlay - Visualización de capas KML en el mapa
+        // KML: Renderizado, carga desde archivo, guardado en BD
         // ---------------------------------------------------------------
-        var kmlLayerGroup = null;
+        var kmlLayerGroups = {};   // { id_or_temp: L.layerGroup }
+        var pendingKmlText = null; // KML text pending to be saved
+        var pendingKmlName = '';
 
         document.getElementById('kml-overlay-input').addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
 
+            pendingKmlName = file.name.replace(/\.kml$/i, '');
             var reader = new FileReader();
             reader.onload = function(ev) {
-                loadKmlOverlay(ev.target.result);
+                pendingKmlText = ev.target.result;
+                renderKmlOnMap(pendingKmlText, 'temp', '#8b5cf6');
+                document.getElementById('btn-save-kml').style.display = 'inline-block';
+                document.getElementById('btn-remove-kml').style.display = 'inline-block';
             };
             reader.readAsText(file);
         });
 
-        function loadKmlOverlay(kmlText) {
-            // Limpiar capa anterior
-            if (kmlLayerGroup) {
-                map.removeLayer(kmlLayerGroup);
+        function renderKmlOnMap(kmlText, layerId, color) {
+            // Remove existing layer with same id
+            if (kmlLayerGroups[layerId]) {
+                map.removeLayer(kmlLayerGroups[layerId]);
             }
-            kmlLayerGroup = L.layerGroup().addTo(map);
+            var group = L.layerGroup().addTo(map);
+            kmlLayerGroups[layerId] = group;
 
             var parser = new DOMParser();
             var xmlDoc = parser.parseFromString(kmlText, 'text/xml');
-
             var placemarks = xmlDoc.querySelectorAll('Placemark');
             var bounds = [];
-            var pointCount = 0;
-            var lineCount = 0;
-            var polygonCount = 0;
+            var totalElements = 0;
 
             placemarks.forEach(function(pm) {
                 var nameEl = pm.querySelector('name');
@@ -686,9 +828,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 var desc = descEl ? descEl.textContent.trim() : '';
 
                 var popupContent = '<div style="max-width:250px;">';
-                if (nombre) popupContent += '<strong style="color:#8b5cf6;">' + nombre + '</strong><br>';
+                if (nombre) popupContent += '<strong style="color:' + color + ';">' + nombre + '</strong><br>';
                 if (desc) popupContent += '<small>' + desc.substring(0, 150) + '</small><br>';
-                popupContent += '<span class="badge" style="background:#8b5cf6;font-size:0.6rem;">KML</span>';
+                popupContent += '<span class="badge" style="background:' + color + ';font-size:0.6rem;">KML</span>';
                 popupContent += '</div>';
 
                 // Points
@@ -701,15 +843,15 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                         if (!isNaN(lat) && !isNaN(lon)) {
                             var icon = L.divIcon({
                                 className: 'kml-marker',
-                                html: '<div style="width:14px;height:14px;border-radius:50%;background:#8b5cf6;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+                                html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
                                 iconSize: [14, 14],
                                 iconAnchor: [7, 7],
                             });
                             L.marker([lat, lon], { icon: icon })
                                 .bindPopup(popupContent)
-                                .addTo(kmlLayerGroup);
+                                .addTo(group);
                             bounds.push([lat, lon]);
-                            pointCount++;
+                            totalElements++;
                         }
                     }
                 }
@@ -719,11 +861,11 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 if (lineEl) {
                     var lineCoords = parseKmlCoordinates(lineEl.textContent);
                     if (lineCoords.length > 0) {
-                        L.polyline(lineCoords, { color: '#8b5cf6', weight: 3, opacity: 0.8 })
+                        L.polyline(lineCoords, { color: color, weight: 3, opacity: 0.8 })
                             .bindPopup(popupContent)
-                            .addTo(kmlLayerGroup);
+                            .addTo(group);
                         lineCoords.forEach(function(c) { bounds.push(c); });
-                        lineCount++;
+                        totalElements++;
                     }
                 }
 
@@ -732,36 +874,21 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 if (polyEl) {
                     var polyCoords = parseKmlCoordinates(polyEl.textContent);
                     if (polyCoords.length > 0) {
-                        L.polygon(polyCoords, { color: '#8b5cf6', fillColor: '#8b5cf6', fillOpacity: 0.15, weight: 2 })
+                        L.polygon(polyCoords, { color: color, fillColor: color, fillOpacity: 0.15, weight: 2 })
                             .bindPopup(popupContent)
-                            .addTo(kmlLayerGroup);
+                            .addTo(group);
                         polyCoords.forEach(function(c) { bounds.push(c); });
-                        polygonCount++;
+                        totalElements++;
                     }
                 }
             });
 
-            if (bounds.length > 0) {
+            if (bounds.length > 0 && layerId === 'temp') {
                 map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
             }
 
-            // Mostrar botón de quitar y actualizar leyenda
-            document.getElementById('btn-remove-kml').style.display = 'inline-block';
-
-            // Añadir info a la stats bar
-            var total = pointCount + lineCount + polygonCount;
-            var statKml = document.getElementById('stat-kml');
-            if (!statKml) {
-                var statsBar = document.getElementById('stats-bar');
-                var pill = document.createElement('div');
-                pill.className = 'stat-pill';
-                pill.id = 'stat-kml';
-                pill.style.color = '#8b5cf6';
-                pill.innerHTML = '<strong>' + total + '</strong> elementos KML';
-                statsBar.appendChild(pill);
-            } else {
-                statKml.innerHTML = '<strong>' + total + '</strong> elementos KML';
-            }
+            updateKmlStats();
+            return totalElements;
         }
 
         function parseKmlCoordinates(text) {
@@ -780,16 +907,186 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             return coords;
         }
 
-        window.removeKmlLayer = function() {
-            if (kmlLayerGroup) {
-                map.removeLayer(kmlLayerGroup);
-                kmlLayerGroup = null;
-            }
-            document.getElementById('kml-overlay-input').value = '';
-            document.getElementById('btn-remove-kml').style.display = 'none';
+        function updateKmlStats() {
+            var count = Object.keys(kmlLayerGroups).length;
             var statKml = document.getElementById('stat-kml');
-            if (statKml) statKml.remove();
+            if (count > 0) {
+                if (!statKml) {
+                    var statsBar = document.getElementById('stats-bar');
+                    var pill = document.createElement('div');
+                    pill.className = 'stat-pill';
+                    pill.id = 'stat-kml';
+                    pill.style.color = '#8b5cf6';
+                    statsBar.appendChild(pill);
+                    statKml = pill;
+                }
+                statKml.innerHTML = '<strong>' + count + '</strong> capa' + (count !== 1 ? 's' : '') + ' KML';
+            } else if (statKml) {
+                statKml.remove();
+            }
+        }
+
+        // Save pending KML to database
+        window.saveKmlToDb = async function() {
+            if (!pendingKmlText) return;
+
+            var nombre = prompt('Nombre para la capa KML:', pendingKmlName);
+            if (!nombre) return;
+
+            var formData = new FormData();
+            formData.append('empresa_id', empresaId);
+            formData.append('nombre', nombre);
+            formData.append('contenido_kml', pendingKmlText);
+            formData.append('color', '#8b5cf6');
+            formData.append('csrf_token', csrfToken);
+
+            try {
+                var resp = await fetch('api/capas_kml.php', { method: 'POST', body: formData });
+                var data = await resp.json();
+
+                if (data.ok) {
+                    // Replace temp layer with saved layer id
+                    if (kmlLayerGroups['temp']) {
+                        map.removeLayer(kmlLayerGroups['temp']);
+                        delete kmlLayerGroups['temp'];
+                    }
+                    renderKmlOnMap(pendingKmlText, 'kml-' + data.id, data.color || '#8b5cf6');
+
+                    pendingKmlText = null;
+                    pendingKmlName = '';
+                    document.getElementById('kml-overlay-input').value = '';
+                    document.getElementById('btn-save-kml').style.display = 'none';
+                    document.getElementById('btn-remove-kml').style.display = 'none';
+
+                    showDragToast('Capa "' + nombre + '" guardada correctamente', 'success');
+                    renderSavedKmlList();
+                } else {
+                    showDragToast('Error: ' + (data.error || 'No se pudo guardar'), 'error');
+                }
+            } catch (err) {
+                showDragToast('Error de conexión al guardar KML', 'error');
+            }
         };
+
+        window.removeKmlLayer = function() {
+            if (kmlLayerGroups['temp']) {
+                map.removeLayer(kmlLayerGroups['temp']);
+                delete kmlLayerGroups['temp'];
+            }
+            pendingKmlText = null;
+            pendingKmlName = '';
+            document.getElementById('kml-overlay-input').value = '';
+            document.getElementById('btn-save-kml').style.display = 'none';
+            document.getElementById('btn-remove-kml').style.display = 'none';
+            updateKmlStats();
+        };
+
+        window.toggleSavedKml = function(capaId, kmlText, color) {
+            var key = 'kml-' + capaId;
+            if (kmlLayerGroups[key]) {
+                map.removeLayer(kmlLayerGroups[key]);
+                delete kmlLayerGroups[key];
+                var btn = document.getElementById('btn-kml-' + capaId);
+                if (btn) { btn.classList.remove('btn-primary'); btn.classList.add('btn-outline-primary'); }
+            } else {
+                renderKmlOnMap(kmlText, key, color);
+                var btn = document.getElementById('btn-kml-' + capaId);
+                if (btn) { btn.classList.remove('btn-outline-primary'); btn.classList.add('btn-primary'); }
+            }
+            updateKmlStats();
+        };
+
+        window.deleteSavedKml = async function(capaId, nombre) {
+            if (!confirm('¿Eliminar la capa "' + nombre + '"?')) return;
+
+            var formData = new FormData();
+            formData.append('empresa_id', empresaId);
+            formData.append('action', 'eliminar');
+            formData.append('capa_id', capaId);
+            formData.append('csrf_token', csrfToken);
+
+            try {
+                var resp = await fetch('api/capas_kml.php', { method: 'POST', body: formData });
+                var data = await resp.json();
+
+                if (data.ok) {
+                    var key = 'kml-' + capaId;
+                    if (kmlLayerGroups[key]) {
+                        map.removeLayer(kmlLayerGroups[key]);
+                        delete kmlLayerGroups[key];
+                    }
+                    showDragToast('Capa "' + nombre + '" eliminada', 'success');
+                    renderSavedKmlList();
+                    updateKmlStats();
+                } else {
+                    showDragToast('Error: ' + (data.error || 'No se pudo eliminar'), 'error');
+                }
+            } catch (err) {
+                showDragToast('Error de conexión', 'error');
+            }
+        };
+
+        // Load saved KML layers from DB
+        var savedCapasKml = <?= json_encode($jsCapasKml, JSON_UNESCAPED_UNICODE) ?>;
+
+        function renderSavedKmlList() {
+            fetch('api/capas_kml.php?empresa_id=' + empresaId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ok) {
+                        savedCapasKml = data.capas;
+                        buildSavedKmlUI();
+                    }
+                });
+        }
+
+        function buildSavedKmlUI() {
+            var container = document.getElementById('saved-kml-list');
+            var group = document.getElementById('saved-kml-group');
+
+            if (savedCapasKml.length === 0) {
+                group.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            group.style.display = '';
+            container.innerHTML = '';
+
+            savedCapasKml.forEach(function(capa) {
+                var isActive = !!kmlLayerGroups['kml-' + capa.id];
+                var wrapper = document.createElement('div');
+                wrapper.className = 'd-flex gap-1';
+                wrapper.innerHTML =
+                    '<button id="btn-kml-' + capa.id + '" class="btn btn-sm ' + (isActive ? 'btn-primary' : 'btn-outline-primary') + '" ' +
+                    'style="font-size:0.75rem;white-space:nowrap;" title="Mostrar/ocultar capa">' +
+                    '<i class="bi bi-layers"></i> ' + capa.nombre +
+                    '</button>' +
+                    '<button class="btn btn-sm btn-outline-danger" style="font-size:0.7rem;" title="Eliminar capa">' +
+                    '<i class="bi bi-trash"></i></button>';
+
+                var toggleBtn = wrapper.querySelector('#btn-kml-' + capa.id);
+                var deleteBtn = wrapper.querySelectorAll('button')[1];
+
+                (function(c) {
+                    toggleBtn.addEventListener('click', function() {
+                        toggleSavedKml(c.id, c.contenido_kml, c.color);
+                    });
+                    deleteBtn.addEventListener('click', function() {
+                        deleteSavedKml(c.id, c.nombre);
+                    });
+                })(capa);
+
+                container.appendChild(wrapper);
+            });
+        }
+
+        // Initialize: render saved KML list and auto-load active layers
+        buildSavedKmlUI();
+        savedCapasKml.forEach(function(capa) {
+            renderKmlOnMap(capa.contenido_kml, 'kml-' + capa.id, capa.color);
+        });
+        updateKmlStats();
     })();
     <?php endif; ?>
 

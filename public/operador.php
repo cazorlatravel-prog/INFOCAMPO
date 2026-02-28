@@ -438,6 +438,7 @@ if ($initials === '') $initials = 'OP';
                 unidadesObra: 'api/unidades_obra.php',
                 fotosComparativas: 'api/fotos_comparativas.php',
                 registrosMapa: 'api/registros_mapa.php',
+                capasKml: 'api/capas_kml.php',
             }
         };
     </script>

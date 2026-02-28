@@ -87,6 +87,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msgType = 'info';
         }
     }
+
+    if ($action === 'delete') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0 && $id !== 9999) {
+            // Eliminar en cascada: valores_campo -> registros -> infraestructuras -> campos_formulario -> unidades_obra -> usuarios -> empresa
+            $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id IN (SELECT id FROM infraestructuras WHERE empresa_id = :eid))")
+                ->execute([':eid' => $id]);
+            $pdo->prepare("DELETE FROM registros WHERE infra_id IN (SELECT id FROM infraestructuras WHERE empresa_id = :eid)")
+                ->execute([':eid' => $id]);
+            $pdo->prepare("DELETE FROM infraestructuras WHERE empresa_id = :eid")
+                ->execute([':eid' => $id]);
+            $pdo->prepare("DELETE FROM campos_formulario WHERE empresa_id = :eid")
+                ->execute([':eid' => $id]);
+            $pdo->prepare("DELETE FROM unidades_obra WHERE empresa_id = :eid")
+                ->execute([':eid' => $id]);
+            $pdo->prepare("DELETE FROM usuarios WHERE empresa_id = :eid AND rol != 'superadmin'")
+                ->execute([':eid' => $id]);
+            $pdo->prepare("DELETE FROM empresas WHERE id = :eid AND id != 9999")
+                ->execute([':eid' => $id]);
+            $msg = 'Empresa eliminada correctamente con todos sus datos.';
+            $msgType = 'success';
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -364,6 +387,14 @@ if (isset($_GET['edit'])) {
                                                 <input type="hidden" name="id" value="<?= $emp['id'] ?>">
                                                 <button type="submit" class="btn btn-sm btn-outline-<?= $emp['activa'] ? 'warning' : 'success' ?>" title="<?= $emp['activa'] ? 'Desactivar' : 'Activar' ?>">
                                                     <i class="bi bi-<?= $emp['activa'] ? 'pause-circle' : 'play-circle' ?>"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" class="d-inline" onsubmit="return confirm('¿ELIMINAR esta empresa permanentemente? Se borrarán TODOS sus datos: usuarios (<?= $emp['num_usuarios'] ?>), infraestructuras (<?= $emp['num_infras'] ?>), registros, fotos, etc. Esta acción NO se puede deshacer.')">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="id" value="<?= $emp['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar empresa">
+                                                    <i class="bi bi-trash"></i>
                                                 </button>
                                             </form>
                                         </div>

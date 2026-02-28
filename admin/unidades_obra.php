@@ -76,6 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msgType = 'info';
         }
     }
+
+    if ($action === 'delete') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $pdo->prepare("DELETE FROM unidades_obra WHERE id = :id AND empresa_id = :emp_id")
+                ->execute([':id' => $id, ':emp_id' => $empresaId]);
+            $msg = 'Unidad de obra eliminada correctamente.';
+            $msgType = 'success';
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -242,6 +252,14 @@ if (isset($_GET['edit'])) {
                                                     <input type="hidden" name="id" value="<?= $u['id'] ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-<?= $u['activa'] ? 'warning' : 'success' ?>">
                                                         <i class="bi bi-<?= $u['activa'] ? 'pause-circle' : 'play-circle' ?>"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('¿ELIMINAR esta unidad de obra permanentemente? Esta acción no se puede deshacer.')">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="action" value="delete">
+                                                    <input type="hidden" name="id" value="<?= $u['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar unidad de obra">
+                                                        <i class="bi bi-trash"></i>
                                                     </button>
                                                 </form>
                                             </div>
