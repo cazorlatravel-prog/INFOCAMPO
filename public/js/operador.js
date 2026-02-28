@@ -653,13 +653,17 @@
 
         camVideo.pause();
 
-        // Generate filename
+        // Generate filename: InfrastructureName_AL001 or InfrastructureName_COMP001
         let filename = '';
         if (state.currentMode === 'comparativo') {
             state.seqComparativa++;
-            filename = `W${state.seqComparativa}_${sanitizeFilename(state.infraName)}`;
+            state.countComparativas++;
+            const seqNum = String(state.countComparativas).padStart(3, '0');
+            filename = `${sanitizeFilename(state.infraName)}_COMP${seqNum}`;
         } else {
-            filename = `foto_${sanitizeFilename(state.infraName)}_${Date.now()}`;
+            state.countAleatorias++;
+            const seqNum = String(state.countAleatorias).padStart(3, '0');
+            filename = `${sanitizeFilename(state.infraName)}_AL${seqNum}`;
         }
 
         // Apply watermark directly on previewCanvas (used for blob generation)
@@ -668,6 +672,7 @@
             lon: state.gps.lon,
             infraName: state.infraName,
             infraCode: state.infraCode,
+            empresaName: CFG.empresaName,
             filename: filename,
             mode: state.currentMode,
             seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
@@ -843,13 +848,9 @@
     }
 
     function updateCounters(seq) {
-        if (state.currentMode === 'aleatorio') {
-            state.countAleatorias++;
-            countAleatorias.textContent = state.countAleatorias;
-        } else {
-            state.countComparativas++;
-            countComparativas.textContent = state.countComparativas;
-        }
+        // Counters are already incremented in captureFrame for filename generation
+        countAleatorias.textContent = state.countAleatorias;
+        countComparativas.textContent = state.countComparativas;
     }
 
     // ===================================================================
@@ -889,60 +890,67 @@
         // 1. Draw original photo
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 2. Bottom bar
-        const barHeight = Math.max(70, h * 0.08);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, h - barHeight, w, barHeight);
+        // 2. Info text block — bottom-right
+        // Lines: Empresa, Infraestructura, Fecha, Coordenadas
+        const fontSize = Math.max(13, Math.round(h * 0.018));
+        const lineHeight = fontSize * 1.5;
+        const numLines = 4;
+        const padding = 16;
+        const blockHeight = lineHeight * numLines + padding * 2;
+        const blockWidth = Math.max(280, Math.round(w * 0.35));
 
-        const fontSize = Math.max(13, Math.round(barHeight * 0.22));
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        // Semi-transparent background block (bottom-right)
+        const bx = w - blockWidth - 12;
+        const by = h - blockHeight - 12;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        roundRect(ctx, bx, by, blockWidth, blockHeight, 8);
+        ctx.fill();
+
         ctx.fillStyle = '#ffffff';
-        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
 
-        // ETRS89 coordinates
+        const textX = bx + padding;
+        let textY = by + padding;
+
+        // Line 1: Nombre Empresa
+        const empresaStr = meta.empresaName || '';
+        ctx.fillText(empresaStr, textX, textY);
+        textY += lineHeight;
+
+        // Line 2: Infraestructura
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
+        ctx.fillText(meta.infraName || '', textX, textY);
+        textY += lineHeight;
+
+        // Line 3: Fecha
+        const dateStr = formatDateMadrid();
+        ctx.fillText(dateStr, textX, textY);
+        textY += lineHeight;
+
+        // Line 4: Coordenadas
         const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
         const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
+        ctx.fillText(`ETRS89: ${latStr}, ${lonStr}`, textX, textY);
 
-        // Date/time Madrid
-        const dateStr = formatDateMadrid();
+        // Reset text align
+        ctx.textAlign = 'start';
 
-        // Line 1: Date + coords
-        const line1 = `${dateStr}  |  ETRS89: ${latStr}, ${lonStr}`;
-        ctx.fillText(line1, 16, h - barHeight * 0.65);
-
-        // Line 2: Infrastructure name + filename
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        const line2 = meta.infraName + (meta.filename ? '  |  ' + meta.filename : '');
-        ctx.fillText(line2, 16, h - barHeight * 0.3);
-
-        // 3. Mode badge (top-left)
-        if (meta.mode === 'comparativo' && meta.seq) {
-            const badgeW = 80;
-            const badgeH = 30;
-            ctx.fillStyle = 'rgba(168, 85, 247, 0.8)';
-            roundRect(ctx, 12, 12, badgeW, badgeH, 8);
-            ctx.fill();
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${Math.round(badgeH * 0.6)}px -apple-system, sans-serif`;
-            ctx.textBaseline = 'middle';
-            ctx.fillText('W' + meta.seq, 24, 12 + badgeH / 2);
-        }
-
-        // 4. Mini-map OSM (top-right)
-        await drawMiniMap(ctx, w, meta.lat, meta.lon);
+        // 3. Mini-map OSM (top-left, 1/8 of image)
+        await drawMiniMap(ctx, w, h, meta.lat, meta.lon);
 
         // Save blob for later
         state.capturedBlob = await canvasToBlob(targetCanvas, 'image/jpeg', 0.85);
     }
 
-    async function drawMiniMap(ctx, canvasWidth, lat, lon) {
+    async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
         if (lat == null || lon == null) return;
 
-        const mapSize = Math.max(80, Math.round(canvasWidth * 0.1));
-        const margin = 12;
-        const x = canvasWidth - mapSize - margin;
-        const y = margin;
+        // 1/8 of image size, positioned top-left, flush to corner
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 8);
+        const x = 0;
+        const y = 0;
 
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(x, y, mapSize, mapSize);
