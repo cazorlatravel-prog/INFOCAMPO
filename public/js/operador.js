@@ -1252,6 +1252,7 @@
         btnDetailNavegar.addEventListener('click', navigateToInfra);
         btnDetailAleatorio.addEventListener('click', () => startVisitFromMap('aleatorio'));
         btnDetailComparativo.addEventListener('click', () => startVisitFromMap('comparativo'));
+        document.getElementById('btn-stop-nav').addEventListener('click', stopNavigation);
 
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
@@ -1319,6 +1320,35 @@
     let mapActiveBaseLayer = null;
     const mapBaseLayers = {};
 
+    // Navigation mode state
+    let navActive = false;
+    let navTarget = null;       // { lat, lon, nombre, codigo }
+    let navLine = null;         // L.polyline
+    let navWatchId = null;      // geolocation watchPosition ID for navigation
+    let navLastBeepTime = 0;    // timestamp of last beep
+    let navAudioCtx = null;     // Web Audio API context
+
+    function getNavAudioCtx() {
+        if (!navAudioCtx) navAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return navAudioCtx;
+    }
+
+    function playBeeps(count) {
+        const ctx = getNavAudioCtx();
+        for (let i = 0; i < count; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.value = 880;
+            gain.gain.value = 0.5;
+            const start = ctx.currentTime + i * 0.25;
+            osc.start(start);
+            osc.stop(start + 0.12);
+        }
+    }
+
     async function openMapScreen() {
         showScreen('mapa');
         mapaDetailPanel.classList.add('hidden');
@@ -1382,6 +1412,7 @@
     }
 
     function closeMapScreen() {
+        if (navActive) stopNavigation();
         showScreen('ficha');
     }
 
@@ -1718,13 +1749,125 @@
     function navigateToInfra() {
         if (!mapSelectedInfra || !mapSelectedInfra.lat || !mapSelectedInfra.lon) return;
 
-        const lat = mapSelectedInfra.lat;
-        const lon = mapSelectedInfra.lon;
-        const name = encodeURIComponent(mapSelectedInfra.nombre);
+        navTarget = {
+            lat: mapSelectedInfra.lat,
+            lon: mapSelectedInfra.lon,
+            nombre: mapSelectedInfra.nombre,
+            codigo: mapSelectedInfra.codigo,
+        };
+        navActive = true;
+        navLastBeepTime = 0;
 
-        // Open Google Maps navigation (works on Android and iOS)
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`;
-        window.open(url, '_blank');
+        // Hide detail panel
+        mapaDetailPanel.classList.add('hidden');
+
+        // Show navigation overlay
+        const overlay = document.getElementById('nav-overlay');
+        if (overlay) overlay.classList.remove('hidden');
+
+        // Resume AudioContext if suspended (mobile requires user gesture)
+        if (navAudioCtx && navAudioCtx.state === 'suspended') navAudioCtx.resume();
+
+        // Start dedicated GPS watch for navigation
+        if (navWatchId !== null) navigator.geolocation.clearWatch(navWatchId);
+        navWatchId = navigator.geolocation.watchPosition(
+            (pos) => updateNavigation(pos.coords.latitude, pos.coords.longitude),
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 2000 }
+        );
+
+        // Do initial update if GPS already available
+        if (state.gps.lat && state.gps.lon) {
+            updateNavigation(state.gps.lat, state.gps.lon);
+        }
+
+        // Zoom map to show both user and target
+        fitNavBounds();
+    }
+
+    function updateNavigation(lat, lon) {
+        if (!navActive || !navTarget) return;
+
+        // Update user marker
+        state.gps.lat = lat;
+        state.gps.lon = lon;
+        updateUserPositionOnMap();
+
+        // Draw/update line from user to target
+        const userLatLng = [lat, lon];
+        const targetLatLng = [navTarget.lat, navTarget.lon];
+
+        if (navLine) {
+            navLine.setLatLngs([userLatLng, targetLatLng]);
+        } else {
+            navLine = L.polyline([userLatLng, targetLatLng], {
+                color: '#dc3545',
+                weight: 3,
+                dashArray: '8, 8',
+                opacity: 0.8,
+            }).addTo(leafletMap);
+        }
+
+        // Calculate distance
+        const dist = haversineDistance(lat, lon, navTarget.lat, navTarget.lon);
+
+        // Update overlay UI
+        const distEl = document.getElementById('nav-distance');
+        const nameEl = document.getElementById('nav-target-name');
+        if (distEl) distEl.textContent = formatDistance(dist);
+        if (nameEl) nameEl.textContent = navTarget.nombre;
+
+        // Color based on proximity
+        const overlay = document.getElementById('nav-overlay');
+        if (overlay) {
+            overlay.classList.remove('nav-far', 'nav-near', 'nav-close', 'nav-arrived');
+            if (dist <= 5) overlay.classList.add('nav-arrived');
+            else if (dist <= 10) overlay.classList.add('nav-close');
+            else if (dist <= 20) overlay.classList.add('nav-near');
+            else overlay.classList.add('nav-far');
+        }
+
+        // Beep logic (every 3 seconds max to avoid spam)
+        const now = Date.now();
+        if (now - navLastBeepTime > 3000) {
+            if (dist <= 5) {
+                playBeeps(3);
+                navLastBeepTime = now;
+            } else if (dist <= 10) {
+                playBeeps(2);
+                navLastBeepTime = now;
+            } else if (dist <= 20) {
+                playBeeps(1);
+                navLastBeepTime = now;
+            }
+        }
+    }
+
+    function fitNavBounds() {
+        if (!leafletMap || !navTarget) return;
+        const bounds = [[navTarget.lat, navTarget.lon]];
+        if (state.gps.lat && state.gps.lon) {
+            bounds.push([state.gps.lat, state.gps.lon]);
+        }
+        leafletMap.fitBounds(bounds, { padding: [80, 80], maxZoom: 18 });
+    }
+
+    function stopNavigation() {
+        navActive = false;
+        navTarget = null;
+
+        if (navWatchId !== null) {
+            navigator.geolocation.clearWatch(navWatchId);
+            navWatchId = null;
+        }
+
+        if (navLine) {
+            leafletMap.removeLayer(navLine);
+            navLine = null;
+        }
+
+        const overlay = document.getElementById('nav-overlay');
+        if (overlay) overlay.classList.add('hidden');
     }
 
     function buildPhotoCard(r) {
@@ -1746,6 +1889,9 @@
 
     function startVisitFromMap(mode) {
         if (!mapSelectedInfra) return;
+
+        // Stop navigation if active
+        if (navActive) stopNavigation();
 
         // Select the infrastructure in the ficha
         selectInfra(mapSelectedInfra.id, mapSelectedInfra.nombre, mapSelectedInfra.codigo);

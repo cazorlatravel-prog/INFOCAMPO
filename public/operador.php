@@ -334,6 +334,23 @@ if ($initials === '') $initials = 'OP';
         </div>
         <div id="op-map" class="op-map"></div>
 
+        <!-- Navigation overlay -->
+        <div id="nav-overlay" class="nav-overlay hidden">
+            <div class="nav-info">
+                <div class="nav-icon"><i class="bi bi-cursor-fill"></i></div>
+                <div class="nav-details">
+                    <span class="nav-label">Navegando a</span>
+                    <strong id="nav-target-name">--</strong>
+                </div>
+                <div class="nav-dist-box">
+                    <span id="nav-distance">--</span>
+                </div>
+            </div>
+            <button type="button" id="btn-stop-nav" class="nav-stop-btn">
+                <i class="bi bi-x-circle-fill"></i> Detener
+            </button>
+        </div>
+
         <!-- Botón Volver fijo abajo -->
         <button type="button" id="btn-mapa-volver" class="mapa-volver-btn">
             <i class="bi bi-arrow-left-circle-fill"></i> Volver a Toma de Datos
