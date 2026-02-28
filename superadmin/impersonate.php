@@ -45,6 +45,7 @@ $pdo = getDB();
 
 // Si se especifica un rol objetivo pero no un user_id, buscar un usuario de ese rol en la empresa
 if ($userId === 0 && $empresaId > 0 && $targetRole !== '') {
+    // Intentar encontrar un usuario del rol solicitado
     $stmt = $pdo->prepare(
         "SELECT id FROM usuarios
          WHERE empresa_id = :emp_id AND rol = :rol AND activo = 1
@@ -56,24 +57,67 @@ if ($userId === 0 && $empresaId > 0 && $targetRole !== '') {
     if ($found) {
         $userId = (int) $found['id'];
     }
+
+    // Si no hay usuario del rol solicitado, intentar con cualquier usuario activo de la empresa
+    if ($userId === 0) {
+        $stmt = $pdo->prepare(
+            "SELECT id FROM usuarios
+             WHERE empresa_id = :emp_id AND activo = 1
+             ORDER BY FIELD(rol, 'admin', 'supervisor', 'operador'), id ASC
+             LIMIT 1"
+        );
+        $stmt->execute([':emp_id' => $empresaId]);
+        $found = $stmt->fetch();
+        if ($found) {
+            $userId = (int) $found['id'];
+        }
+    }
+}
+
+// Si no se encontró ningún usuario, acceder directamente como admin virtual de la empresa
+if ($userId <= 0 && $empresaId > 0) {
+    // Verificar que la empresa existe
+    $stmt = $pdo->prepare("SELECT id, nombre FROM empresas WHERE id = :id");
+    $stmt->execute([':id' => $empresaId]);
+    $empresa = $stmt->fetch();
+
+    if (!$empresa) {
+        $_SESSION['flash_msg'] = 'Empresa no encontrada.';
+        $_SESSION['flash_type'] = 'danger';
+        header('Location: /superadmin/empresas.php');
+        exit;
+    }
+
+    // Crear sesión virtual de admin para esta empresa (sin usuario real)
+    $_SESSION['impersonating_from'] = [
+        'user_id'        => $_SESSION['user_id'],
+        'user_name'      => $_SESSION['user_name'],
+        'user_email'     => $_SESSION['user_email'],
+        'user_rol'       => $_SESSION['user_rol'],
+        'empresa_id'     => $_SESSION['empresa_id'],
+        'empresa_nombre' => $_SESSION['empresa_nombre'],
+    ];
+
+    $_SESSION['user_id']        = 0;
+    $_SESSION['user_name']      = 'SuperAdmin';
+    $_SESSION['user_email']     = $_SESSION['impersonating_from']['user_email'];
+    $_SESSION['user_rol']       = 'admin';
+    $_SESSION['empresa_id']     = (int) $empresa['id'];
+    $_SESSION['empresa_nombre'] = $empresa['nombre'];
+
+    header('Location: /admin/dashboard.php');
+    exit;
 }
 
 if ($userId <= 0) {
-    $_SESSION['flash_msg'] = 'No se encontró un usuario de rol "' . htmlspecialchars($targetRole) . '" en esa empresa.';
+    $_SESSION['flash_msg'] = 'No se encontró un usuario ni empresa válida para acceder.';
     $_SESSION['flash_type'] = 'warning';
     header('Location: /superadmin/empresas.php');
     exit;
 }
 
 if (startImpersonation($userId)) {
-    // Redirigir según el rol del usuario suplantado
-    $rol = $_SESSION['user_rol'];
-    if ($rol === 'admin') {
-        header('Location: /admin/index.php?empresa_id=' . $_SESSION['empresa_id']);
-    } else {
-        // Para operador/supervisor, también redirigir al panel admin para ver sus datos
-        header('Location: /admin/index.php?empresa_id=' . $_SESSION['empresa_id']);
-    }
+    header('Location: /admin/dashboard.php');
 } else {
     $_SESSION['flash_msg'] = 'Error al suplantar usuario.';
     $_SESSION['flash_type'] = 'danger';
