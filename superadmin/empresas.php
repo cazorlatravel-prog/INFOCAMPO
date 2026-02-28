@@ -163,6 +163,9 @@ if (isset($_GET['edit'])) {
             <li><a href="campos.php" class="nav-link"><i class="bi bi-ui-checks-grid"></i> Campos Formulario</a></li>
         </ul>
         <div style="position:absolute;bottom:0;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding:16px 20px;">
+            <a href="perfil.php" class="btn btn-sm btn-outline-light w-100 mb-2" style="font-size:0.8rem;">
+                <i class="bi bi-person-gear"></i> Mi Perfil
+            </a>
             <a href="logout.php" class="btn btn-sm btn-outline-light w-100" style="opacity:0.6;font-size:0.8rem;">
                 <i class="bi bi-box-arrow-left"></i> Cerrar sesión
             </a>

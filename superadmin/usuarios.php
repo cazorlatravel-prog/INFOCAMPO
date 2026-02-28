@@ -51,6 +51,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         }
     }
 
+    // --- Editar nombre y email de usuario ---
+    if ($action === 'edit_user') {
+        $targetId  = (int) ($_POST['user_id'] ?? 0);
+        $newNombre = trim($_POST['edit_nombre'] ?? '');
+        $newEmail  = trim($_POST['edit_email'] ?? '');
+
+        if ($targetId <= 0) {
+            $msg = 'Usuario no válido.';
+            $msgType = 'danger';
+        } elseif ($newNombre === '' || $newEmail === '') {
+            $msg = 'El nombre y el email son obligatorios.';
+            $msgType = 'danger';
+        } elseif (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            $msg = 'El email no es válido.';
+            $msgType = 'danger';
+        } else {
+            // Verificar que el email no esté en uso por otro usuario
+            $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :id");
+            $check->execute([':email' => $newEmail, ':id' => $targetId]);
+            if ($check->fetch()) {
+                $msg = 'Ya existe otro usuario con ese email.';
+                $msgType = 'danger';
+            } else {
+                $stmt = $pdo->prepare(
+                    "UPDATE usuarios SET nombre = :nombre, email = :email WHERE id = :id AND rol != 'superadmin'"
+                );
+                $stmt->execute([':nombre' => $newNombre, ':email' => $newEmail, ':id' => $targetId]);
+                if ($stmt->rowCount() > 0) {
+                    $msg = 'Usuario actualizado correctamente.';
+                    $msgType = 'success';
+                } else {
+                    $msg = 'No se realizaron cambios.';
+                    $msgType = 'info';
+                }
+            }
+        }
+    }
+
     // --- Crear usuario ---
     if ($action === 'create_user') {
         $nombre    = trim($_POST['nombre'] ?? '');
@@ -244,6 +282,9 @@ if ($empresaId > 0) {
                     <div class="small" style="opacity:0.5;font-size:0.7rem;"><?= htmlspecialchars($user['email']) ?></div>
                 </div>
             </div>
+            <a href="perfil.php" class="btn btn-sm btn-outline-light w-100 mb-2" style="font-size:0.8rem;">
+                <i class="bi bi-person-gear"></i> Mi Perfil
+            </a>
             <a href="logout.php" class="btn btn-sm btn-outline-light w-100" style="opacity:0.6;font-size:0.8rem;">
                 <i class="bi bi-box-arrow-left"></i> Cerrar sesión
             </a>
@@ -374,6 +415,15 @@ if ($empresaId > 0) {
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end">
+                                            <!-- Editar usuario -->
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    title="Editar nombre / email"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalEditUser"
+                                                    onclick="setEditUser(<?= $u['id'] ?>, '<?= htmlspecialchars($u['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['email'], ENT_QUOTES) ?>')">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+
                                             <!-- Cambiar contraseña -->
                                             <button type="button" class="btn btn-sm btn-outline-warning"
                                                     title="Cambiar contraseña"
@@ -476,11 +526,51 @@ if ($empresaId > 0) {
         </div>
     </div>
 
+    <!-- Modal editar usuario -->
+    <div class="modal fade" id="modalEditUser" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="action" value="edit_user">
+                    <input type="hidden" name="user_id" id="editUserId" value="">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-pencil-square me-2"></i>Editar usuario
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nombre</label>
+                            <input type="text" name="edit_nombre" id="editUserNombre" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Email</label>
+                            <input type="email" name="edit_email" id="editUserEmail" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Guardar cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     function setPasswordUser(id, name) {
         document.getElementById('passUserId').value = id;
         document.getElementById('passUserName').textContent = name;
+    }
+    function setEditUser(id, name, email) {
+        document.getElementById('editUserId').value = id;
+        document.getElementById('editUserNombre').value = name;
+        document.getElementById('editUserEmail').value = email;
     }
     </script>
 </body>
