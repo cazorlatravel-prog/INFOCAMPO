@@ -64,8 +64,14 @@ class CloudinaryHelper
         }
 
         // Generar firma (signature) según API de Cloudinary
+        // No usar http_build_query() porque URL-codifica los valores
+        // (ej: / → %2F) y Cloudinary espera valores sin codificar.
         ksort($paramsToSign);
-        $signatureString = http_build_query($paramsToSign) . $apiSecret;
+        $parts = [];
+        foreach ($paramsToSign as $key => $value) {
+            $parts[] = $key . '=' . $value;
+        }
+        $signatureString = implode('&', $parts) . $apiSecret;
         $signature = sha1($signatureString);
 
         $url = "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload";
