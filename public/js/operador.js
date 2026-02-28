@@ -2160,7 +2160,7 @@
             }
 
             let html = '';
-            data.visitas.forEach(visita => {
+            data.visitas.forEach((visita, idx) => {
                 const fechaFmt = formatFechaVisita(visita.fecha);
                 html += `<div class="visita-group">
                     <div class="visita-group-header">
@@ -2183,13 +2183,111 @@
                     </div>`;
                 });
 
-                html += `</div></div>`;
+                html += `</div>
+                    <button type="button" class="btn-continuar-visita" data-visita-idx="${idx}">
+                        <i class="bi bi-pencil-square"></i> Continuar visita
+                    </button>
+                </div>`;
             });
 
+            // Store visitas data for continuarVisita
+            window._visitasData = data.visitas;
+
             visitasBody.innerHTML = html;
+
+            // Bind "Continuar visita" buttons
+            visitasBody.querySelectorAll('.btn-continuar-visita').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(btn.dataset.visitaIdx);
+                    if (window._visitasData && window._visitasData[idx]) {
+                        continuarVisita(window._visitasData[idx]);
+                    }
+                });
+            });
         } catch (err) {
             visitasBody.innerHTML = '<div class="visita-empty"><i class="bi bi-wifi-off"></i><p>Error de conexión</p></div>';
         }
+    }
+
+    // ===================================================================
+    // CONTINUAR VISITA - Load full visit into Ficha
+    // ===================================================================
+    function continuarVisita(visita) {
+        // 1. Select the infrastructure
+        selectInfra(visita.infra_id, visita.infra_nombre, visita.infra_codigo);
+
+        // 2. Determine situación from the most recent photo
+        if (visita.fotos && visita.fotos.length > 0) {
+            const lastFoto = visita.fotos[0]; // fotos are ordered by most recent first
+            const sitMap = { antes: 0, durante: 1, despues: 2 };
+            const sitIdx = sitMap[lastFoto.estado] !== undefined ? sitMap[lastFoto.estado] : 0;
+            state.situacionIdx = sitIdx;
+
+            // Update situación selector UI
+            const sitSel = $('#situacion-selector');
+            if (sitSel) {
+                sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+                const activeBtn = sitSel.querySelector(`[data-sit="${sitIdx}"]`);
+                if (activeBtn) activeBtn.classList.add('active');
+            }
+        }
+
+        // 3. Set observations from the most recent photo
+        const obsField = $('#observaciones-general');
+        if (obsField && visita.fotos && visita.fotos.length > 0) {
+            // Use the last photo's observations as a starting point
+            const lastObs = visita.fotos[0].observaciones || '';
+            obsField.value = lastObs;
+        }
+
+        // 4. Set work unit from the most recent photo that has one
+        if (visita.fotos && visita.fotos.length > 0) {
+            const fotoConUO = visita.fotos.find(f => f.unidad_obra_id);
+            if (fotoConUO && fotoConUO.unidad_obra_id) {
+                unidadObra.value = fotoConUO.unidad_obra_id;
+                state.unidadObraId = fotoConUO.unidad_obra_id;
+            }
+        }
+
+        // 5. Load all visit photos into gallery and set counters
+        galleryGrid.innerHTML = '';
+        state.photos = [];
+        state.countAleatorias = 0;
+        state.countComparativas = 0;
+        state.countTotal = 0;
+        state.seqComparativa = 0;
+
+        if (visita.fotos && visita.fotos.length > 0) {
+            // Reverse to show oldest first (chronological order in gallery)
+            const fotosOrdenadas = [...visita.fotos].reverse();
+            fotosOrdenadas.forEach(foto => {
+                const tipo = foto.tipo || 'aleatorio';
+                const seq = foto.seq || null;
+                const nombre = foto.nombre || '';
+                const url = foto.url || '';
+
+                if (tipo === 'comparativo') {
+                    state.countComparativas++;
+                    if (seq && seq > state.seqComparativa) {
+                        state.seqComparativa = seq;
+                    }
+                } else {
+                    state.countAleatorias++;
+                }
+                state.countTotal++;
+
+                addToGallery(url, tipo, nombre, seq);
+            });
+        }
+
+        // 6. Update counters in UI
+        countAleatorias.textContent = state.countAleatorias;
+        countComparativas.textContent = state.countComparativas;
+
+        // 7. Show Ficha screen
+        showScreen('ficha');
+        showNotification(`Visita a "${visita.infra_nombre}" cargada. Puedes editar datos y seguir tomando fotos.`);
     }
 
     // Global handler for clicking on a visit photo

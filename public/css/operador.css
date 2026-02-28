@@ -2214,6 +2214,29 @@ select.input-field {
     padding: 10px;
 }
 
+.btn-continuar-visita {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: calc(100% - 20px);
+    margin: 0 10px 10px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #4f6ef7 0%, #6366f1 100%);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    box-shadow: 0 2px 8px rgba(79, 110, 247, 0.3);
+}
+.btn-continuar-visita:active {
+    opacity: 0.85;
+    transform: scale(0.98);
+}
+
 .visita-foto-item {
     position: relative;
     cursor: pointer;
