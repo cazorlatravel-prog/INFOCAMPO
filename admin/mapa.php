@@ -278,7 +278,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 <body>
     <?php include __DIR__ . '/includes/header.php'; ?>
 
-    <?php if ($empresaId > 0 && !empty($registros)): ?>
+    <?php if ($empresaId > 0): ?>
 
     <!-- Mobile filter toggle -->
     <button class="filter-toggle-btn" id="btn-filter-toggle" onclick="toggleFilterDrawer()">
@@ -400,12 +400,6 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div id="map"></div>
     </div>
 
-    <?php elseif ($empresaId > 0): ?>
-        <div class="text-center py-5">
-            <i class="bi bi-camera" style="font-size:3rem;color:#adb5bd;"></i>
-            <h5 class="mt-3 text-muted">Sin fotos registradas</h5>
-            <p class="text-muted">Los operadores aún no han subido fotos para esta empresa.</p>
-        </div>
     <?php else: ?>
         <div class="container-fluid py-4">
             <div class="text-center py-5">
@@ -428,7 +422,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
-    <?php if ($empresaId > 0 && !empty($registros)): ?>
+    <?php if ($empresaId > 0): ?>
     (function() {
         var allData = <?= json_encode($jsRegistros, JSON_UNESCAPED_UNICODE) ?>;
         var empresaId = <?= $empresaId ?>;
@@ -659,6 +653,17 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
         // Show infra circles by default
         renderInfraCircles();
+
+        // If no photos but there are infrastructures, fit map to infra bounds
+        if (allData.length === 0 && infraData.length > 0) {
+            var infraBounds = [];
+            infraData.forEach(function(inf) {
+                if (inf.lat && inf.lon) infraBounds.push([inf.lat, inf.lon]);
+            });
+            if (infraBounds.length > 0) {
+                map.fitBounds(infraBounds, { padding: [30, 30], maxZoom: 16 });
+            }
+        }
 
         window.toggleInfraMarkers = function() {
             var btn = document.getElementById('btn-toggle-infra-markers');
