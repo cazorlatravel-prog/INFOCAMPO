@@ -371,6 +371,14 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             <label>KML Guardados</label>
             <div id="saved-kml-list" class="d-flex gap-1 flex-wrap"></div>
         </div>
+        <div class="filter-group">
+            <label>Mapa Base</label>
+            <select id="filter-base-layer" class="form-select" style="width:160px;" onchange="switchBaseLayer(this.value)">
+                <option value="osm">OpenStreetMap</option>
+                <option value="ortofoto">Ortofoto Andalucía 2020</option>
+                <option value="topografico">Topográfico Andalucía</option>
+            </select>
+        </div>
         <div class="filter-group" style="margin-left:auto;">
             <label>&nbsp;</label>
             <button class="btn btn-sm btn-outline-secondary" onclick="resetFilters()">
@@ -429,10 +437,35 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
         var stateColors = { 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e' };
 
-        // Tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
-        }).addTo(map);
+        // Base layers
+        var baseLayers = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+            }),
+            ortofoto: L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
+                layers: 'ortofoto_2020',
+                format: 'image/png',
+                transparent: false,
+                attribution: '&copy; Junta de Andalucía - Ortofoto 2020',
+                maxZoom: 20,
+            }),
+            topografico: L.tileLayer.wms('https://www.ideandalucia.es/wms/mta10r_2001-2013?', {
+                layers: 'mta10r_2001-2013',
+                format: 'image/png',
+                transparent: false,
+                attribution: '&copy; IDEAndalucía - MTA 1:10.000',
+                maxZoom: 20,
+            }),
+        };
+        var activeBaseLayer = baseLayers.osm;
+        activeBaseLayer.addTo(map);
+
+        window.switchBaseLayer = function(key) {
+            if (activeBaseLayer) map.removeLayer(activeBaseLayer);
+            activeBaseLayer = baseLayers[key] || baseLayers.osm;
+            activeBaseLayer.addTo(map);
+            activeBaseLayer.bringToBack();
+        };
 
         // Legend
         var legend = L.control({ position: 'bottomright' });

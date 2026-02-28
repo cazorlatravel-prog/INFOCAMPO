@@ -1316,6 +1316,8 @@
     let mapSelectedInfra = null; // { id, nombre, codigo, lat, lon, registros }
     let mapUserMarker = null;
     let mapKmlLayers = []; // KML layer groups
+    let mapActiveBaseLayer = null;
+    const mapBaseLayers = {};
 
     async function openMapScreen() {
         showScreen('mapa');
@@ -1325,10 +1327,44 @@
         if (!leafletMap) {
             leafletMap = L.map('op-map', { zoomControl: false });
             L.control.zoom({ position: 'topright' }).addTo(leafletMap);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OSM',
-                maxZoom: 19,
-            }).addTo(leafletMap);
+
+            // Base layers
+            mapBaseLayers.osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OSM', maxZoom: 19,
+            });
+            mapBaseLayers.ortofoto = L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
+                layers: 'ortofoto_2020', format: 'image/png', transparent: false,
+                attribution: '&copy; Junta de Andalucía', maxZoom: 20,
+            });
+            mapBaseLayers.topografico = L.tileLayer.wms('https://www.ideandalucia.es/wms/mta10r_2001-2013?', {
+                layers: 'mta10r_2001-2013', format: 'image/png', transparent: false,
+                attribution: '&copy; IDEAndalucía', maxZoom: 20,
+            });
+
+            mapActiveBaseLayer = mapBaseLayers.osm;
+            mapActiveBaseLayer.addTo(leafletMap);
+
+            // Layer switcher control (top-left)
+            const layerControl = L.control({ position: 'topleft' });
+            layerControl.onAdd = function() {
+                const div = L.DomUtil.create('div', 'op-layer-switcher');
+                div.innerHTML =
+                    '<select id="op-base-layer-select" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;">' +
+                    '<option value="osm">Mapa</option>' +
+                    '<option value="ortofoto">Ortofoto</option>' +
+                    '<option value="topografico">Topográfico</option>' +
+                    '</select>';
+                L.DomEvent.disableClickPropagation(div);
+                return div;
+            };
+            layerControl.addTo(leafletMap);
+
+            document.getElementById('op-base-layer-select').addEventListener('change', function() {
+                if (mapActiveBaseLayer) leafletMap.removeLayer(mapActiveBaseLayer);
+                mapActiveBaseLayer = mapBaseLayers[this.value] || mapBaseLayers.osm;
+                mapActiveBaseLayer.addTo(leafletMap);
+                mapActiveBaseLayer.bringToBack();
+            });
 
             // Set initial view to current GPS or Spain center
             if (state.gps.lat && state.gps.lon) {
