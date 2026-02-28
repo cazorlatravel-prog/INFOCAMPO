@@ -340,6 +340,9 @@ if (isset($_GET['edit'])) {
                                             <a href="usuarios.php?empresa_id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-dark" title="Gestionar usuarios">
                                                 <i class="bi bi-people"></i>
                                             </a>
+                                            <a href="/admin/infraestructuras.php?empresa_id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-success" title="Gestionar infraestructuras">
+                                                <i class="bi bi-geo-alt"></i>
+                                            </a>
                                             <a href="campos.php?empresa_id=<?= $emp['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Campos formulario">
                                                 <i class="bi bi-ui-checks-grid"></i>
                                             </a>
