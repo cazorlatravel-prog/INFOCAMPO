@@ -64,18 +64,26 @@ class CloudinaryHelper
         }
 
         // Generar firma (signature) según API de Cloudinary
+        // No usar http_build_query() porque URL-codifica los valores
+        // (ej: / → %2F) y Cloudinary espera valores sin codificar.
         ksort($paramsToSign);
-        $signatureString = http_build_query($paramsToSign) . $apiSecret;
-        $signature = sha1($signatureString);
+        $parts = [];
+        foreach ($paramsToSign as $key => $value) {
+            $parts[] = $key . '=' . $value;
+        }
+        $signatureString = implode('&', $parts) . $apiSecret;
+        // Cuentas Cloudinary creadas desde julio 2023 requieren SHA-256
+        $signature = hash('sha256', $signatureString);
 
         $url = "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload";
 
         $postFields = [
-            'file'      => new \CURLFile($filePath),
-            'folder'    => $folder,
-            'timestamp' => $timestamp,
-            'api_key'   => $apiKey,
-            'signature' => $signature,
+            'file'                => new \CURLFile($filePath),
+            'folder'              => $folder,
+            'timestamp'           => $timestamp,
+            'api_key'             => $apiKey,
+            'signature'           => $signature,
+            'signature_algorithm' => 'sha256',
         ];
 
         if ($publicId !== null) {
