@@ -103,6 +103,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msgType = 'info';
         }
     }
+
+    if ($action === 'delete') {
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($id > 0 && $empresaId > 0) {
+            $stmt = $pdo->prepare("SELECT id FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id");
+            $stmt->execute([':id' => $id, ':emp_id' => $empresaId]);
+            if ($stmt->fetch()) {
+                // Eliminar valores_campo de registros asociados, luego registros, luego infraestructura
+                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id = :iid)")
+                    ->execute([':iid' => $id]);
+                $pdo->prepare("DELETE FROM registros WHERE infra_id = :iid")
+                    ->execute([':iid' => $id]);
+                $pdo->prepare("DELETE FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id")
+                    ->execute([':id' => $id, ':emp_id' => $empresaId]);
+                $msg = 'Infraestructura eliminada correctamente.';
+                $msgType = 'success';
+            } else {
+                $msg = 'No se pudo eliminar la infraestructura.';
+                $msgType = 'danger';
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -341,6 +363,14 @@ if (isset($_GET['edit'])) {
                             <button type="submit" class="btn btn-sm btn-outline-<?= $inf['activa'] ? 'warning' : 'success' ?>"
                                     title="<?= $inf['activa'] ? 'Desactivar' : 'Activar' ?>">
                                 <i class="bi bi-<?= $inf['activa'] ? 'pause-circle' : 'play-circle' ?>"></i>
+                            </button>
+                        </form>
+                        <form method="post" class="d-inline" onsubmit="return confirm('¿ELIMINAR esta infraestructura permanentemente? Se borrarán también todos sus registros e inspecciones (<?= $inf['num_registros'] ?>). Esta acción no se puede deshacer.')">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="<?= $inf['id'] ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar infraestructura">
+                                <i class="bi bi-trash"></i>
                             </button>
                         </form>
                     </div>

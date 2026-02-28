@@ -118,6 +118,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msgType = 'info';
         }
     }
+
+    // --- Eliminar usuario ---
+    if ($action === 'delete_user') {
+        $targetId = (int) ($_POST['user_id'] ?? 0);
+        if ($targetId > 0) {
+            $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE id = :id AND rol != 'superadmin'");
+            $stmt->execute([':id' => $targetId]);
+            if ($stmt->fetch()) {
+                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE usuario_id = :uid)")
+                    ->execute([':uid' => $targetId]);
+                $pdo->prepare("DELETE FROM registros WHERE usuario_id = :uid")
+                    ->execute([':uid' => $targetId]);
+                $pdo->prepare("DELETE FROM usuarios WHERE id = :id AND rol != 'superadmin'")
+                    ->execute([':id' => $targetId]);
+                $msg = 'Usuario eliminado correctamente.';
+                $msgType = 'success';
+            } else {
+                $msg = 'No se pudo eliminar el usuario.';
+                $msgType = 'danger';
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -380,6 +402,16 @@ if ($empresaId > 0) {
                                                 <button type="submit" class="btn btn-sm btn-outline-<?= $u['activo'] ? 'danger' : 'success' ?>"
                                                         title="<?= $u['activo'] ? 'Desactivar' : 'Activar' ?>">
                                                     <i class="bi bi-<?= $u['activo'] ? 'person-x' : 'person-check' ?>"></i>
+                                                </button>
+                                            </form>
+
+                                            <!-- Eliminar -->
+                                            <form method="post" class="d-inline" onsubmit="return confirm('¿ELIMINAR este usuario permanentemente? Se borrarán también todos sus registros e inspecciones. Esta acción no se puede deshacer.')">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="action" value="delete_user">
+                                                <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar usuario">
+                                                    <i class="bi bi-trash"></i>
                                                 </button>
                                             </form>
                                         </div>
