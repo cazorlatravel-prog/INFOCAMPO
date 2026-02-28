@@ -333,21 +333,29 @@
 
     function searchInfra(query) {
         clearTimeout(searchTimeout);
-        if (query.length < 1) {
-            infraResults.classList.add('hidden');
-            return;
-        }
 
         searchTimeout = setTimeout(async () => {
             try {
-                const res = await fetch(
-                    `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&q=${encodeURIComponent(query)}${getFilterParams()}`
-                );
+                let url = `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}${getFilterParams()}`;
+                if (query.length > 0) {
+                    url += `&q=${encodeURIComponent(query)}`;
+                }
+                const res = await fetch(url);
                 const data = await res.json();
 
-                if (!data.ok) return;
+                if (!data.ok) {
+                    console.warn('API error:', data.error);
+                    return;
+                }
 
                 let html = '';
+
+                if (data.infraestructuras.length === 0 && query.length === 0) {
+                    html += `<div class="result-item" style="color:#9ca3af;pointer-events:none;">
+                        <i class="bi bi-info-circle"></i> No hay infraestructuras disponibles
+                    </div>`;
+                }
+
                 data.infraestructuras.forEach(inf => {
                     const loc = [inf.municipio, inf.provincia].filter(Boolean).join(', ');
                     html += `<div class="result-item" data-id="${inf.id}" data-name="${escHtml(inf.nombre)}" data-code="${escHtml(inf.codigo_unico)}">
@@ -356,16 +364,18 @@
                     </div>`;
                 });
 
-                // Option to create new
-                html += `<div class="result-new" data-new="true">
-                    <i class="bi bi-plus-circle"></i> Crear: "${escHtml(query)}"
-                </div>`;
+                // Option to create new (only when user typed something)
+                if (query.length > 0) {
+                    html += `<div class="result-new" data-new="true">
+                        <i class="bi bi-plus-circle"></i> Crear: "${escHtml(query)}"
+                    </div>`;
+                }
 
                 infraResults.innerHTML = html;
                 infraResults.classList.remove('hidden');
 
                 // Bind clicks
-                infraResults.querySelectorAll('.result-item').forEach(el => {
+                infraResults.querySelectorAll('.result-item[data-id]').forEach(el => {
                     el.addEventListener('click', () => selectInfra(
                         parseInt(el.dataset.id),
                         el.dataset.name,
@@ -373,13 +383,16 @@
                     ));
                 });
 
-                infraResults.querySelector('.result-new').addEventListener('click', () => {
-                    createNewInfra(query);
-                });
+                const newBtn = infraResults.querySelector('.result-new');
+                if (newBtn) {
+                    newBtn.addEventListener('click', () => {
+                        createNewInfra(query);
+                    });
+                }
             } catch (err) {
                 console.warn('Error searching infra:', err);
             }
-        }, 300);
+        }, query.length === 0 ? 50 : 300);
     }
 
     function selectInfra(id, name, code) {
@@ -1041,10 +1054,8 @@
         }
 
         // Infrastructure search
-        infraSearch.addEventListener('input', (e) => searchInfra(e.target.value));
-        infraSearch.addEventListener('focus', (e) => {
-            if (e.target.value.length > 0) searchInfra(e.target.value);
-        });
+        infraSearch.addEventListener('input', (e) => searchInfra(e.target.value.trim()));
+        infraSearch.addEventListener('focus', () => searchInfra(infraSearch.value.trim()));
         infraClear.addEventListener('click', clearInfra);
 
         // Close search results on outside click
