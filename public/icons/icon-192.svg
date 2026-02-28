@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#4f6ef7"/>
+  <g transform="translate(96,80)" fill="none">
+    <path d="M0-40a40 40 0 0 1 40 40c0 30-40 72-40 72S-40 70-40 40A40 40 0 0 1 0-40z" fill="#fff"/>
+    <circle r="16" fill="#4f6ef7"/>
+  </g>
+  <text x="96" y="170" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="800" fill="#fff">GPS</text>
+</svg>

@@ -7,12 +7,15 @@
  *   - Fallback page when completely offline
  */
 
-const CACHE_NAME = 'infocampo-v4';
+const CACHE_NAME = 'infocampo-v5';
 const STATIC_ASSETS = [
     'css/operador.css',
     'js/operador.js',
     'js/watermark.js',
     'js/offline.js',
+    'manifest.json',
+    'icons/icon-192.png',
+    'icons/icon-512.png',
 ];
 
 // Install: pre-cache static assets

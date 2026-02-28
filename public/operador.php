@@ -51,8 +51,13 @@ if ($initials === '') $initials = 'OP';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#4f6ef7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FotoGPS">
     <title>FotoGPS.app - Operador de Campo</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="css/operador.css">
@@ -86,6 +91,27 @@ if ($initials === '') $initials = 'OP';
 
         <!-- Body -->
         <div class="ficha-body">
+
+            <!-- Banner: Instalar App -->
+            <div id="install-banner" class="install-banner hidden">
+                <div class="install-banner-content">
+                    <div class="install-banner-icon">
+                        <i class="bi bi-download"></i>
+                    </div>
+                    <div class="install-banner-text">
+                        <strong>Instalar FotoGPS</strong>
+                        <small>Acceso directo desde tu pantalla de inicio</small>
+                    </div>
+                </div>
+                <div class="install-banner-actions">
+                    <button type="button" id="btn-install-app" class="install-btn">
+                        <i class="bi bi-phone-fill"></i> Instalar App
+                    </button>
+                    <button type="button" id="btn-install-dismiss" class="install-dismiss">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
 
             <!-- Card: Ubicacion -->
             <div class="card">

@@ -180,6 +180,113 @@ html, body {
 }
 
 
+/* --- Install Banner --- */
+.install-banner {
+    background: linear-gradient(135deg, #4f6ef7, #3b5de7);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(79, 110, 247, 0.3);
+}
+
+.install-banner.hidden { display: none !important; }
+
+.install-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.install-banner-icon {
+    width: 42px;
+    height: 42px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.install-banner-text {
+    min-width: 0;
+}
+
+.install-banner-text strong {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.install-banner-text small {
+    display: block;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.75);
+    margin-top: 1px;
+}
+
+.install-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.install-btn {
+    background: #ffffff;
+    border: none;
+    color: #4f6ef7;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-height: 40px;
+    transition: all 0.15s;
+}
+
+.install-btn:hover {
+    background: #eef2ff;
+}
+
+.install-btn:active {
+    transform: scale(0.96);
+}
+
+.install-dismiss {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: rgba(255,255,255,0.7);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.install-dismiss:hover {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+
 /* --- Cards --- */
 .card {
     background: #ffffff;

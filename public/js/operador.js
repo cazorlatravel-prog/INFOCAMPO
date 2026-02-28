@@ -1547,8 +1547,89 @@
     }
 
     // ===================================================================
+    // PWA INSTALL
+    // ===================================================================
+    let deferredInstallPrompt = null;
+
+    function initPWAInstall() {
+        const banner = $('#install-banner');
+        const btnInstall = $('#btn-install-app');
+        const btnDismiss = $('#btn-install-dismiss');
+
+        if (!banner || !btnInstall) return;
+
+        // Listen for the browser's install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+
+            // Only show if user hasn't dismissed recently
+            const dismissed = localStorage.getItem('pwa-install-dismissed');
+            if (dismissed) {
+                const dismissedAt = parseInt(dismissed, 10);
+                // Show again after 7 days
+                if (Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return;
+            }
+
+            banner.classList.remove('hidden');
+        });
+
+        btnInstall.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) {
+                // Fallback: show instructions for iOS/Safari
+                showInstallInstructions();
+                return;
+            }
+
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+
+            if (outcome === 'accepted') {
+                banner.classList.add('hidden');
+                showNotification('App instalada correctamente');
+            }
+        });
+
+        if (btnDismiss) {
+            btnDismiss.addEventListener('click', () => {
+                banner.classList.add('hidden');
+                localStorage.setItem('pwa-install-dismissed', String(Date.now()));
+            });
+        }
+
+        // Detect if already installed (standalone mode)
+        if (window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true) {
+            banner.classList.add('hidden');
+            return;
+        }
+
+        // For iOS where beforeinstallprompt doesn't fire
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS && !window.navigator.standalone) {
+            const dismissed = localStorage.getItem('pwa-install-dismissed');
+            if (!dismissed || (Date.now() - parseInt(dismissed, 10)) > 7 * 24 * 60 * 60 * 1000) {
+                banner.classList.remove('hidden');
+            }
+        }
+    }
+
+    function showInstallInstructions() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+            alert('Para instalar FotoGPS en tu iPhone:\n\n1. Pulsa el botón Compartir (cuadrado con flecha)\n2. Desplázate y pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
+        } else {
+            alert('Para instalar FotoGPS:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
+        }
+    }
+
+    // ===================================================================
     // START
     // ===================================================================
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        init();
+        initPWAInstall();
+    });
 
 })();
