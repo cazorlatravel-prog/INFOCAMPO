@@ -84,8 +84,6 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
-    const btnSituacion   = $('#btn-situacion');
-    const situacionLabel = $('#situacion-label');
 
     // Preview
     const previewCanvas  = $('#preview-canvas');
@@ -1299,17 +1297,6 @@
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
 
-        // Situación toggle (camera)
-        if (btnSituacion) {
-            btnSituacion.addEventListener('click', () => {
-                state.situacionIdx = (state.situacionIdx + 1) % SITUACIONES.length;
-                situacionLabel.textContent = SITUACIONES_UI[state.situacionIdx];
-                btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[state.situacionIdx];
-                // Sync Ficha selector
-                syncFichaSituacion();
-            });
-        }
-
         // Ghost toggle
         btnGhostToggle.addEventListener('click', () => {
             if (!state.ghostUrl) return;
@@ -1361,12 +1348,8 @@
                 btn.addEventListener('click', () => {
                     const sitIdx = parseInt(btn.dataset.sit);
                     state.situacionIdx = sitIdx;
-                    // Update active state in Ficha selector
                     situacionSelector.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    // Sync camera situacion label too
-                    if (situacionLabel) situacionLabel.textContent = SITUACIONES_UI[sitIdx];
-                    if (btnSituacion) btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[sitIdx];
                 });
             });
         }
@@ -2100,17 +2083,6 @@
         } else {
             alert('Para instalar FotoGPS:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
         }
-    }
-
-    // ===================================================================
-    // SYNC SITUACION FICHA <-> CAMERA
-    // ===================================================================
-    function syncFichaSituacion() {
-        const sitSel = $('#situacion-selector');
-        if (!sitSel) return;
-        sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-        const target = sitSel.querySelector(`[data-sit="${state.situacionIdx}"]`);
-        if (target) target.classList.add('active');
     }
 
     // ===================================================================

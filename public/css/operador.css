@@ -2043,8 +2043,10 @@ select.input-field {
    BOTÓN FINALIZAR VISITA (rojo, fijo abajo)
    ========================================================== */
 .guardar-visita-fixed {
-    padding: 16px;
-    background: transparent;
+    padding: 12px 16px;
+    background: #fff;
+    border-top: 1px solid #e8ecf1;
+    flex-shrink: 0;
 }
 
 .btn-finalizar-visita {

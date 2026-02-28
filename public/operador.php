@@ -273,13 +273,13 @@ if ($initials === '') $initials = 'OP';
                 <h3 class="gallery-title"><i class="bi bi-images"></i> Fotos de esta visita</h3>
                 <div id="gallery-grid" class="gallery-grid"></div>
             </div>
+        </div>
 
-            <!-- Botón Finalizar Visita (fijo abajo, rojo, visible con infra + fotos) -->
-            <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
-                <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita">
-                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
-                </button>
-            </div>
+        <!-- Botón Finalizar Visita (fijo abajo, rojo, fuera del scroll) -->
+        <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
+            <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita">
+                <i class="bi bi-check-circle-fill"></i> Finalizar visita
+            </button>
         </div>
     </div>
 
@@ -309,12 +309,6 @@ if ($initials === '') $initials = 'OP';
 
         <div id="cam-seq-counter" class="cam-seq hidden">
             <span id="cam-seq-label">W1</span>
-        </div>
-
-        <div class="cam-situacion">
-            <button type="button" id="btn-situacion" class="cam-situacion-btn" title="Cambiar situación">
-                <i class="bi bi-flag"></i> <span id="situacion-label">ANTES</span>
-            </button>
         </div>
 
         <div class="cam-controls">
