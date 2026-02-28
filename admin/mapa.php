@@ -234,6 +234,15 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 <option value="critico">Critico</option>
             </select>
         </div>
+        <div class="filter-group">
+            <label>Capa KML</label>
+            <div class="d-flex gap-1">
+                <input type="file" id="kml-overlay-input" accept=".kml" class="form-control" style="font-size:0.8rem;height:34px;width:180px;">
+                <button class="btn btn-sm btn-outline-danger" id="btn-remove-kml" onclick="removeKmlLayer()" style="display:none;" title="Quitar capa KML">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
         <div class="filter-group" style="margin-left:auto;">
             <label>&nbsp;</label>
             <button class="btn btn-sm btn-outline-secondary" onclick="resetFilters()">
@@ -308,7 +317,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 '<div class="legend-row"><div class="legend-dot" style="background:#ef4444;"></div> Critico</div>' +
                 '<hr style="margin:4px 0;">' +
                 '<div class="legend-row"><div class="legend-dot" style="background:#3b82f6;width:8px;height:8px;"></div> Aleatoria</div>' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Comparativa</div>';
+                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Comparativa</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#8b5cf6;"></div> Capa KML</div>';
             return div;
         };
         legend.addTo(map);
@@ -419,6 +429,150 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
         // Initial render
         renderMarkers(allData);
+
+        // ---------------------------------------------------------------
+        // KML Overlay - Visualización de capas KML en el mapa
+        // ---------------------------------------------------------------
+        var kmlLayerGroup = null;
+
+        document.getElementById('kml-overlay-input').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                loadKmlOverlay(ev.target.result);
+            };
+            reader.readAsText(file);
+        });
+
+        function loadKmlOverlay(kmlText) {
+            // Limpiar capa anterior
+            if (kmlLayerGroup) {
+                map.removeLayer(kmlLayerGroup);
+            }
+            kmlLayerGroup = L.layerGroup().addTo(map);
+
+            var parser = new DOMParser();
+            var xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+
+            var placemarks = xmlDoc.querySelectorAll('Placemark');
+            var bounds = [];
+            var pointCount = 0;
+            var lineCount = 0;
+            var polygonCount = 0;
+
+            placemarks.forEach(function(pm) {
+                var nameEl = pm.querySelector('name');
+                var nombre = nameEl ? nameEl.textContent.trim() : '';
+                var descEl = pm.querySelector('description');
+                var desc = descEl ? descEl.textContent.trim() : '';
+
+                var popupContent = '<div style="max-width:250px;">';
+                if (nombre) popupContent += '<strong style="color:#8b5cf6;">' + nombre + '</strong><br>';
+                if (desc) popupContent += '<small>' + desc.substring(0, 150) + '</small><br>';
+                popupContent += '<span class="badge" style="background:#8b5cf6;font-size:0.6rem;">KML</span>';
+                popupContent += '</div>';
+
+                // Points
+                var pointEl = pm.querySelector('Point coordinates');
+                if (pointEl) {
+                    var coords = pointEl.textContent.trim().split(',');
+                    if (coords.length >= 2) {
+                        var lat = parseFloat(coords[1]);
+                        var lon = parseFloat(coords[0]);
+                        if (!isNaN(lat) && !isNaN(lon)) {
+                            var icon = L.divIcon({
+                                className: 'kml-marker',
+                                html: '<div style="width:14px;height:14px;border-radius:50%;background:#8b5cf6;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+                                iconSize: [14, 14],
+                                iconAnchor: [7, 7],
+                            });
+                            L.marker([lat, lon], { icon: icon })
+                                .bindPopup(popupContent)
+                                .addTo(kmlLayerGroup);
+                            bounds.push([lat, lon]);
+                            pointCount++;
+                        }
+                    }
+                }
+
+                // LineStrings
+                var lineEl = pm.querySelector('LineString coordinates');
+                if (lineEl) {
+                    var lineCoords = parseKmlCoordinates(lineEl.textContent);
+                    if (lineCoords.length > 0) {
+                        L.polyline(lineCoords, { color: '#8b5cf6', weight: 3, opacity: 0.8 })
+                            .bindPopup(popupContent)
+                            .addTo(kmlLayerGroup);
+                        lineCoords.forEach(function(c) { bounds.push(c); });
+                        lineCount++;
+                    }
+                }
+
+                // Polygons
+                var polyEl = pm.querySelector('Polygon outerBoundaryIs LinearRing coordinates');
+                if (polyEl) {
+                    var polyCoords = parseKmlCoordinates(polyEl.textContent);
+                    if (polyCoords.length > 0) {
+                        L.polygon(polyCoords, { color: '#8b5cf6', fillColor: '#8b5cf6', fillOpacity: 0.15, weight: 2 })
+                            .bindPopup(popupContent)
+                            .addTo(kmlLayerGroup);
+                        polyCoords.forEach(function(c) { bounds.push(c); });
+                        polygonCount++;
+                    }
+                }
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+            }
+
+            // Mostrar botón de quitar y actualizar leyenda
+            document.getElementById('btn-remove-kml').style.display = 'inline-block';
+
+            // Añadir info a la stats bar
+            var total = pointCount + lineCount + polygonCount;
+            var statKml = document.getElementById('stat-kml');
+            if (!statKml) {
+                var statsBar = document.getElementById('stats-bar');
+                var pill = document.createElement('div');
+                pill.className = 'stat-pill';
+                pill.id = 'stat-kml';
+                pill.style.color = '#8b5cf6';
+                pill.innerHTML = '<strong>' + total + '</strong> elementos KML';
+                statsBar.appendChild(pill);
+            } else {
+                statKml.innerHTML = '<strong>' + total + '</strong> elementos KML';
+            }
+        }
+
+        function parseKmlCoordinates(text) {
+            var coords = [];
+            var tuples = text.trim().split(/\s+/);
+            tuples.forEach(function(t) {
+                var parts = t.split(',');
+                if (parts.length >= 2) {
+                    var lon = parseFloat(parts[0]);
+                    var lat = parseFloat(parts[1]);
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        coords.push([lat, lon]);
+                    }
+                }
+            });
+            return coords;
+        }
+
+        window.removeKmlLayer = function() {
+            if (kmlLayerGroup) {
+                map.removeLayer(kmlLayerGroup);
+                kmlLayerGroup = null;
+            }
+            document.getElementById('kml-overlay-input').value = '';
+            document.getElementById('btn-remove-kml').style.display = 'none';
+            var statKml = document.getElementById('stat-kml');
+            if (statKml) statKml.remove();
+        };
     })();
     <?php endif; ?>
     </script>

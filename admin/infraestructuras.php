@@ -206,6 +206,9 @@ if (isset($_GET['edit'])) {
                     </select>
                 </form>
                 <?php if ($empresaId > 0): ?>
+                    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalKml">
+                        <i class="bi bi-file-earmark-arrow-up"></i> Importar KML
+                    </button>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formInfra">
                         <i class="bi bi-plus-lg"></i> Nueva Infraestructura
                     </button>
@@ -394,6 +397,86 @@ if (isset($_GET['edit'])) {
         <?php endif; ?>
     </div>
 
+    <!-- Modal Importar KML -->
+    <?php if ($empresaId > 0): ?>
+    <div class="modal fade" id="modalKml" tabindex="-1" aria-labelledby="modalKmlLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff;">
+                    <h5 class="modal-title" id="modalKmlLabel">
+                        <i class="bi bi-file-earmark-arrow-up me-2"></i>Importar Infraestructuras desde KML
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Sube un archivo <strong>.kml</strong> o <strong>.kmz</strong> con puntos (Placemarks).
+                        Cada punto se importará como una infraestructura con sus coordenadas.
+                        <br>
+                        <strong>Campos reconocidos:</strong> nombre, descripción, coordenadas, y datos extendidos
+                        (tipo, provincia, municipio).
+                    </div>
+
+                    <form id="form-kml" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                        <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+
+                        <div class="mb-3">
+                            <label for="archivo_kml" class="form-label fw-semibold">Archivo KML / KMZ</label>
+                            <input type="file" class="form-control" id="archivo_kml" name="archivo_kml"
+                                   accept=".kml,.kmz" required>
+                            <div class="form-text">Tamaño máximo: 10 MB</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Duplicados</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="duplicados" id="dup_omitir" value="omitir" checked>
+                                <label class="form-check-label" for="dup_omitir">
+                                    Omitir duplicados (nombre o coordenadas coincidentes)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="duplicados" id="dup_importar" value="importar">
+                                <label class="form-check-label" for="dup_importar">
+                                    Importar todos (pueden crearse duplicados)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Previsualización del mapa -->
+                    <div id="kml-preview-section" style="display:none;">
+                        <hr>
+                        <h6><i class="bi bi-eye me-1"></i>Previsualización</h6>
+                        <div id="kml-preview-map" style="height: 300px; border-radius: 10px; border: 2px solid #e5e7eb;"></div>
+                        <div id="kml-preview-stats" class="mt-2 small text-muted"></div>
+                    </div>
+
+                    <!-- Resultado -->
+                    <div id="kml-result" style="display:none;" class="mt-3"></div>
+
+                    <!-- Progreso -->
+                    <div id="kml-progress" style="display:none;" class="mt-3">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%">
+                                Importando...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-success" id="btn-importar-kml" onclick="importarKml()">
+                        <i class="bi bi-cloud-upload me-1"></i>Importar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -470,6 +553,185 @@ if (isset($_GET['edit'])) {
                 pickerMarker = L.marker([lat, lon]).addTo(pickerMap);
             }
         }
+
+        // ---------------------------------------------------------------
+        // KML Import
+        // ---------------------------------------------------------------
+        let kmlPreviewMap = null;
+        let kmlPreviewMarkers = [];
+
+        // Previsualización al seleccionar archivo
+        document.getElementById('archivo_kml')?.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext === 'kml') {
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    previewKml(ev.target.result);
+                };
+                reader.readAsText(file);
+            } else if (ext === 'kmz') {
+                // No podemos previsualizar KMZ en el navegador fácilmente
+                document.getElementById('kml-preview-section').style.display = 'none';
+                document.getElementById('kml-preview-stats').textContent = '';
+            }
+        });
+
+        function previewKml(kmlText) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+
+            const placemarks = xmlDoc.querySelectorAll('Placemark');
+            if (placemarks.length === 0) {
+                document.getElementById('kml-preview-section').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('kml-preview-section').style.display = 'block';
+
+            // Inicializar mapa de previsualización
+            if (!kmlPreviewMap) {
+                kmlPreviewMap = L.map('kml-preview-map').setView([40.416775, -3.703790], 6);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OSM', maxZoom: 19,
+                }).addTo(kmlPreviewMap);
+            }
+
+            // Limpiar marcadores previos
+            kmlPreviewMarkers.forEach(m => kmlPreviewMap.removeLayer(m));
+            kmlPreviewMarkers = [];
+
+            const bounds = [];
+            let pointCount = 0;
+
+            placemarks.forEach(pm => {
+                const coordEl = pm.querySelector('Point coordinates');
+                if (!coordEl) return;
+
+                const coordStr = coordEl.textContent.trim();
+                const parts = coordStr.split(',');
+                if (parts.length < 2) return;
+
+                const lon = parseFloat(parts[0]);
+                const lat = parseFloat(parts[1]);
+                if (isNaN(lat) || isNaN(lon)) return;
+
+                const nameEl = pm.querySelector('name');
+                const nombre = nameEl ? nameEl.textContent.trim() : 'Sin nombre';
+
+                const marker = L.marker([lat, lon])
+                    .bindPopup('<strong>' + nombre + '</strong><br><small>' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '</small>')
+                    .addTo(kmlPreviewMap);
+
+                kmlPreviewMarkers.push(marker);
+                bounds.push([lat, lon]);
+                pointCount++;
+            });
+
+            if (bounds.length > 0) {
+                kmlPreviewMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+            }
+
+            document.getElementById('kml-preview-stats').innerHTML =
+                '<i class="bi bi-geo-alt"></i> <strong>' + pointCount + '</strong> punto' + (pointCount !== 1 ? 's' : '') +
+                ' encontrado' + (pointCount !== 1 ? 's' : '') + ' en el archivo';
+
+            setTimeout(() => kmlPreviewMap.invalidateSize(), 200);
+        }
+
+        async function importarKml() {
+            const form = document.getElementById('form-kml');
+            const fileInput = document.getElementById('archivo_kml');
+            const resultDiv = document.getElementById('kml-result');
+            const progressDiv = document.getElementById('kml-progress');
+            const btnImportar = document.getElementById('btn-importar-kml');
+
+            if (!fileInput.files[0]) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Selecciona un archivo KML o KMZ</div>';
+                return;
+            }
+
+            // Mostrar progreso
+            progressDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+            btnImportar.disabled = true;
+            btnImportar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importando...';
+
+            const formData = new FormData(form);
+
+            try {
+                const resp = await fetch('importar_kml.php', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await resp.json();
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+
+                if (data.ok) {
+                    let html = '<div class="alert alert-success">' +
+                        '<i class="bi bi-check-circle me-1"></i>' +
+                        '<strong>' + data.importados + '</strong> infraestructura' + (data.importados !== 1 ? 's' : '') + ' importada' + (data.importados !== 1 ? 's' : '') + ' correctamente.';
+
+                    if (data.omitidos > 0) {
+                        html += '<br><small>' + data.omitidos + ' omitida' + (data.omitidos !== 1 ? 's' : '') + ' (duplicadas o sin coordenadas)</small>';
+                    }
+
+                    if (data.errores && data.errores.length > 0) {
+                        html += '<br><small class="text-warning">' + data.errores.join('<br>') + '</small>';
+                    }
+
+                    html += '</div>';
+
+                    // Tabla de detalles
+                    if (data.detalles && data.detalles.length > 0) {
+                        html += '<div style="max-height: 200px; overflow-y: auto;">';
+                        html += '<table class="table table-sm table-striped small">';
+                        html += '<thead><tr><th>Nombre</th><th>Código</th><th>Lat</th><th>Lon</th></tr></thead><tbody>';
+                        data.detalles.forEach(d => {
+                            html += '<tr><td>' + d.nombre + '</td><td><code>' + d.codigo + '</code></td>' +
+                                    '<td>' + d.lat.toFixed(6) + '</td><td>' + d.lon.toFixed(6) + '</td></tr>';
+                        });
+                        html += '</tbody></table></div>';
+                    }
+
+                    resultDiv.innerHTML = html;
+
+                    // Recargar la página tras 2 segundos para mostrar las nuevas infraestructuras
+                    if (data.importados > 0) {
+                        setTimeout(() => location.reload(), 2500);
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>' + (data.error || 'Error desconocido') + '</div>';
+                }
+            } catch (err) {
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>Error de conexión: ' + err.message + '</div>';
+            }
+
+            btnImportar.disabled = false;
+            btnImportar.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Importar';
+        }
+
+        // Reinicializar preview al abrir el modal
+        document.getElementById('modalKml')?.addEventListener('shown.bs.modal', function() {
+            if (kmlPreviewMap) {
+                setTimeout(() => kmlPreviewMap.invalidateSize(), 200);
+            }
+        });
+
+        // Limpiar al cerrar el modal
+        document.getElementById('modalKml')?.addEventListener('hidden.bs.modal', function() {
+            document.getElementById('kml-result').style.display = 'none';
+            document.getElementById('kml-progress').style.display = 'none';
+            document.getElementById('kml-preview-section').style.display = 'none';
+            document.getElementById('archivo_kml').value = '';
+        });
     </script>
 </body>
 </html>
