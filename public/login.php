@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Acceso Operador de Campo</title>
+    <title>FotoGPS.app - Acceso Operador de Campo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="icon-circle">
                 <i class="bi bi-phone-fill"></i>
             </div>
-            <h1><i class="bi bi-geo-alt-fill me-2"></i>INFOCAMPO</h1>
+            <h1><i class="bi bi-geo-alt-fill me-2"></i>FotoGPS.app</h1>
             <p>Acceso Operador de Campo</p>
         </div>
         <div class="login-body">

@@ -40,7 +40,7 @@ if ($empresaId > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>INFOCAMPO - Operador de Campo</title>
+    <title>FotoGPS.app - Operador de Campo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="css/operador.css">
@@ -52,7 +52,7 @@ if ($empresaId > 0) {
     <div id="screen-ficha" class="screen active">
         <div class="ficha-header">
             <div class="ficha-brand">
-                <strong>INFOCAMPO</strong>
+                <strong>FotoGPS.app</strong>
                 <span><?= htmlspecialchars($empresaName) ?></span>
             </div>
             <div class="ficha-header-right">

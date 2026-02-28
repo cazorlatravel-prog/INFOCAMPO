@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Acceso Administración</title>
+    <title>FotoGPS.app - Acceso Administración</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="login-card">
         <div class="login-header">
-            <h1><i class="bi bi-geo-alt-fill me-2"></i>INFOCAMPO</h1>
+            <h1><i class="bi bi-geo-alt-fill me-2"></i>FotoGPS.app</h1>
             <p>Panel de Administración</p>
         </div>
         <div class="login-body">
@@ -170,7 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
         <div class="login-footer">
-            INFOCAMPO SaaS &mdash; Inspección de Infraestructuras
+            FotoGPS.app &mdash; Tu APP de recogida de datos en Campo
         </div>
     </div>
 </body>

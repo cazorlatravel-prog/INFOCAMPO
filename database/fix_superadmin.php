@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../includes/config.php';
 
 header('Content-Type: text/html; charset=utf-8');
-echo '<h2>Diagnóstico SuperAdmin - INFOCAMPO</h2>';
+echo '<h2>Diagnóstico SuperAdmin - FotoGPS.app</h2>';
 echo '<pre>';
 
 try {

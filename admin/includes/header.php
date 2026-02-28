@@ -48,7 +48,7 @@ if ($_navEmpresaId > 0) {
 <!-- Header -->
 <div class="brand-bar d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-3">
-        <h1 class="mb-0" style="font-size:1.3rem;font-weight:700;color:#fff;">INFOCAMPO</h1>
+        <h1 class="mb-0" style="font-size:1.3rem;font-weight:700;color:#fff;">FotoGPS.app</h1>
         <?php if ($_navEmpresaNombre): ?>
             <span class="badge" style="background:rgba(255,255,255,0.15);font-size:0.75rem;padding:5px 12px;border-radius:8px;">
                 <?= htmlspecialchars($_navEmpresaNombre) ?>

@@ -184,7 +184,7 @@ $html = <<<HTML
 </head>
 <body>
     <div class="header">
-        <h1>INFOCAMPO &mdash; Informe de Inspección</h1>
+        <h1>FotoGPS.app &mdash; Informe de Inspección</h1>
         <p>Generado el {$fechaGeneracion}</p>
     </div>
 
@@ -372,7 +372,7 @@ if (!empty($aleatorias)) {
 
 // Footer
 $html .= '<div class="footer">
-    INFOCAMPO SaaS &mdash; Informe generado automáticamente &mdash; ' . $fechaGeneracion . '
+    FotoGPS.app &mdash; Informe generado automáticamente &mdash; ' . $fechaGeneracion . '
 </div>';
 
 $html .= '</body></html>';
