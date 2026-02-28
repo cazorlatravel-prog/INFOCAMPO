@@ -278,7 +278,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 <body>
     <?php include __DIR__ . '/includes/header.php'; ?>
 
-    <?php if ($empresaId > 0 && !empty($registros)): ?>
+    <?php if ($empresaId > 0): ?>
 
     <!-- Mobile filter toggle -->
     <button class="filter-toggle-btn" id="btn-filter-toggle" onclick="toggleFilterDrawer()">
@@ -400,12 +400,6 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div id="map"></div>
     </div>
 
-    <?php elseif ($empresaId > 0): ?>
-        <div class="text-center py-5">
-            <i class="bi bi-camera" style="font-size:3rem;color:#adb5bd;"></i>
-            <h5 class="mt-3 text-muted">Sin fotos registradas</h5>
-            <p class="text-muted">Los operadores aún no han subido fotos para esta empresa.</p>
-        </div>
     <?php else: ?>
         <div class="container-fluid py-4">
             <div class="text-center py-5">
@@ -428,7 +422,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
-    <?php if ($empresaId > 0 && !empty($registros)): ?>
+    <?php if ($empresaId > 0): ?>
     (function() {
         var allData = <?= json_encode($jsRegistros, JSON_UNESCAPED_UNICODE) ?>;
         var empresaId = <?= $empresaId ?>;
@@ -443,7 +437,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
             }),
             ortofoto: L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
-                layers: 'ortofoto_2020',
+                layers: 'orto_RGBlr_2020_raster',
                 format: 'image/png',
                 transparent: false,
                 attribution: '&copy; Junta de Andalucía - Ortofoto 2020',
@@ -573,6 +567,39 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             });
 
             renderMarkers(filtered);
+
+            // Zoom to filtered results including infrastructure positions
+            var anyFilterActive = opVal || infraVal || uoVal || tipoVal || estadoVal;
+            if (anyFilterActive) {
+                var bounds = [];
+
+                // Bounds from filtered photo records
+                filtered.forEach(function(r) {
+                    if (r.lat && r.lon) bounds.push([r.lat, r.lon]);
+                });
+
+                // Include matching infrastructure positions from infraData
+                if (typeof infraData !== 'undefined') {
+                    var filteredInfraIds = {};
+                    filtered.forEach(function(r) { filteredInfraIds[r.infra_id] = true; });
+
+                    infraData.forEach(function(inf) {
+                        if (!inf.lat || !inf.lon) return;
+                        // If specific infra selected, include it
+                        if (infraVal && inf.id === parseInt(infraVal)) {
+                            bounds.push([inf.lat, inf.lon]);
+                        }
+                        // If filtering by operator/UO/etc, include infras that have matching photos
+                        if (!infraVal && filteredInfraIds[inf.id]) {
+                            bounds.push([inf.lat, inf.lon]);
+                        }
+                    });
+                }
+
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+                }
+            }
         }
 
         window.resetFilters = function() {
@@ -660,6 +687,17 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         // Show infra circles by default
         renderInfraCircles();
 
+        // If no photos but there are infrastructures, fit map to infra bounds
+        if (allData.length === 0 && infraData.length > 0) {
+            var infraBounds = [];
+            infraData.forEach(function(inf) {
+                if (inf.lat && inf.lon) infraBounds.push([inf.lat, inf.lon]);
+            });
+            if (infraBounds.length > 0) {
+                map.fitBounds(infraBounds, { padding: [30, 30], maxZoom: 16 });
+            }
+        }
+
         window.toggleInfraMarkers = function() {
             var btn = document.getElementById('btn-toggle-infra-markers');
             if (infraCirclesVisible) {
@@ -723,10 +761,22 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '</div>'
                 );
 
-                marker.on('dragend', function(e) {
-                    var newLatLng = e.target.getLatLng();
-                    updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
-                });
+                (function(originalLat, originalLon) {
+                    marker.on('dragend', function(e) {
+                        var newLatLng = e.target.getLatLng();
+                        var confirmed = confirm(
+                            '¿Mover "' + inf.nombre + '" a la nueva ubicación?\n\n' +
+                            'Anterior: ' + originalLat.toFixed(7) + ', ' + originalLon.toFixed(7) + '\n' +
+                            'Nueva: ' + newLatLng.lat.toFixed(7) + ', ' + newLatLng.lng.toFixed(7)
+                        );
+                        if (confirmed) {
+                            updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
+                        } else {
+                            e.target.setLatLng([originalLat, originalLon]);
+                            showDragToast('Reubicación cancelada', 'error');
+                        }
+                    });
+                })(inf.lat, inf.lon);
 
                 marker.addTo(infraDragGroup);
             });

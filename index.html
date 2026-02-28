@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FotoGPS.app - Tu APP de recogida de datos en Campo</title>
-    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark GPS, comparativas con ghosting, mapas interactivos, importación KML, informes PDF, exportación CSV y modo offline avanzado.">
+    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark GPS, navegación con alertas de proximidad, capas WMS (Ortofoto, Topográfico), ghosting comparativo, capas KML, informes PDF, exportación CSV y modo offline.">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -660,7 +660,13 @@
             color: rgba(255,255,255,0.7);
         }
 
-        .footer-text { font-size: 0.78rem; color: var(--text-muted); }
+        .footer-text { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; }
+
+        .footer-copyright {
+            font-size: 0.72rem;
+            color: rgba(148, 163, 184, 0.6);
+            letter-spacing: 0.3px;
+        }
 
         /* ---- RESPONSIVE ---- */
         @media (max-width: 900px) {
@@ -755,8 +761,8 @@
                         <span class="gradient-text">inteligentes y geolocalizadas</span>
                     </h1>
                     <p class="hero-desc">
-                        Captura fotos con coordenadas ETRS89, compara el estado de infraestructuras
-                        con ghosting visual, importa datos KML, genera informes PDF y exporta a CSV.
+                        Captura fotos con coordenadas ETRS89, navega a infraestructuras con alertas de proximidad,
+                        compara con ghosting visual, visualiza capas WMS y KML, genera informes PDF y exporta a CSV.
                         App instalable con modo offline avanzado.
                     </p>
                     <div class="hero-actions">
@@ -845,7 +851,13 @@
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--green"><i class="bi bi-map-fill"></i></div>
                     <h3>Mapa de Visitas</h3>
-                    <p>Mapa interactivo con todas las infraestructuras geolocalizadas del operador. Navega directamente a cada punto con Google Maps.</p>
+                    <p>Mapa interactivo con todas las infraestructuras geolocalizadas. Selector de capas base: OpenStreetMap, Ortofoto de Andalucía y Topográfico 1:10.000.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--red"><i class="bi bi-cursor-fill"></i></div>
+                    <h3>Navegación con Alertas</h3>
+                    <p>Navega a cualquier infraestructura con línea de dirección en tiempo real. Pitidos de proximidad automáticos: 1 a 20m, 2 a 10m y 3 a 5m del destino.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -861,9 +873,21 @@
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--red"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                    <div class="feature-icon feature-icon--cyan"><i class="bi bi-signpost-split-fill"></i></div>
+                    <h3>Distancia en Tiempo Real</h3>
+                    <p>Indicador visual de distancia a la infraestructura con código de colores: rojo (lejos), amarillo (cerca) y verde (destino alcanzado).</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--rose"><i class="bi bi-exclamation-triangle-fill"></i></div>
                     <h3>Alertas de Subida</h3>
-                    <p>Si falla la subida a Cloudinary, el operador recibe alerta visual para no borrar las fotos. El administrador es notificado para resolver el problema.</p>
+                    <p>Si falla la subida a Cloudinary, el operador recibe alerta visual. El administrador es notificado automáticamente para resolver el problema.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-toggles"></i></div>
+                    <h3>Estados de Inspección</h3>
+                    <p>Clasifica cada foto como Antes, Durante o Después con un solo toque. El estado se refleja automáticamente en el watermark y en los informes.</p>
                 </div>
             </div>
         </div>
@@ -883,7 +907,7 @@
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--purple"><i class="bi bi-grid-1x2-fill"></i></div>
                     <h3>Dashboard con Métricas</h3>
-                    <p>Vista general con contadores de infraestructuras, operadores activos, inspecciones realizadas, incidencias críticas y alertas de subidas fallidas.</p>
+                    <p>Vista general con contadores de infraestructuras, operadores activos, inspecciones, incidencias críticas, gráficos de actividad y alertas de subidas fallidas.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -894,8 +918,14 @@
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--green"><i class="bi bi-pin-map-fill"></i></div>
-                    <h3>Mapa Interactivo con KML</h3>
-                    <p>Mapa con clustering de marcadores, filtros dinámicos, capas KML/KMZ importadas y drag & drop para reubicar infraestructuras directamente en el mapa.</p>
+                    <h3>Mapa Interactivo Avanzado</h3>
+                    <p>Mapa con clustering, filtros dinámicos, capas KML guardadas en base de datos, drag & drop para reubicar infraestructuras y marcadores por estado.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--teal"><i class="bi bi-globe-americas"></i></div>
+                    <h3>Capas WMS: Ortofoto y Topográfico</h3>
+                    <p>Cambia entre OpenStreetMap, Ortofoto Digital de Andalucía 2020 y Mapa Topográfico 1:10.000. Visualiza las infraestructuras sobre imágenes reales del terreno.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -917,6 +947,12 @@
                 </div>
 
                 <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--amber"><i class="bi bi-file-zip-fill"></i></div>
+                    <h3>Descarga Masiva ZIP</h3>
+                    <p>Descarga todas las fotos de una infraestructura en un archivo ZIP organizado con nombres descriptivos: código, fecha, estado y número de secuencia.</p>
+                </div>
+
+                <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--orange"><i class="bi bi-search"></i></div>
                     <h3>Búsqueda Global</h3>
                     <p>Buscador instantáneo con Ctrl+K que busca en infraestructuras, registros y operadores simultáneamente. Filtros combinados por tipo de resultado.</p>
@@ -925,13 +961,19 @@
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--indigo"><i class="bi bi-geo-fill"></i></div>
                     <h3>Importación KML / KMZ</h3>
-                    <p>Carga masiva de infraestructuras desde archivos KML o KMZ. Vista previa en mapa antes de importar con puntos, líneas y polígonos.</p>
+                    <p>Importa capas KML con puntos, líneas y polígonos. Guárdalas en la base de datos para visualizarlas siempre que abras el mapa sin volver a cargarlas.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--rose"><i class="bi bi-arrows-move"></i></div>
+                    <h3>Reubicación de Infraestructuras</h3>
+                    <p>Arrastra los marcadores directamente en el mapa para corregir la ubicación GPS de cualquier infraestructura. Los cambios se guardan automáticamente.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--sky"><i class="bi bi-activity"></i></div>
                     <h3>Indicadores de Estado</h3>
-                    <p>Cada infraestructura muestra indicadores visuales: estado de última inspección, conteo de incidencias críticas y tiempo desde la última visita.</p>
+                    <p>Cada infraestructura muestra indicadores visuales: estado de última inspección, conteo de fotos, incidencias críticas y tiempo desde la última visita.</p>
                 </div>
             </div>
         </div>
@@ -957,13 +999,31 @@
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--rose"><i class="bi bi-ui-checks-grid"></i></div>
                     <h3>Formularios Dinámicos</h3>
-                    <p>El super administrador configura campos personalizados por empresa: textos, selectores, checkboxes. Cada operador ve solo los campos de su compañía.</p>
+                    <p>Configura campos personalizados por empresa: textos, selectores, checkboxes, fechas y más. Cada operador ve solo los campos de su compañía.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--teal"><i class="bi bi-shield-check"></i></div>
                     <h3>Seguridad y Roles</h3>
-                    <p>Cuatro niveles de acceso (superadmin, admin, supervisor, operador) con autenticación por sesiones, protección CSRF y contraseñas cifradas con bcrypt.</p>
+                    <p>Cuatro niveles de acceso (superadmin, admin, supervisor, operador) con protección CSRF, contraseñas cifradas con bcrypt y aislamiento total de datos.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--blue"><i class="bi bi-key-fill"></i></div>
+                    <h3>Gestión de Licencias</h3>
+                    <p>Control de suscripciones por empresa con planes (free, pro, enterprise), límites de usuarios e infraestructuras y fechas de vigencia de licencia.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--purple"><i class="bi bi-people-fill"></i></div>
+                    <h3>Impersonación de Usuarios</h3>
+                    <p>El super administrador puede ver la aplicación como cualquier usuario para dar soporte técnico sin necesidad de conocer sus credenciales.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--green"><i class="bi bi-database-fill-gear"></i></div>
+                    <h3>Migraciones Automáticas</h3>
+                    <p>Sistema de migraciones incrementales con SQL idempotente. Actualiza el esquema de base de datos sin perder datos existentes ni interrumpir el servicio.</p>
                 </div>
             </div>
         </div>
@@ -1015,16 +1075,20 @@
                 <div class="stat-label">Funcional offline</div>
             </div>
             <div class="stat reveal">
+                <div class="stat-value">WMS</div>
+                <div class="stat-label">Ortofoto y Topográfico</div>
+            </div>
+            <div class="stat reveal">
                 <div class="stat-value">PDF</div>
                 <div class="stat-label">Informes automáticos</div>
             </div>
             <div class="stat reveal">
-                <div class="stat-value">CSV</div>
-                <div class="stat-label">Exportación de datos</div>
+                <div class="stat-value">KML</div>
+                <div class="stat-label">Capas geolocalizadas</div>
             </div>
             <div class="stat reveal">
-                <div class="stat-value">KML</div>
-                <div class="stat-label">Importación geodatos</div>
+                <div class="stat-value">ZIP</div>
+                <div class="stat-label">Descarga masiva</div>
             </div>
         </div>
     </div>
@@ -1047,10 +1111,11 @@
                     <ul class="access-features">
                         <li><i class="bi bi-check-circle-fill"></i> Fotos con watermark GPS (ETRS89)</li>
                         <li><i class="bi bi-check-circle-fill"></i> Ghosting comparativo entre visitas</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Navegación con alertas de proximidad</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Mapa con Ortofoto y Topográfico WMS</li>
                         <li><i class="bi bi-check-circle-fill"></i> Modo offline con auto-sincronización</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Mapa de visitas con navegación GPS</li>
                         <li><i class="bi bi-check-circle-fill"></i> App instalable (PWA)</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Alertas de fallos de subida</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Estados: Antes / Durante / Después</li>
                     </ul>
                     <a href="/public/login.php" class="access-btn">
                         <i class="bi bi-camera"></i> Acceder como Operador
@@ -1063,12 +1128,13 @@
                     <h3>Administrador de Empresa</h3>
                     <p>Panel completo de gestión, análisis visual y generación de informes.</p>
                     <ul class="access-features">
-                        <li><i class="bi bi-check-circle-fill"></i> Dashboard con métricas en tiempo real</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Dashboard con métricas y gráficos</li>
                         <li><i class="bi bi-check-circle-fill"></i> Timeline y galería de inspecciones</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Mapa interactivo con capas KML</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Mapa con capas KML, Ortofoto y Topográfico</li>
                         <li><i class="bi bi-check-circle-fill"></i> Comparador de fotos side-by-side</li>
                         <li><i class="bi bi-check-circle-fill"></i> Informes PDF y exportación CSV</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Importación KML/KMZ masiva</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Descarga masiva de fotos en ZIP</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Reubicar infraestructuras con drag & drop</li>
                         <li><i class="bi bi-check-circle-fill"></i> Búsqueda global con Ctrl+K</li>
                         <li><i class="bi bi-check-circle-fill"></i> Gestión de infraestructuras y usuarios</li>
                     </ul>
@@ -1085,9 +1151,10 @@
                     <ul class="access-features">
                         <li><i class="bi bi-check-circle-fill"></i> Gestión de empresas y licencias</li>
                         <li><i class="bi bi-check-circle-fill"></i> Administración global de usuarios</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Configuración de formularios dinámicos</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Constructor de formularios dinámicos</li>
                         <li><i class="bi bi-check-circle-fill"></i> Impersonación de usuarios (soporte)</li>
                         <li><i class="bi bi-check-circle-fill"></i> Métricas globales de la plataforma</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Control de planes y vigencia</li>
                     </ul>
                     <a href="/superadmin/" class="access-btn">
                         <i class="bi bi-gear"></i> Panel Super Admin
@@ -1105,6 +1172,9 @@
             </div>
             <p class="footer-text">
                 Tu APP de recogida de datos en Campo
+            </p>
+            <p class="footer-copyright">
+                &copy; 2026 Jose Caballero Sánchez. Todos los derechos reservados.
             </p>
         </div>
     </footer>
