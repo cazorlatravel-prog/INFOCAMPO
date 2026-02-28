@@ -35,18 +35,20 @@ if ($empresaId > 0) {
     if ($row) $empresaName = $row['nombre'];
 }
 
-// Obtener iniciales del usuario
+// Iniciales del usuario para el avatar
 $initials = '';
 $nameParts = explode(' ', trim($userName));
 foreach (array_slice($nameParts, 0, 2) as $part) {
-    $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+    if (mb_strlen($part) > 0) $initials .= mb_strtoupper(mb_substr($part, 0, 1));
 }
+if ($initials === '') $initials = 'OP';
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#ffffff">
     <title>FotoGPS.app - Operador de Campo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -57,154 +59,147 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
          PANTALLA 1: FICHA DE VISITA
          ======================================================== -->
     <div id="screen-ficha" class="screen active">
+        <!-- Header -->
         <div class="ficha-header">
             <div class="ficha-brand">
-                <div class="brand-logo"><i class="bi bi-geo-alt-fill"></i></div>
-                <div class="brand-info">
-                    <strong>FotoGPS.app</strong>
+                <div class="brand-logo">
+                    <i class="bi bi-geo-alt-fill"></i>
+                </div>
+                <div class="brand-text">
+                    <strong>FotoGPS</strong>
                     <span><?= htmlspecialchars($empresaName) ?></span>
                 </div>
             </div>
             <div class="ficha-header-right">
-                <div id="offline-indicator" class="status-pill online">
-                    <div id="offline-dot" class="status-dot online"></div>
+                <div id="offline-indicator" class="offline-indicator online">
+                    <div id="offline-dot" class="offline-dot online"></div>
                     <span id="offline-text">En linea</span>
                 </div>
-                <div class="ficha-avatar" title="<?= htmlspecialchars($userName) ?>">
+                <div class="user-avatar" title="<?= htmlspecialchars($userName) ?>">
                     <?= $initials ?>
                 </div>
             </div>
         </div>
 
+        <!-- Body -->
         <div class="ficha-body">
-            <!-- GPS Status Card -->
-            <div class="gps-card" id="gps-card">
-                <div class="gps-card-icon">
-                    <i class="bi bi-crosshair"></i>
-                </div>
-                <div class="gps-card-info">
-                    <span class="gps-card-label">Ubicacion GPS</span>
-                    <span class="gps-card-coords" id="gps-coords">Obteniendo...</span>
-                </div>
-                <div class="gps-card-status" id="gps-status-icon">
-                    <div class="gps-spinner"></div>
-                </div>
-            </div>
 
-            <!-- Filtros provincia / municipio -->
-            <div class="field-card">
-                <div class="field-card-header">
-                    <i class="bi bi-pin-map"></i>
-                    <span>Ubicacion</span>
+            <!-- Card: Ubicacion -->
+            <div class="card">
+                <div class="card-label">
+                    <i class="bi bi-pin-map-fill"></i> Ubicacion
                 </div>
                 <div class="filter-row">
-                    <select id="filter-provincia" class="field-select">
+                    <select id="filter-provincia" class="input-field">
                         <option value="">Todas las provincias</option>
                     </select>
-                    <select id="filter-municipio" class="field-select" disabled>
+                    <select id="filter-municipio" class="input-field" disabled>
                         <option value="">Todos los municipios</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Infraestructura -->
-            <div class="field-card">
-                <div class="field-card-header">
-                    <i class="bi bi-geo-alt"></i>
-                    <span>Infraestructura</span>
+            <!-- Card: Infraestructura -->
+            <div class="card">
+                <div class="card-label">
+                    <i class="bi bi-building"></i> Infraestructura
                 </div>
                 <div class="search-container">
-                    <i class="bi bi-search search-icon"></i>
-                    <input type="text" id="infra-search" placeholder="Buscar o escribir nombre..."
-                           autocomplete="off" spellcheck="false" class="field-input field-input--search">
+                    <div class="search-input-wrap">
+                        <i class="bi bi-search search-icon-left"></i>
+                        <input type="text" id="infra-search" placeholder="Buscar o crear infraestructura..."
+                               autocomplete="off" spellcheck="false" class="input-field input-with-icon">
+                    </div>
                     <div id="infra-results" class="search-results hidden"></div>
                 </div>
                 <input type="hidden" id="infra-id" value="">
                 <div id="infra-selected" class="selected-badge hidden">
-                    <div class="selected-badge-info">
+                    <div class="selected-badge-left">
                         <i class="bi bi-check-circle-fill"></i>
                         <span id="infra-selected-name"></span>
                     </div>
-                    <button type="button" id="infra-clear" class="clear-btn"><i class="bi bi-x-lg"></i></button>
+                    <button type="button" id="infra-clear" class="clear-btn">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
-                <!-- Precache indicator + button -->
                 <div id="precache-indicator" class="precache-indicator hidden">
                     <i class="bi bi-cloud-check"></i> Fotos precargadas
                 </div>
                 <button type="button" id="btn-precache" class="precache-btn">
-                    <i class="bi bi-cloud-download"></i> Precargar fotos para modo offline
+                    <i class="bi bi-cloud-download"></i> Precargar fotos offline
                 </button>
             </div>
 
-            <!-- Unidad de obra -->
-            <div class="field-card">
-                <div class="field-card-header">
-                    <i class="bi bi-tools"></i>
-                    <span>Unidad de Obra</span>
+            <!-- Card: Unidad de Obra -->
+            <div class="card">
+                <div class="card-label">
+                    <i class="bi bi-tools"></i> Unidad de Obra
                 </div>
-                <select id="unidad-obra" class="field-select">
+                <select id="unidad-obra" class="input-field">
                     <option value="">Seleccionar unidad de obra</option>
                 </select>
             </div>
 
-            <!-- Fecha y Observaciones -->
-            <div class="field-card">
-                <div class="field-card-header">
-                    <i class="bi bi-calendar3"></i>
-                    <span>Fecha</span>
+            <!-- Card: Fecha + Observaciones -->
+            <div class="card">
+                <div class="card-row">
+                    <div class="card-row-item">
+                        <div class="card-label"><i class="bi bi-calendar3"></i> Fecha</div>
+                        <div class="fecha-display" id="fecha-display"></div>
+                    </div>
                 </div>
-                <div class="fecha-display" id="fecha-display"></div>
+                <div class="card-separator"></div>
+                <div class="card-label"><i class="bi bi-chat-text"></i> Observaciones</div>
+                <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="input-field input-textarea"></textarea>
             </div>
 
-            <div class="field-card">
-                <div class="field-card-header">
-                    <i class="bi bi-chat-text"></i>
-                    <span>Observaciones</span>
-                </div>
-                <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="field-textarea"></textarea>
-            </div>
-
-            <!-- Aviso: seleccionar infraestructura -->
+            <!-- Hint -->
             <div id="hint-select-infra" class="hint-box">
                 <i class="bi bi-info-circle"></i>
-                <span>Busca o crea una infraestructura para habilitar las fotos</span>
+                <span>Selecciona una infraestructura para habilitar las fotos</span>
             </div>
 
-            <!-- Botones de fotos -->
+            <!-- Botones de accion: Fotos -->
             <div class="foto-buttons">
-                <button type="button" id="btn-fotos-aleatorias" class="action-card action-card--blue" disabled>
-                    <div class="action-card-icon"><i class="bi bi-camera-fill"></i></div>
-                    <div class="action-card-content">
+                <button type="button" id="btn-fotos-aleatorias" class="foto-btn foto-btn--aleatorio" disabled>
+                    <div class="foto-btn-icon">
+                        <i class="bi bi-camera-fill"></i>
+                    </div>
+                    <div class="foto-btn-text">
                         <strong>Fotos Aleatorias</strong>
-                        <small>Fotos libres con coordenadas ETRS89</small>
+                        <small>Fotos libres con GPS ETRS89</small>
                     </div>
-                    <div class="action-card-badge" id="count-aleatorias">0</div>
+                    <span class="foto-count" id="count-aleatorias">0</span>
                 </button>
 
-                <button type="button" id="btn-fotos-comparativas" class="action-card action-card--purple" disabled>
-                    <div class="action-card-icon"><i class="bi bi-layers-fill"></i></div>
-                    <div class="action-card-content">
+                <button type="button" id="btn-fotos-comparativas" class="foto-btn foto-btn--comparativo" disabled>
+                    <div class="foto-btn-icon">
+                        <i class="bi bi-layers-fill"></i>
+                    </div>
+                    <div class="foto-btn-text">
                         <strong>Fotos Comparativas</strong>
-                        <small>Ghosting con foto anterior al 50%</small>
+                        <small>Ghosting con foto anterior</small>
                     </div>
-                    <div class="action-card-badge" id="count-comparativas">0</div>
+                    <span class="foto-count" id="count-comparativas">0</span>
                 </button>
 
-                <button type="button" id="btn-ver-mapa" class="action-card action-card--green">
-                    <div class="action-card-icon"><i class="bi bi-map-fill"></i></div>
-                    <div class="action-card-content">
-                        <strong>Ver Mapa de Visitas</strong>
-                        <small>Ubicacion de fotos anteriores</small>
+                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa">
+                    <div class="foto-btn-icon">
+                        <i class="bi bi-map-fill"></i>
                     </div>
-                    <div class="action-card-arrow"><i class="bi bi-chevron-right"></i></div>
+                    <div class="foto-btn-text">
+                        <strong>Mapa de Visitas</strong>
+                        <small>Ver ubicaciones anteriores</small>
+                    </div>
+                    <span class="foto-count"><i class="bi bi-chevron-right"></i></span>
                 </button>
             </div>
 
-            <!-- Barra de sincronizacion offline -->
+            <!-- Sync bar -->
             <div id="sync-bar" class="sync-bar hidden">
                 <div class="sync-bar-info">
                     <i class="bi bi-cloud-arrow-up"></i>
-                    <span><span id="sync-count">0</span> foto(s) pendiente(s) de subir</span>
+                    <span><span id="sync-count">0</span> foto(s) pendiente(s)</span>
                 </div>
                 <div class="sync-bar-actions">
                     <div class="sync-progress">
@@ -217,12 +212,9 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
                 </div>
             </div>
 
-            <!-- Galeria de fotos tomadas -->
+            <!-- Galeria -->
             <div id="gallery-section" class="hidden">
-                <div class="gallery-header">
-                    <i class="bi bi-images"></i>
-                    <span>Fotos de esta visita</span>
-                </div>
+                <h3 class="gallery-title"><i class="bi bi-images"></i> Fotos de esta visita</h3>
                 <div id="gallery-grid" class="gallery-grid"></div>
             </div>
         </div>
@@ -274,7 +266,7 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
     </div>
 
     <!-- ========================================================
-         PANTALLA 3: PREVIEW (tras captura)
+         PANTALLA 3: PREVIEW
          ======================================================== -->
     <div id="screen-preview" class="screen">
         <canvas id="preview-canvas"></canvas>
@@ -292,7 +284,7 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
     </div>
 
     <!-- ========================================================
-         PANTALLA 4: MAPA DE VISITAS
+         PANTALLA 4: MAPA
          ======================================================== -->
     <div id="screen-mapa" class="screen">
         <div class="mapa-topbar">
@@ -316,10 +308,10 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
             <div class="mapa-detail-body" id="mapa-detail-body"></div>
             <div class="mapa-detail-actions">
                 <button type="button" id="btn-detail-aleatorio" class="mapa-action-btn mapa-action--aleatorio">
-                    <i class="bi bi-camera"></i> Nueva Foto Aleatoria
+                    <i class="bi bi-camera"></i> Foto Aleatoria
                 </button>
                 <button type="button" id="btn-detail-comparativo" class="mapa-action-btn mapa-action--comparativo">
-                    <i class="bi bi-layers"></i> Nueva Foto Comparativa
+                    <i class="bi bi-layers"></i> Foto Comparativa
                 </button>
             </div>
         </div>
@@ -334,7 +326,7 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
     <div id="modal-prev-photos" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="bi bi-clock-history"></i> Fotos comparativas anteriores</h3>
+                <h3><i class="bi bi-clock-history"></i> Fotos anteriores</h3>
                 <button type="button" id="btn-close-prev" class="modal-close"><i class="bi bi-x-lg"></i></button>
             </div>
             <div id="prev-photos-grid" class="prev-photos-grid">
@@ -351,7 +343,7 @@ foreach (array_slice($nameParts, 0, 2) as $part) {
     <div id="precache-modal" class="modal-overlay hidden">
         <div class="modal-content precache-modal-content">
             <div class="modal-header">
-                <h3><i class="bi bi-cloud-download"></i> Precargando fotos</h3>
+                <h3><i class="bi bi-cloud-download"></i> Precargando</h3>
                 <button type="button" id="btn-close-precache" class="modal-close"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="precache-body">
