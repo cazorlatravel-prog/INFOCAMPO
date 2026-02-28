@@ -16,7 +16,22 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../includes/config.php';
 
-$pdo = getDB();
+try {
+    $pdo = getDB();
+} catch (\Exception $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Error de conexión a base de datos']);
+    exit;
+}
+
+// Detectar si las columnas provincia/municipio existen
+$hasLocationCols = false;
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM infraestructuras LIKE 'provincia'")->fetchAll();
+    $hasLocationCols = count($cols) > 0;
+} catch (\Exception $e) {
+    // tabla puede no existir todavía
+}
 
 // ---------------------------------------------------------------
 // GET: buscar infraestructuras / listas de provincias/municipios
@@ -32,6 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     // Listar provincias únicas
     if ($action === 'provincias') {
+        if (!$hasLocationCols) {
+            echo json_encode(['ok' => true, 'provincias' => []]);
+            exit;
+        }
         $stmt = $pdo->prepare(
             "SELECT DISTINCT provincia
              FROM infraestructuras
@@ -46,6 +65,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     // Listar municipios de una provincia
     if ($action === 'municipios') {
+        if (!$hasLocationCols) {
+            echo json_encode(['ok' => true, 'municipios' => []]);
+            exit;
+        }
         $provincia = trim($_GET['provincia'] ?? '');
         if ($provincia === '') {
             echo json_encode(['ok' => true, 'municipios' => []]);
@@ -72,11 +95,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $where  = "empresa_id = :emp_id AND activa = 1";
     $params = [':emp_id' => $empresaId];
 
-    if ($provincia !== '') {
+    if ($hasLocationCols && $provincia !== '') {
         $where .= " AND provincia = :provincia";
         $params[':provincia'] = $provincia;
     }
-    if ($municipio !== '') {
+    if ($hasLocationCols && $municipio !== '') {
         $where .= " AND municipio = :municipio";
         $params[':municipio'] = $municipio;
     }
@@ -86,8 +109,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $params[':q'] = '%' . $q . '%';
     }
 
+    $selectCols = "id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo";
+    if ($hasLocationCols) {
+        $selectCols .= ", provincia, municipio";
+    }
+
     $stmt = $pdo->prepare(
-        "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio
+        "SELECT $selectCols
          FROM infraestructuras
          WHERE $where
          ORDER BY nombre ASC
@@ -119,19 +147,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Auto-generar código único
     $codigo = 'INF-' . strtoupper(substr(md5($nombre . time()), 0, 8));
 
-    $stmt = $pdo->prepare(
-        "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, activa)
-         VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, :provincia, :municipio, 1)"
-    );
-    $stmt->execute([
-        ':emp_id'    => $empresaId,
-        ':nombre'    => $nombre,
-        ':codigo'    => $codigo,
-        ':lat'       => $lat,
-        ':lon'       => $lon,
-        ':provincia' => $provincia ?: null,
-        ':municipio' => $municipio ?: null,
-    ]);
+    if ($hasLocationCols) {
+        $stmt = $pdo->prepare(
+            "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, activa)
+             VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, :provincia, :municipio, 1)"
+        );
+        $stmt->execute([
+            ':emp_id'    => $empresaId,
+            ':nombre'    => $nombre,
+            ':codigo'    => $codigo,
+            ':lat'       => $lat,
+            ':lon'       => $lon,
+            ':provincia' => $provincia ?: null,
+            ':municipio' => $municipio ?: null,
+        ]);
+    } else {
+        $stmt = $pdo->prepare(
+            "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, activa)
+             VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, 1)"
+        );
+        $stmt->execute([
+            ':emp_id'  => $empresaId,
+            ':nombre'  => $nombre,
+            ':codigo'  => $codigo,
+            ':lat'     => $lat,
+            ':lon'     => $lon,
+        ]);
+    }
 
     $newId = (int) $pdo->lastInsertId();
 
