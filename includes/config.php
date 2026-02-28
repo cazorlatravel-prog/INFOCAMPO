@@ -55,7 +55,16 @@ define('CLOUDINARY_API_SECRET', env('CLOUDINARY_API_SECRET'));
 // -----------------------------------------------------------
 // App
 // -----------------------------------------------------------
-define('APP_URL', env('APP_URL', 'http://localhost'));
+$_appUrl = env('APP_URL');
+if ($_appUrl === '') {
+    // Auto-detectar URL base desde la petición HTTP
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $_appUrl = $scheme . '://' . $host;
+}
+// Quitar barra final si la tiene
+$_appUrl = rtrim($_appUrl, '/');
+define('APP_URL', $_appUrl);
 define('APP_NAME', 'INFOCAMPO');
 
 // -----------------------------------------------------------
