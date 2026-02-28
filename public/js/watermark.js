@@ -11,7 +11,7 @@ const Watermark = (() => {
      * en el canvas de preview con marca de agua.
      *
      * @param {HTMLCanvasElement} sourceCanvas  Canvas con la foto original
-     * @param {Object} meta  { lat, lon, code, fecha }
+     * @param {Object} meta  { lat, lon, code, fecha, empresaName, infraName }
      */
     async function process(sourceCanvas, meta) {
         const w = sourceCanvas.width;
@@ -25,45 +25,81 @@ const Watermark = (() => {
         // 1. Dibujar la foto original
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 2. Franja inferior semitransparente
-        const barHeight = Math.max(60, h * 0.07);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(0, h - barHeight, w, barHeight);
+        // 2. Bloque de info abajo-derecha
+        const fontSize = Math.max(13, Math.round(h * 0.018));
+        const lineHeight = fontSize * 1.5;
+        const numLines = 4;
+        const padding = 16;
+        const blockHeight = lineHeight * numLines + padding * 2;
+        const blockWidth = Math.max(280, Math.round(w * 0.35));
 
-        // Texto de la franja
-        const fontSize = Math.max(14, Math.round(barHeight * 0.32));
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        const bx = w - blockWidth - 12;
+        const by = h - blockHeight - 12;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.beginPath();
+        const r = 8;
+        ctx.moveTo(bx + r, by);
+        ctx.lineTo(bx + blockWidth - r, by);
+        ctx.quadraticCurveTo(bx + blockWidth, by, bx + blockWidth, by + r);
+        ctx.lineTo(bx + blockWidth, by + blockHeight - r);
+        ctx.quadraticCurveTo(bx + blockWidth, by + blockHeight, bx + blockWidth - r, by + blockHeight);
+        ctx.lineTo(bx + r, by + blockHeight);
+        ctx.quadraticCurveTo(bx, by + blockHeight, bx, by + blockHeight - r);
+        ctx.lineTo(bx, by + r);
+        ctx.quadraticCurveTo(bx, by, bx + r, by);
+        ctx.closePath();
+        ctx.fill();
+
         ctx.fillStyle = '#ffffff';
-        ctx.textBaseline = 'middle';
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
 
+        const textX = bx + padding;
+        let textY = by + padding;
+
+        // Line 1: Empresa
+        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+        ctx.fillText(meta.empresaName || '', textX, textY);
+        textY += lineHeight;
+
+        // Line 2: Infraestructura
+        ctx.font = `${fontSize}px -apple-system, sans-serif`;
+        ctx.fillText(meta.infraName || meta.code || '', textX, textY);
+        textY += lineHeight;
+
+        // Line 3: Fecha
         const dateStr = meta.fecha.toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid',
             day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
         });
+        ctx.fillText(dateStr, textX, textY);
+        textY += lineHeight;
 
+        // Line 4: Coordenadas
         const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
         const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
+        ctx.fillText(`ETRS89: ${latStr}, ${lonStr}`, textX, textY);
 
-        const line = `${dateStr}  |  GPS: ${latStr}, ${lonStr}  |  ${meta.code}`;
-        ctx.fillText(line, 16, h - barHeight / 2);
+        ctx.textAlign = 'start';
 
-        // 3. Mini-mapa OSM (esquina superior derecha)
-        await drawMiniMap(ctx, w, meta.lat, meta.lon);
+        // 3. Mini-mapa OSM (arriba-izquierda, 1/8 de imagen)
+        await drawMiniMap(ctx, w, h, meta.lat, meta.lon);
 
         // 4. Convertir a JPEG blob (calidad 0.8)
         processedBlob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.8);
     }
 
     /**
-     * Dibuja un tile estático de OpenStreetMap en la esquina superior derecha.
+     * Dibuja un tile estático de OpenStreetMap en la esquina superior izquierda (1/8 de imagen).
      */
-    async function drawMiniMap(ctx, canvasWidth, lat, lon) {
+    async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
         if (lat == null || lon == null) return;
 
-        const mapSize = Math.max(80, Math.round(canvasWidth * 0.12));
-        const margin = 12;
-        const x = canvasWidth - mapSize - margin;
-        const y = margin;
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 8);
+        const x = 0;
+        const y = 0;
 
         // Fondo mientras carga
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
