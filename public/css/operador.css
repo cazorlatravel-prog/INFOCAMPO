@@ -577,3 +577,248 @@ html, body {
 .mapa-action--aleatorio:hover { background: rgba(59,130,246,0.35); }
 .mapa-action--comparativo { background: rgba(168,85,247,0.2); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
 .mapa-action--comparativo:hover { background: rgba(168,85,247,0.35); }
+
+/* ----------------------------------------------------------
+   OFFLINE MODE INDICATORS & SYNC UI
+   ---------------------------------------------------------- */
+
+/* Header right section */
+.ficha-header-right {
+    display: flex; align-items: center; gap: 12px;
+}
+
+/* Online/Offline indicator */
+.offline-indicator {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.offline-indicator.online {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+}
+
+.offline-indicator.offline {
+    background: rgba(239,68,68,0.2);
+    color: #f87171;
+    animation: pulse-offline 2s ease-in-out infinite;
+}
+
+.offline-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    transition: background 0.3s;
+}
+
+.offline-dot.online {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34,197,94,0.5);
+}
+
+.offline-dot.offline {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239,68,68,0.5);
+}
+
+@keyframes pulse-offline {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Precache button & indicator */
+.precache-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; margin-top: 8px;
+    background: rgba(99,102,241,0.1);
+    border: 1px dashed rgba(99,102,241,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #818cf8;
+    font-size: 0.8rem; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.precache-btn:hover {
+    background: rgba(99,102,241,0.2);
+    border-color: rgba(99,102,241,0.5);
+}
+
+.precache-btn i { font-size: 1.1rem; }
+
+.precache-indicator {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 6px;
+    padding: 6px 12px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 8px;
+    color: #4ade80;
+    font-size: 0.75rem; font-weight: 600;
+}
+
+/* Sync bar */
+.sync-bar {
+    background: rgba(234,179,8,0.1);
+    border: 1px solid rgba(234,179,8,0.25);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-top: 20px;
+}
+
+.sync-bar-info {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.85rem; font-weight: 600;
+    color: #fbbf24;
+    margin-bottom: 8px;
+}
+
+.sync-bar-info i { font-size: 1.1rem; }
+
+.sync-bar-actions {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sync-progress {
+    flex: 1; min-width: 80px;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.sync-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    border-radius: 3px;
+    width: 0;
+    transition: width 0.3s ease;
+}
+
+.sync-progress-text {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+}
+
+.sync-btn {
+    background: rgba(234,179,8,0.2);
+    border: 1px solid rgba(234,179,8,0.4);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #fbbf24;
+    font-size: 0.8rem; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.sync-btn:hover {
+    background: rgba(234,179,8,0.35);
+}
+
+/* Sync queue badge (on header) */
+#sync-queue-badge {
+    display: none;
+    background: #f59e0b;
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 800;
+    min-width: 18px; height: 18px;
+    border-radius: 9px;
+    align-items: center; justify-content: center;
+    padding: 0 5px;
+}
+
+/* Sync notification toast */
+.sync-notification {
+    position: fixed;
+    bottom: 24px; left: 16px; right: 16px;
+    z-index: 600;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 0.85rem; font-weight: 600;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    transition: all 0.3s ease;
+}
+
+.sync-notification.hidden {
+    transform: translateY(100px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sync-notification.success {
+    background: rgba(34,197,94,0.95);
+    color: #fff;
+}
+
+.sync-notification.warning {
+    background: rgba(234,179,8,0.95);
+    color: #000;
+}
+
+.sync-notification.error {
+    background: rgba(239,68,68,0.95);
+    color: #fff;
+}
+
+.sync-notif-close {
+    background: none; border: none;
+    color: inherit; opacity: 0.7;
+    font-size: 1.1rem; cursor: pointer;
+    padding: 4px;
+}
+
+/* Precache modal */
+.precache-modal-content { max-width: 400px; }
+
+.precache-body {
+    padding: 24px 20px;
+    text-align: center;
+}
+
+.precache-progress {
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.precache-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #818cf8, #6366f1);
+    border-radius: 4px;
+    width: 0;
+    transition: width 0.3s ease;
+}
+
+.precache-text {
+    color: rgba(255,255,255,0.6);
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+/* Gallery pending badge */
+.gallery-type.pending,
+.gallery-type.aleatorio.pending,
+.gallery-type.comparativo.pending {
+    background: rgba(234,179,8,0.8);
+}
+
+/* Offline-aware body attribute styling */
+[data-online="false"] .foto-btn--mapa {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+[data-online="false"] .precache-btn {
+    opacity: 0.4;
+    pointer-events: none;
+}

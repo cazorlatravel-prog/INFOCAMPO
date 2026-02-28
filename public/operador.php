@@ -55,9 +55,15 @@ if ($empresaId > 0) {
                 <strong>INFOCAMPO</strong>
                 <span><?= htmlspecialchars($empresaName) ?></span>
             </div>
-            <div class="ficha-user">
-                <i class="bi bi-person-circle"></i>
-                <span><?= htmlspecialchars($userName) ?></span>
+            <div class="ficha-header-right">
+                <div id="offline-indicator" class="offline-indicator online">
+                    <div id="offline-dot" class="offline-dot online"></div>
+                    <span id="offline-text">En línea</span>
+                </div>
+                <div class="ficha-user">
+                    <i class="bi bi-person-circle"></i>
+                    <span><?= htmlspecialchars($userName) ?></span>
+                </div>
             </div>
         </div>
 
@@ -75,6 +81,13 @@ if ($empresaId > 0) {
                     <span id="infra-selected-name"></span>
                     <button type="button" id="infra-clear" class="clear-btn"><i class="bi bi-x"></i></button>
                 </div>
+                <!-- Precache indicator + button -->
+                <div id="precache-indicator" class="precache-indicator hidden">
+                    <i class="bi bi-cloud-check"></i> Fotos precargadas
+                </div>
+                <button type="button" id="btn-precache" class="precache-btn">
+                    <i class="bi bi-cloud-download"></i> Precargar fotos para modo offline
+                </button>
             </div>
 
             <!-- Unidad de obra -->
@@ -125,6 +138,23 @@ if ($empresaId > 0) {
                     </div>
                     <span class="foto-count"><i class="bi bi-chevron-right"></i></span>
                 </button>
+            </div>
+
+            <!-- Barra de sincronización offline -->
+            <div id="sync-bar" class="sync-bar hidden">
+                <div class="sync-bar-info">
+                    <i class="bi bi-cloud-arrow-up"></i>
+                    <span><span id="sync-count">0</span> foto(s) pendiente(s) de subir</span>
+                </div>
+                <div class="sync-bar-actions">
+                    <div class="sync-progress">
+                        <div id="sync-progress-bar" class="sync-progress-fill"></div>
+                    </div>
+                    <span id="sync-progress-text" class="sync-progress-text"></span>
+                    <button type="button" id="btn-manual-sync" class="sync-btn">
+                        <i class="bi bi-arrow-repeat"></i> Sincronizar
+                    </button>
+                </div>
             </div>
 
             <!-- Galería de fotos tomadas -->
@@ -272,6 +302,32 @@ if ($empresaId > 0) {
         </div>
     </div>
 
+    <!-- ========================================================
+         MODAL: Precargando fotos
+         ======================================================== -->
+    <div id="precache-modal" class="modal-overlay hidden">
+        <div class="modal-content precache-modal-content">
+            <div class="modal-header">
+                <h3><i class="bi bi-cloud-download"></i> Precargando fotos</h3>
+                <button type="button" id="btn-close-precache" class="modal-close"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="precache-body">
+                <div class="precache-progress">
+                    <div id="precache-progress-bar" class="precache-progress-fill"></div>
+                </div>
+                <p id="precache-progress-text" class="precache-text">Preparando...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================
+         NOTIFICACIÓN: Resultado de sincronización
+         ======================================================== -->
+    <div id="sync-notification" class="sync-notification hidden">
+        <span class="sync-notif-text"></span>
+        <button type="button" id="sync-notif-close" class="sync-notif-close"><i class="bi bi-x"></i></button>
+    </div>
+
     <!-- Config -->
     <script>
         window.INFOCAMPO = {
@@ -289,6 +345,7 @@ if ($empresaId > 0) {
         };
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/offline.js"></script>
     <script src="js/operador.js"></script>
 </body>
 </html>

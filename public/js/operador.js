@@ -110,6 +110,105 @@
         loadUnidadesObra();
         bindEvents();
         initGPS();
+        initOffline();
+        registerServiceWorker();
+    }
+
+    // ===================================================================
+    // OFFLINE INTEGRATION
+    // ===================================================================
+    function initOffline() {
+        if (!window.InfocampoOffline) return;
+
+        window.InfocampoOffline.init({
+            onStatusChange: (online) => {
+                const indicator = $('#offline-indicator');
+                const dot = $('#offline-dot');
+                const text = $('#offline-text');
+                if (!indicator) return;
+
+                if (online) {
+                    indicator.classList.remove('offline');
+                    indicator.classList.add('online');
+                    dot.className = 'offline-dot online';
+                    text.textContent = 'En línea';
+                } else {
+                    indicator.classList.remove('online');
+                    indicator.classList.add('offline');
+                    dot.className = 'offline-dot offline';
+                    text.textContent = 'Sin conexión';
+                }
+            },
+            onQueueChange: (count) => {
+                const badge = $('#sync-queue-badge');
+                const syncBar = $('#sync-bar');
+                if (badge) {
+                    badge.textContent = count;
+                    badge.style.display = count > 0 ? 'inline-flex' : 'none';
+                }
+                if (syncBar) {
+                    syncBar.classList.toggle('hidden', count === 0);
+                    const syncCount = $('#sync-count');
+                    if (syncCount) syncCount.textContent = count;
+                }
+            },
+            onSyncProgress: ({ synced, total, current }) => {
+                const bar = $('#sync-progress-bar');
+                const text = $('#sync-progress-text');
+                if (bar) bar.style.width = ((synced / total) * 100) + '%';
+                if (text) text.textContent = `Subiendo ${synced + 1}/${total}: ${current}`;
+            },
+            onSyncComplete: (results) => {
+                const ok = results.filter(r => r.ok).length;
+                const fail = results.filter(r => !r.ok).length;
+                const bar = $('#sync-progress-bar');
+                if (bar) bar.style.width = '100%';
+
+                showSyncNotification(ok, fail);
+
+                // Reload gallery with synced photos
+                results.forEach(r => {
+                    if (r.ok && r.result) {
+                        addToGallery(r.result.url_imagen, 'synced', r.result.nombre_archivo || 'foto', null);
+                    }
+                });
+            },
+            onPrecacheProgress: ({ loaded, total }) => {
+                const bar = $('#precache-progress-bar');
+                const text = $('#precache-progress-text');
+                if (bar) bar.style.width = ((loaded / total) * 100) + '%';
+                if (text) text.textContent = `Descargando ${loaded}/${total} fotos...`;
+            },
+        });
+    }
+
+    function showSyncNotification(ok, fail) {
+        const notification = $('#sync-notification');
+        if (!notification) return;
+
+        let msg = '';
+        if (ok > 0 && fail === 0) {
+            msg = `${ok} foto${ok > 1 ? 's' : ''} sincronizada${ok > 1 ? 's' : ''} correctamente`;
+            notification.className = 'sync-notification success';
+        } else if (ok > 0 && fail > 0) {
+            msg = `${ok} subida${ok > 1 ? 's' : ''}, ${fail} con error`;
+            notification.className = 'sync-notification warning';
+        } else {
+            msg = `Error al sincronizar ${fail} foto${fail > 1 ? 's' : ''}`;
+            notification.className = 'sync-notification error';
+        }
+
+        notification.querySelector('.sync-notif-text').textContent = msg;
+        notification.classList.remove('hidden');
+        setTimeout(() => notification.classList.add('hidden'), 5000);
+    }
+
+    function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => {
+                console.warn('SW registration failed:', err);
+            });
+        }
     }
 
     // ===================================================================
@@ -232,6 +331,7 @@
         infraSelected.classList.remove('hidden');
         infraSelectedName.textContent = `${name} (${code || 'sin código'})`;
         updateButtonState();
+        updatePrecacheIndicator();
     }
 
     async function createNewInfra(name) {
@@ -369,6 +469,31 @@
     // ===================================================================
     async function checkPreviousPhotos() {
         if (!state.infraId) return;
+
+        // Try cached photos first when offline
+        if (!navigator.onLine && window.InfocampoOffline) {
+            try {
+                const cached = await window.InfocampoOffline.getCachedPhotos(state.infraId);
+                if (cached.length > 0) {
+                    // Map cached photos to the expected format using blob URLs
+                    state.prevPhotos = cached.map(c => ({
+                        id: c.id,
+                        url_cloudinary: c.blobUrl, // Use local blob URL
+                        secuencia_comparativa: c.secuencia_comparativa,
+                        nombre_archivo: c.nombre_archivo,
+                        fecha: c.fecha,
+                        _cached: true,
+                    }));
+                    showPrevPhotosModal(state.prevPhotos, null);
+                    return;
+                }
+            } catch (err) {
+                console.warn('Error loading cached photos:', err);
+            }
+            return; // No cached photos and offline
+        }
+
+        // Online — fetch from server
         try {
             const res = await fetch(
                 `${CFG.endpoints.fotosComparativas}?infra_id=${state.infraId}`
@@ -379,6 +504,26 @@
                 showPrevPhotosModal(data.fotos, data.fecha_visita);
             }
         } catch (err) {
+            // Network failed — try cached as fallback
+            if (window.InfocampoOffline) {
+                try {
+                    const cached = await window.InfocampoOffline.getCachedPhotos(state.infraId);
+                    if (cached.length > 0) {
+                        state.prevPhotos = cached.map(c => ({
+                            id: c.id,
+                            url_cloudinary: c.blobUrl,
+                            secuencia_comparativa: c.secuencia_comparativa,
+                            nombre_archivo: c.nombre_archivo,
+                            fecha: c.fecha,
+                            _cached: true,
+                        }));
+                        showPrevPhotosModal(state.prevPhotos, null);
+                        return;
+                    }
+                } catch (cacheErr) {
+                    console.warn('Cache fallback error:', cacheErr);
+                }
+            }
             console.warn('Error loading previous photos:', err);
         }
     }
@@ -478,17 +623,72 @@
             filename = `foto_${sanitizeFilename(state.infraName)}_${Date.now()}`;
         }
 
-        // Upload
+        // Build form data object
+        const uploadData = {
+            infra_id: state.infraId,
+            usuario_id: CFG.usuarioId,
+            lat_real: state.gps.lat || 0,
+            lon_real: state.gps.lon || 0,
+            estado_incidencia: 'bajo',
+            tipo_foto: state.currentMode,
+            nombre_archivo: filename,
+            observaciones: $('#observaciones-general').value || '',
+            secuencia_comparativa: seq,
+            unidad_obra_id: unidadObra.value || null,
+            datos_tecnicos: JSON.stringify({
+                timestamp: new Date().toISOString(),
+                etrs89_lat: state.gps.lat,
+                etrs89_lon: state.gps.lon,
+                timezone: 'Europe/Madrid',
+                mode: state.currentMode,
+            }),
+            uploadUrl: CFG.endpoints.upload,
+        };
+
+        // Check connectivity — if offline, queue locally
+        if (!navigator.onLine && window.InfocampoOffline) {
+            try {
+                await window.InfocampoOffline.enqueue(blob, uploadData);
+
+                uploadOverlay.classList.add('hidden');
+
+                // Create local blob URL for gallery preview
+                const localUrl = URL.createObjectURL(blob);
+                addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
+
+                // Update counters
+                updateCounters(seq);
+
+                // For comparativo mode, use local blob as ghost for next shot
+                if (state.currentMode === 'comparativo') {
+                    setGhostImage(localUrl);
+                    camSeqLabel.textContent = 'W' + (state.seqComparativa + 1);
+                }
+
+                camVideo.play();
+                showScreen('camera');
+                return;
+            } catch (queueErr) {
+                console.error('Error saving offline:', queueErr);
+                uploadOverlay.classList.add('hidden');
+                alert('Error al guardar localmente: ' + queueErr.message);
+                camVideo.play();
+                showScreen('camera');
+                return;
+            }
+        }
+
+        // Online — upload directly
         const formData = new FormData();
         formData.append('imagen', blob, filename + '.jpg');
-        formData.append('infra_id', state.infraId);
-        formData.append('usuario_id', CFG.usuarioId);
-        formData.append('lat_real', state.gps.lat || 0);
-        formData.append('lon_real', state.gps.lon || 0);
-        formData.append('estado_incidencia', 'bajo');
-        formData.append('tipo_foto', state.currentMode);
-        formData.append('nombre_archivo', filename);
-        formData.append('observaciones', $('#observaciones-general').value || '');
+        formData.append('infra_id', uploadData.infra_id);
+        formData.append('usuario_id', uploadData.usuario_id);
+        formData.append('lat_real', uploadData.lat_real);
+        formData.append('lon_real', uploadData.lon_real);
+        formData.append('estado_incidencia', uploadData.estado_incidencia);
+        formData.append('tipo_foto', uploadData.tipo_foto);
+        formData.append('nombre_archivo', uploadData.nombre_archivo);
+        formData.append('observaciones', uploadData.observaciones);
 
         if (seq !== null) {
             formData.append('secuencia_comparativa', seq);
@@ -498,13 +698,7 @@
             formData.append('unidad_obra_id', unidadObra.value);
         }
 
-        formData.append('datos_tecnicos', JSON.stringify({
-            timestamp: new Date().toISOString(),
-            etrs89_lat: state.gps.lat,
-            etrs89_lon: state.gps.lon,
-            timezone: 'Europe/Madrid',
-            mode: state.currentMode,
-        }));
+        formData.append('datos_tecnicos', uploadData.datos_tecnicos);
 
         try {
             const res = await fetch(CFG.endpoints.upload, { method: 'POST', body: formData });
@@ -513,23 +707,14 @@
             uploadOverlay.classList.add('hidden');
 
             if (data.ok) {
-                // Add to gallery
                 addToGallery(data.url_imagen, state.currentMode, filename, seq);
+                updateCounters(seq);
 
-                // Update counters
-                if (state.currentMode === 'aleatorio') {
-                    state.countAleatorias++;
-                    countAleatorias.textContent = state.countAleatorias;
-                } else {
-                    state.countComparativas++;
-                    countComparativas.textContent = state.countComparativas;
-
-                    // Use this photo as ghost for next comparative shot
+                if (state.currentMode === 'comparativo') {
                     setGhostImage(data.url_imagen);
                     camSeqLabel.textContent = 'W' + (state.seqComparativa + 1);
                 }
 
-                // Go back to camera for more photos
                 camVideo.play();
                 showScreen('camera');
             } else {
@@ -539,9 +724,41 @@
             }
         } catch (err) {
             uploadOverlay.classList.add('hidden');
+
+            // Network error — try to queue offline
+            if (window.InfocampoOffline) {
+                try {
+                    await window.InfocampoOffline.enqueue(blob, uploadData);
+                    const localUrl = URL.createObjectURL(blob);
+                    addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
+                    updateCounters(seq);
+
+                    if (state.currentMode === 'comparativo') {
+                        setGhostImage(localUrl);
+                        camSeqLabel.textContent = 'W' + (state.seqComparativa + 1);
+                    }
+
+                    camVideo.play();
+                    showScreen('camera');
+                    return;
+                } catch (qErr) {
+                    console.error('Fallback queue error:', qErr);
+                }
+            }
+
             alert('Error de red: ' + err.message);
             camVideo.play();
             showScreen('camera');
+        }
+    }
+
+    function updateCounters(seq) {
+        if (state.currentMode === 'aleatorio') {
+            state.countAleatorias++;
+            countAleatorias.textContent = state.countAleatorias;
+        } else {
+            state.countComparativas++;
+            countComparativas.textContent = state.countComparativas;
         }
     }
 
@@ -551,16 +768,21 @@
     function addToGallery(url, type, name, seq) {
         gallerySection.classList.remove('hidden');
 
+        const isPending = type.includes('pending');
+        const baseType = type.replace(' pending', '').replace(' synced', '');
+        let label = baseType === 'comparativo' ? 'W' + seq : 'ALEA';
+        if (isPending) label += ' *';
+
         const div = document.createElement('div');
         div.className = 'gallery-item';
         div.innerHTML = `
             <img src="${escHtml(url)}" alt="${escHtml(name)}" loading="lazy">
-            <span class="gallery-type ${type}">${type === 'comparativo' ? 'W' + seq : 'ALEA'}</span>
+            <span class="gallery-type ${baseType}${isPending ? ' pending' : ''}">${label}</span>
             <div class="gallery-label">${escHtml(name)}</div>
         `;
         galleryGrid.appendChild(div);
 
-        state.photos.push({ url, type, seq, name });
+        state.photos.push({ url, type: baseType, seq, name, pending: isPending });
     }
 
     // ===================================================================
@@ -670,6 +892,71 @@
     }
 
     // ===================================================================
+    // PRECACHE & MANUAL SYNC
+    // ===================================================================
+    async function precacheInfraPhotos() {
+        if (!state.infraId) {
+            alert('Selecciona primero una infraestructura');
+            return;
+        }
+        if (!navigator.onLine) {
+            alert('Se necesita conexión a Internet para precargar las fotos');
+            return;
+        }
+
+        const modal = $('#precache-modal');
+        const bar = $('#precache-progress-bar');
+        const text = $('#precache-progress-text');
+        if (modal) {
+            modal.classList.remove('hidden');
+            if (bar) bar.style.width = '0%';
+            if (text) text.textContent = 'Iniciando precarga...';
+        }
+
+        try {
+            const result = await window.InfocampoOffline.precachePhotos(
+                state.infraId,
+                CFG.endpoints.fotosComparativas
+            );
+
+            if (text) {
+                if (result.cached > 0) {
+                    text.textContent = `${result.cached} foto${result.cached > 1 ? 's' : ''} precargada${result.cached > 1 ? 's' : ''} correctamente`;
+                } else {
+                    text.textContent = 'No hay fotos comparativas para precargar';
+                }
+            }
+            if (bar) bar.style.width = '100%';
+
+            // Update precache indicator
+            updatePrecacheIndicator();
+
+            setTimeout(() => { if (modal) modal.classList.add('hidden'); }, 2500);
+        } catch (err) {
+            if (text) text.textContent = 'Error: ' + err.message;
+            setTimeout(() => { if (modal) modal.classList.add('hidden'); }, 3000);
+        }
+    }
+
+    async function updatePrecacheIndicator() {
+        if (!window.InfocampoOffline || !state.infraId) return;
+        const hasCached = await window.InfocampoOffline.hasCachedPhotos(state.infraId);
+        const indicator = $('#precache-indicator');
+        if (indicator) {
+            indicator.classList.toggle('hidden', !hasCached);
+        }
+    }
+
+    async function triggerManualSync() {
+        if (!navigator.onLine) {
+            alert('Se necesita conexión a Internet para sincronizar');
+            return;
+        }
+        if (!window.InfocampoOffline) return;
+        await window.InfocampoOffline.syncQueue();
+    }
+
+    // ===================================================================
     // EVENTS
     // ===================================================================
     function bindEvents() {
@@ -727,6 +1014,28 @@
         // Preview
         btnRetake.addEventListener('click', retakePhoto);
         btnAccept.addEventListener('click', acceptPhoto);
+
+        // Offline: precache button
+        const btnPrecache = $('#btn-precache');
+        if (btnPrecache) btnPrecache.addEventListener('click', precacheInfraPhotos);
+
+        // Offline: manual sync button
+        const btnSync = $('#btn-manual-sync');
+        if (btnSync) btnSync.addEventListener('click', triggerManualSync);
+
+        // Offline: close precache modal
+        const btnClosePrecache = $('#btn-close-precache');
+        if (btnClosePrecache) btnClosePrecache.addEventListener('click', () => {
+            const modal = $('#precache-modal');
+            if (modal) modal.classList.add('hidden');
+        });
+
+        // Offline: dismiss sync notification
+        const notifClose = $('#sync-notif-close');
+        if (notifClose) notifClose.addEventListener('click', () => {
+            const notif = $('#sync-notification');
+            if (notif) notif.classList.add('hidden');
+        });
     }
 
     // ===================================================================
