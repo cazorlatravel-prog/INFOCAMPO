@@ -1,9 +1,9 @@
 <?php
 /**
- * INFOCAMPO SaaS - Login de Administrador de Empresa
+ * INFOCAMPO SaaS - Login de Operador de Campo
  *
- * Permite a los administradores y supervisores de empresa
- * iniciar sesión directamente sin necesidad de superadmin.
+ * Permite a los operadores iniciar sesión con email y contraseña
+ * y los redirige a la interfaz de operador con sus parámetros.
  */
 
 declare(strict_types=1);
@@ -17,11 +17,16 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
-// Si ya está autenticado como admin/supervisor, redirigir al panel
+// Si ya está autenticado como operador, redirigir a la interfaz
 if (isLoggedIn()) {
     $rol = $_SESSION['user_rol'] ?? '';
+    if ($rol === 'operador') {
+        header('Location: operador.php?user=' . $_SESSION['user_id'] . '&empresa=' . $_SESSION['empresa_id']);
+        exit;
+    }
+    // Si es otro rol, redirigir a su panel correspondiente
     if (in_array($rol, ['admin', 'supervisor'], true)) {
-        header('Location: dashboard.php');
+        header('Location: /admin/dashboard.php');
         exit;
     }
     if ($rol === 'superadmin') {
@@ -44,15 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Credenciales incorrectas o cuenta desactivada.';
         } else {
             $rol = $result['rol'];
-            if (in_array($rol, ['admin', 'supervisor'], true)) {
-                header('Location: dashboard.php');
+            if ($rol === 'operador') {
+                header('Location: operador.php?user=' . $result['id'] . '&empresa=' . $result['empresa_id']);
+                exit;
+            } elseif (in_array($rol, ['admin', 'supervisor'], true)) {
+                header('Location: /admin/dashboard.php');
                 exit;
             } elseif ($rol === 'superadmin') {
                 header('Location: /superadmin/index.php');
-                exit;
-            } elseif ($rol === 'operador') {
-                // Operador: redirigir a su login/interfaz
-                header('Location: /public/operador.php?user=' . $result['id'] . '&empresa=' . $result['empresa_id']);
                 exit;
             } else {
                 logout();
@@ -67,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Acceso Administración</title>
+    <title>INFOCAMPO - Acceso Operador de Campo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -76,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #2d6a9f 100%);
+            background: linear-gradient(135deg, #0a1628 0%, #0f2847 50%, #1a4a7a 100%);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         .login-card {
@@ -88,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             overflow: hidden;
         }
         .login-header {
-            background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
             color: #fff;
             padding: 32px 28px 24px;
             text-align: center;
@@ -101,8 +105,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .login-header p {
             margin: 0;
-            opacity: 0.7;
+            opacity: 0.8;
             font-size: 0.85rem;
+        }
+        .login-header .icon-circle {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 14px;
+            font-size: 1.5rem;
         }
         .login-body { padding: 32px 28px; }
         .form-floating { margin-bottom: 16px; }
@@ -112,8 +124,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 16px 14px 8px;
         }
         .form-floating .form-control:focus {
-            border-color: #2d6a9f;
-            box-shadow: 0 0 0 3px rgba(45,106,159,0.15);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
         }
         .btn-login {
             width: 100%;
@@ -121,14 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-radius: 10px;
             font-weight: 700;
             font-size: 1rem;
-            background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
             border: none;
             color: #fff;
             transition: all 0.2s;
         }
         .btn-login:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(30,58,95,0.4);
+            box-shadow: 0 4px 16px rgba(59,130,246,0.4);
             color: #fff;
         }
         .login-footer {
@@ -137,13 +149,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 0.8rem;
             color: #9ca3af;
         }
+        .login-footer a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="login-card">
         <div class="login-header">
+            <div class="icon-circle">
+                <i class="bi bi-phone-fill"></i>
+            </div>
             <h1><i class="bi bi-geo-alt-fill me-2"></i>INFOCAMPO</h1>
-            <p>Panel de Administración</p>
+            <p>Acceso Operador de Campo</p>
         </div>
         <div class="login-body">
             <?php if ($error): ?>
@@ -165,12 +187,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="password"><i class="bi bi-lock me-1"></i> Contraseña</label>
                 </div>
                 <button type="submit" class="btn btn-login mt-2">
-                    <i class="bi bi-box-arrow-in-right me-1"></i> Acceder
+                    <i class="bi bi-camera me-1"></i> Acceder como Operador
                 </button>
             </form>
         </div>
         <div class="login-footer">
-            INFOCAMPO SaaS &mdash; Inspección de Infraestructuras
+            <a href="/"><i class="bi bi-arrow-left me-1"></i>Volver a la página principal</a>
         </div>
     </div>
 </body>
