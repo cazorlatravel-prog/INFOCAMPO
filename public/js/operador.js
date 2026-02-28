@@ -81,6 +81,7 @@
     // Preview
     const previewCanvas  = $('#preview-canvas');
     const previewFilename = $('#preview-filename');
+    // Preview buttons (kept for backwards compat but no longer primary flow)
     const btnRetake      = $('#btn-retake');
     const btnAccept      = $('#btn-accept');
 
@@ -538,8 +539,7 @@
     }
 
     function closeCamera() {
-        camVideo.pause();
-        // Keep stream alive for reuse
+        stopCameraStream();
         camGhost.classList.remove('active');
         showScreen('ficha');
     }
@@ -642,7 +642,7 @@
     // ===================================================================
     // CAPTURE
     // ===================================================================
-    function captureFrame() {
+    async function captureFrame() {
         const vw = camVideo.videoWidth;
         const vh = camVideo.videoHeight;
         camCapture.width = vw;
@@ -662,8 +662,8 @@
             filename = `foto_${sanitizeFilename(state.infraName)}_${Date.now()}`;
         }
 
-        // Apply watermark
-        applyWatermark(camCapture, previewCanvas, {
+        // Apply watermark directly on previewCanvas (used for blob generation)
+        await applyWatermark(camCapture, previewCanvas, {
             lat: state.gps.lat,
             lon: state.gps.lon,
             infraName: state.infraName,
@@ -671,39 +671,66 @@
             filename: filename,
             mode: state.currentMode,
             seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
-        }).then(() => {
-            previewFilename.textContent = filename;
-            showScreen('preview');
         });
+
+        // Auto-accept: upload + save to gallery + go back to ficha
+        await processAndUploadPhoto(filename);
     }
 
-    function retakePhoto() {
-        if (state.currentMode === 'comparativo') {
-            state.seqComparativa--;
+    // ===================================================================
+    // SAVE TO DEVICE GALLERY
+    // ===================================================================
+    async function saveToDeviceGallery(blob, filename) {
+        try {
+            const file = new File([blob], filename + '.jpg', { type: 'image/jpeg' });
+
+            // Try native share (best for mobile - offers "Save to Photos")
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file] });
+                return;
+            }
+        } catch (err) {
+            // User cancelled share or not supported — fall through to download
+            if (err.name === 'AbortError') return;
         }
-        camVideo.play();
-        showScreen('camera');
+
+        // Fallback: trigger download (saves to Downloads / Files on mobile)
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename + '.jpg';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
 
-    async function acceptPhoto() {
-        // Convert preview to blob
+    // ===================================================================
+    // PROCESS, UPLOAD & RETURN TO FICHA
+    // ===================================================================
+    async function processAndUploadPhoto(filename) {
+        // Convert preview canvas to blob
         const blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.85);
-        if (!blob) { alert('Error al procesar la foto.'); return; }
+        if (!blob) {
+            alert('Error al procesar la foto.');
+            camVideo.play();
+            showScreen('ficha');
+            return;
+        }
 
         // Show upload overlay
         uploadOverlay.classList.remove('hidden');
 
-        // Build filename
-        let filename = '';
+        // Save to device gallery (non-blocking)
+        saveToDeviceGallery(blob, filename);
+
         let seq = null;
         if (state.currentMode === 'comparativo') {
             seq = state.seqComparativa;
-            filename = `W${seq}_${sanitizeFilename(state.infraName)}`;
-        } else {
-            filename = `foto_${sanitizeFilename(state.infraName)}_${Date.now()}`;
         }
 
-        // Build form data object
+        // Build upload data
         const uploadData = {
             infra_id: state.infraId,
             usuario_id: CFG.usuarioId,
@@ -725,35 +752,27 @@
             uploadUrl: CFG.endpoints.upload,
         };
 
+        // Stop camera stream since we return to ficha
+        stopCameraStream();
+
         // Check connectivity — if offline, queue locally
         if (!navigator.onLine && window.InfocampoOffline) {
             try {
                 await window.InfocampoOffline.enqueue(blob, uploadData);
-
                 uploadOverlay.classList.add('hidden');
 
-                // Create local blob URL for gallery preview
                 const localUrl = URL.createObjectURL(blob);
                 addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
-
-                // Update counters
                 updateCounters(seq);
 
-                // For comparativo mode, use local blob as ghost for next shot
-                if (state.currentMode === 'comparativo') {
-                    setGhostImage(localUrl);
-                    camSeqLabel.textContent = 'W' + (state.seqComparativa + 1);
-                }
-
-                camVideo.play();
-                showScreen('camera');
+                showScreen('ficha');
+                showNotification('Foto guardada (pendiente de sincronizar)');
                 return;
             } catch (queueErr) {
                 console.error('Error saving offline:', queueErr);
                 uploadOverlay.classList.add('hidden');
                 alert('Error al guardar localmente: ' + queueErr.message);
-                camVideo.play();
-                showScreen('camera');
+                showScreen('ficha');
                 return;
             }
         }
@@ -773,34 +792,24 @@
         if (seq !== null) {
             formData.append('secuencia_comparativa', seq);
         }
-
         if (unidadObra.value) {
             formData.append('unidad_obra_id', unidadObra.value);
         }
-
         formData.append('datos_tecnicos', uploadData.datos_tecnicos);
 
         try {
             const res = await fetch(CFG.endpoints.upload, { method: 'POST', body: formData });
             const data = await res.json();
-
             uploadOverlay.classList.add('hidden');
 
             if (data.ok) {
                 addToGallery(data.url_imagen, state.currentMode, filename, seq);
                 updateCounters(seq);
-
-                if (state.currentMode === 'comparativo') {
-                    setGhostImage(data.url_imagen);
-                    camSeqLabel.textContent = 'W' + (state.seqComparativa + 1);
-                }
-
-                camVideo.play();
-                showScreen('camera');
+                showScreen('ficha');
+                showNotification('Foto subida correctamente');
             } else {
                 alert('Error: ' + (data.error || 'Error desconocido'));
-                camVideo.play();
-                showScreen('camera');
+                showScreen('ficha');
             }
         } catch (err) {
             uploadOverlay.classList.add('hidden');
@@ -812,14 +821,8 @@
                     const localUrl = URL.createObjectURL(blob);
                     addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
                     updateCounters(seq);
-
-                    if (state.currentMode === 'comparativo') {
-                        setGhostImage(localUrl);
-                        camSeqLabel.textContent = 'W' + (state.seqComparativa + 1);
-                    }
-
-                    camVideo.play();
-                    showScreen('camera');
+                    showScreen('ficha');
+                    showNotification('Foto guardada (pendiente de sincronizar)');
                     return;
                 } catch (qErr) {
                     console.error('Fallback queue error:', qErr);
@@ -827,9 +830,26 @@
             }
 
             alert('Error de red: ' + err.message);
-            camVideo.play();
-            showScreen('camera');
+            showScreen('ficha');
         }
+    }
+
+    function stopCameraStream() {
+        if (state.stream) {
+            state.stream.getTracks().forEach(t => t.stop());
+            state.stream = null;
+        }
+        camVideo.pause();
+        camVideo.srcObject = null;
+    }
+
+    function showNotification(msg) {
+        const notif = $('#sync-notification');
+        if (!notif) return;
+        const text = notif.querySelector('.sync-notif-text');
+        if (text) text.textContent = msg;
+        notif.classList.remove('hidden');
+        setTimeout(() => notif.classList.add('hidden'), 3000);
     }
 
     function updateCounters(seq) {
@@ -1102,9 +1122,9 @@
         btnClosePrev.addEventListener('click', () => modalPrevPhotos.classList.add('hidden'));
         btnSkipPrev.addEventListener('click', () => modalPrevPhotos.classList.add('hidden'));
 
-        // Preview
-        btnRetake.addEventListener('click', retakePhoto);
-        btnAccept.addEventListener('click', acceptPhoto);
+        // Preview (legacy — photo now auto-accepts and returns to ficha)
+        if (btnRetake) btnRetake.addEventListener('click', () => showScreen('ficha'));
+        if (btnAccept) btnAccept.addEventListener('click', () => showScreen('ficha'));
 
         // Offline: precache button
         const btnPrecache = $('#btn-precache');
