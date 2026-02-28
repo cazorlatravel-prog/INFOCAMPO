@@ -222,6 +222,24 @@ if ($initials === '') $initials = 'OP';
                     </div>
                     <span class="foto-count"><i class="bi bi-chevron-right"></i></span>
                 </button>
+
+                <button type="button" id="btn-mis-visitas" class="foto-btn foto-btn--visitas">
+                    <div class="foto-btn-icon">
+                        <i class="bi bi-journal-text"></i>
+                    </div>
+                    <div class="foto-btn-text">
+                        <strong>Mis Visitas</strong>
+                        <small>Ver y editar registros anteriores</small>
+                    </div>
+                    <span class="foto-count"><i class="bi bi-chevron-right"></i></span>
+                </button>
+            </div>
+
+            <!-- Botón Guardar Visita (visible solo cuando hay infra seleccionada y fotos) -->
+            <div id="guardar-visita-section" class="hidden">
+                <button type="button" id="btn-guardar-visita" class="btn-guardar-visita">
+                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
+                </button>
             </div>
 
             <!-- Sync bar -->
@@ -378,6 +396,85 @@ if ($initials === '') $initials = 'OP';
         </div>
     </div>
 
+    <!-- ========================================================
+         PANTALLA 5: MIS VISITAS
+         ======================================================== -->
+    <div id="screen-visitas" class="screen">
+        <div class="visitas-topbar">
+            <button type="button" id="btn-visitas-back" class="cam-btn-back">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <div class="visitas-title">
+                <strong>Mis Visitas</strong>
+                <span>Registros anteriores</span>
+            </div>
+            <div style="width:40px;"></div>
+        </div>
+        <div class="visitas-body" id="visitas-body">
+            <div class="visitas-loading">
+                <div class="spinner"></div>
+                <span>Cargando visitas...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================
+         PANTALLA 6: EDITAR VISITA (detalle de una foto/registro)
+         ======================================================== -->
+    <div id="screen-editar-visita" class="screen">
+        <div class="visitas-topbar">
+            <button type="button" id="btn-editar-back" class="cam-btn-back">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <div class="visitas-title">
+                <strong>Editar Registro</strong>
+                <span id="editar-infra-name">--</span>
+            </div>
+            <div style="width:40px;"></div>
+        </div>
+        <div class="editar-body" id="editar-body">
+            <div class="editar-foto-preview">
+                <img id="editar-foto-img" src="" alt="Foto">
+            </div>
+            <div class="card" style="margin:12px 16px;">
+                <div class="card-label"><i class="bi bi-info-circle"></i> Información</div>
+                <div class="editar-info" id="editar-info"></div>
+            </div>
+            <div class="card" style="margin:12px 16px;">
+                <div class="card-label"><i class="bi bi-flag"></i> Situación</div>
+                <select id="editar-estado" class="input-field">
+                    <option value="antes">Antes</option>
+                    <option value="durante">Durante</option>
+                    <option value="despues">Después</option>
+                </select>
+            </div>
+            <div class="card" style="margin:12px 16px;">
+                <div class="card-label"><i class="bi bi-tools"></i> Unidad de Obra</div>
+                <select id="editar-uo" class="input-field">
+                    <option value="">Sin asignar</option>
+                </select>
+            </div>
+            <div class="card" style="margin:12px 16px;">
+                <div class="card-label"><i class="bi bi-chat-text"></i> Observaciones</div>
+                <textarea id="editar-observaciones" class="input-field input-textarea" rows="3" placeholder="Observaciones..."></textarea>
+            </div>
+            <div style="padding:12px 16px 24px;">
+                <button type="button" id="btn-guardar-edicion" class="btn-guardar-visita">
+                    <i class="bi bi-check-circle-fill"></i> Guardar cambios
+                </button>
+            </div>
+            <div style="padding:0 16px 24px;">
+                <button type="button" id="btn-añadir-foto-visita" class="foto-btn foto-btn--aleatorio" style="width:100%;">
+                    <div class="foto-btn-icon"><i class="bi bi-camera-fill"></i></div>
+                    <div class="foto-btn-text">
+                        <strong>Añadir foto</strong>
+                        <small>Tomar foto para esta infraestructura</small>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Overlays & Modals -->
     <div id="upload-overlay" class="overlay hidden">
         <div class="spinner"></div>
@@ -456,6 +553,7 @@ if ($initials === '') $initials = 'OP';
                 fotosComparativas: 'api/fotos_comparativas.php',
                 registrosMapa: 'api/registros_mapa.php',
                 capasKml: 'api/capas_kml.php',
+                visitas: 'api/visitas.php',
             }
         };
     </script>

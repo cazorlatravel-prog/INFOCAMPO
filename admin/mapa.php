@@ -761,10 +761,22 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '</div>'
                 );
 
-                marker.on('dragend', function(e) {
-                    var newLatLng = e.target.getLatLng();
-                    updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
-                });
+                (function(originalLat, originalLon) {
+                    marker.on('dragend', function(e) {
+                        var newLatLng = e.target.getLatLng();
+                        var confirmed = confirm(
+                            '¿Mover "' + inf.nombre + '" a la nueva ubicación?\n\n' +
+                            'Anterior: ' + originalLat.toFixed(7) + ', ' + originalLon.toFixed(7) + '\n' +
+                            'Nueva: ' + newLatLng.lat.toFixed(7) + ', ' + newLatLng.lng.toFixed(7)
+                        );
+                        if (confirmed) {
+                            updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
+                        } else {
+                            e.target.setLatLng([originalLat, originalLon]);
+                            showDragToast('Reubicación cancelada', 'error');
+                        }
+                    });
+                })(inf.lat, inf.lon);
 
                 marker.addTo(infraDragGroup);
             });

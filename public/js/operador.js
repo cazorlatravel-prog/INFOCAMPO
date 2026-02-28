@@ -48,6 +48,8 @@
         camera:  $('#screen-camera'),
         preview: $('#screen-preview'),
         mapa:    $('#screen-mapa'),
+        visitas: $('#screen-visitas'),
+        editarVisita: $('#screen-editar-visita'),
     };
 
     // Ficha
@@ -104,6 +106,16 @@
     const btnDetailNavegar     = $('#btn-detail-navegar');
     const btnDetailAleatorio   = $('#btn-detail-aleatorio');
     const btnDetailComparativo = $('#btn-detail-comparativo');
+
+    // Visitas
+    const btnMisVisitas      = $('#btn-mis-visitas');
+    const btnVisitasBack     = $('#btn-visitas-back');
+    const visitasBody        = $('#visitas-body');
+    const guardarVisitaSection = $('#guardar-visita-section');
+    const btnGuardarVisita   = $('#btn-guardar-visita');
+    const btnEditarBack      = $('#btn-editar-back');
+    const btnGuardarEdicion  = $('#btn-guardar-edicion');
+    const btnAñadirFotoVisita = $('#btn-añadir-foto-visita');
 
     // Overlay / Modal
     const uploadOverlay  = $('#upload-overlay');
@@ -541,10 +553,24 @@
         state.infraId = null;
         state.infraName = '';
         state.infraCode = '';
+        state.countAleatorias = 0;
+        state.countComparativas = 0;
+        state.countTotal = 0;
+        state.seqComparativa = 0;
+        state.photos = [];
+        state.prevPhotos = [];
+        state.ghostUrl = null;
+        state.ghostActive = false;
         infraIdInput.value = '';
         infraSearch.value = '';
         infraSearch.classList.remove('hidden');
         infraSelected.classList.add('hidden');
+        countAleatorias.textContent = '0';
+        countComparativas.textContent = '0';
+        galleryGrid.innerHTML = '';
+        gallerySection.classList.add('hidden');
+        const obsField = $('#observaciones-general');
+        if (obsField) obsField.value = '';
         updateButtonState();
     }
 
@@ -581,6 +607,12 @@
         const hint = $('#hint-select-infra');
         if (hint) {
             hint.classList.toggle('hidden', enabled);
+        }
+
+        // Show/hide guardar visita button (visible when infra selected and there are photos)
+        if (guardarVisitaSection) {
+            const hasPhotos = state.photos.length > 0;
+            guardarVisitaSection.classList.toggle('hidden', !enabled || !hasPhotos);
         }
     }
 
@@ -1002,6 +1034,7 @@
         galleryGrid.appendChild(div);
 
         state.photos.push({ url, type: baseType, seq, name, pending: isPending });
+        updateButtonState();
     }
 
     // ===================================================================
@@ -1307,6 +1340,20 @@
             const notif = $('#sync-notification');
             if (notif) notif.classList.add('hidden');
         });
+
+        // Guardar visita (finalizar y resetear)
+        if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
+
+        // Mis Visitas
+        if (btnMisVisitas) btnMisVisitas.addEventListener('click', openVisitasScreen);
+        if (btnVisitasBack) btnVisitasBack.addEventListener('click', () => showScreen('ficha'));
+
+        // Editar visita
+        if (btnEditarBack) btnEditarBack.addEventListener('click', () => {
+            openVisitasScreen(); // volver al listado y refrescar
+        });
+        if (btnGuardarEdicion) btnGuardarEdicion.addEventListener('click', guardarEdicion);
+        if (btnAñadirFotoVisita) btnAñadirFotoVisita.addEventListener('click', añadirFotoDesdeVisita);
     }
 
     // ===================================================================
@@ -2024,6 +2071,231 @@
         } else {
             alert('Para instalar FotoGPS:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
         }
+    }
+
+    // ===================================================================
+    // FINALIZAR VISITA (Guardar y Resetear)
+    // ===================================================================
+    function finalizarVisita() {
+        const numFotos = state.photos.length;
+        const infraName = state.infraName;
+
+        showNotification(`Visita a "${infraName}" finalizada (${numFotos} foto${numFotos !== 1 ? 's' : ''})`);
+
+        // Reset state
+        state.infraId = null;
+        state.infraName = '';
+        state.infraCode = '';
+        state.countAleatorias = 0;
+        state.countComparativas = 0;
+        state.countTotal = 0;
+        state.seqComparativa = 0;
+        state.photos = [];
+        state.prevPhotos = [];
+        state.ghostUrl = null;
+        state.ghostActive = false;
+        state.situacionIdx = 0;
+        state.unidadObraId = null;
+
+        // Reset UI
+        infraIdInput.value = '';
+        infraSearch.value = '';
+        infraSearch.classList.remove('hidden');
+        infraSelected.classList.add('hidden');
+        unidadObra.value = '';
+        const obsField = $('#observaciones-general');
+        if (obsField) obsField.value = '';
+        countAleatorias.textContent = '0';
+        countComparativas.textContent = '0';
+        galleryGrid.innerHTML = '';
+        gallerySection.classList.add('hidden');
+
+        updateButtonState();
+    }
+
+    // ===================================================================
+    // MIS VISITAS - Panel de visitas del operador
+    // ===================================================================
+    let editingRegistroId = null;
+    let editingInfraId = null;
+
+    async function openVisitasScreen() {
+        showScreen('visitas');
+        visitasBody.innerHTML = '<div class="visitas-loading"><div class="spinner"></div><span>Cargando visitas...</span></div>';
+
+        try {
+            const res = await fetch(
+                `${CFG.endpoints.visitas}?usuario_id=${CFG.usuarioId}&empresa_id=${CFG.empresaId}`
+            );
+            const data = await res.json();
+
+            if (!data.ok) {
+                visitasBody.innerHTML = '<div class="visita-empty"><i class="bi bi-exclamation-circle"></i><p>Error al cargar visitas</p></div>';
+                return;
+            }
+
+            if (!data.visitas || data.visitas.length === 0) {
+                visitasBody.innerHTML = '<div class="visita-empty"><i class="bi bi-journal-text"></i><p>No tienes visitas registradas</p></div>';
+                return;
+            }
+
+            let html = '';
+            data.visitas.forEach(visita => {
+                const fechaFmt = formatFechaVisita(visita.fecha);
+                html += `<div class="visita-group">
+                    <div class="visita-group-header">
+                        <div>
+                            <strong>${escHtml(visita.infra_nombre)}</strong><br>
+                            <code>${escHtml(visita.infra_codigo)}</code>
+                        </div>
+                        <div class="visita-group-date">
+                            <i class="bi bi-calendar3"></i> ${fechaFmt}
+                        </div>
+                    </div>
+                    <div class="visita-fotos">`;
+
+                visita.fotos.forEach(foto => {
+                    const tipoLabel = foto.tipo === 'comparativo' ? ('W' + (foto.seq || '')) : 'ALEA';
+                    html += `<div class="visita-foto-item" data-registro-id="${foto.id}" onclick="window._editarRegistro(${foto.id})">
+                        <img src="${escHtml(foto.url)}" alt="" loading="lazy">
+                        <span class="visita-foto-badge ${foto.estado}">${foto.estado}</span>
+                        <span class="visita-foto-tipo">${tipoLabel} ${foto.hora}</span>
+                    </div>`;
+                });
+
+                html += `</div></div>`;
+            });
+
+            visitasBody.innerHTML = html;
+        } catch (err) {
+            visitasBody.innerHTML = '<div class="visita-empty"><i class="bi bi-wifi-off"></i><p>Error de conexión</p></div>';
+        }
+    }
+
+    // Global handler for clicking on a visit photo
+    window._editarRegistro = async function(registroId) {
+        editingRegistroId = registroId;
+        showScreen('editarVisita');
+
+        const editarBody = $('#editar-body');
+        const editarImg = $('#editar-foto-img');
+        const editarInfo = $('#editar-info');
+        const editarEstado = $('#editar-estado');
+        const editarUo = $('#editar-uo');
+        const editarObs = $('#editar-observaciones');
+        const editarInfraName = $('#editar-infra-name');
+
+        try {
+            const res = await fetch(
+                `${CFG.endpoints.visitas}?action=detalle&registro_id=${registroId}&usuario_id=${CFG.usuarioId}&empresa_id=${CFG.empresaId}`
+            );
+            const data = await res.json();
+
+            if (!data.ok || !data.registro) {
+                showNotification('No se pudo cargar el registro');
+                showScreen('visitas');
+                return;
+            }
+
+            const r = data.registro;
+            editingInfraId = parseInt(r.infra_id);
+
+            editarImg.src = r.url_cloudinary || '';
+            editarInfraName.textContent = r.infra_nombre;
+
+            const fechaFmt = r.fecha ? new Date(r.fecha).toLocaleString('es-ES', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            }) : '--';
+
+            editarInfo.innerHTML = `
+                <strong>${escHtml(r.infra_nombre)}</strong> <code>${escHtml(r.codigo_unico)}</code><br>
+                <i class="bi bi-calendar3"></i> ${fechaFmt}<br>
+                <i class="bi bi-camera"></i> ${r.tipo_foto === 'comparativo' ? 'Comparativa' : 'Aleatoria'}
+                ${r.nombre_archivo ? ' - ' + escHtml(r.nombre_archivo) : ''}
+            `;
+
+            editarEstado.value = r.estado_incidencia || 'antes';
+            editarObs.value = r.observaciones || '';
+
+            // Load UO options
+            editarUo.innerHTML = '<option value="">Sin asignar</option>';
+            try {
+                const uoRes = await fetch(`${CFG.endpoints.unidadesObra}?empresa_id=${CFG.empresaId}`);
+                const uoData = await uoRes.json();
+                if (uoData.ok && uoData.unidades) {
+                    uoData.unidades.forEach(u => {
+                        const label = u.codigo ? `${u.codigo} - ${u.nombre}` : u.nombre;
+                        const sel = (r.unidad_obra_id && parseInt(r.unidad_obra_id) === parseInt(u.id)) ? 'selected' : '';
+                        editarUo.innerHTML += `<option value="${u.id}" ${sel}>${escHtml(label)}</option>`;
+                    });
+                }
+            } catch (e) { /* UO loading optional */ }
+
+        } catch (err) {
+            showNotification('Error al cargar registro');
+            showScreen('visitas');
+        }
+    };
+
+    async function guardarEdicion() {
+        if (!editingRegistroId) return;
+
+        const editarEstado = $('#editar-estado');
+        const editarUo = $('#editar-uo');
+        const editarObs = $('#editar-observaciones');
+
+        const formData = new FormData();
+        formData.append('action', 'editar');
+        formData.append('registro_id', editingRegistroId);
+        formData.append('usuario_id', CFG.usuarioId);
+        formData.append('estado_incidencia', editarEstado.value);
+        formData.append('unidad_obra_id', editarUo.value);
+        formData.append('observaciones', editarObs.value);
+
+        try {
+            const res = await fetch(CFG.endpoints.visitas, {
+                method: 'POST',
+                body: formData,
+            });
+            const data = await res.json();
+
+            if (data.ok) {
+                showNotification('Registro actualizado correctamente');
+                openVisitasScreen(); // volver al listado
+            } else {
+                showNotification('Error: ' + (data.error || 'No se pudo guardar'));
+            }
+        } catch (err) {
+            showNotification('Error de conexión');
+        }
+    }
+
+    function añadirFotoDesdeVisita() {
+        if (!editingInfraId) {
+            showNotification('No se puede determinar la infraestructura');
+            return;
+        }
+
+        // We need the infra name and code - fetch them from the edit screen
+        const editarInfraName = $('#editar-infra-name');
+        const editarInfo = $('#editar-info');
+        const infraName = editarInfraName ? editarInfraName.textContent : '';
+        const codeEl = editarInfo ? editarInfo.querySelector('code') : null;
+        const infraCode = codeEl ? codeEl.textContent : '';
+
+        // Select the infrastructure and go back to ficha to take a photo
+        selectInfra(editingInfraId, infraName, infraCode);
+        showScreen('ficha');
+        showNotification('Infraestructura seleccionada. Toma una foto.');
+    }
+
+    function formatFechaVisita(fechaStr) {
+        const parts = fechaStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return fechaStr;
     }
 
     // ===================================================================
