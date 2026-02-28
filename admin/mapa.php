@@ -567,6 +567,39 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             });
 
             renderMarkers(filtered);
+
+            // Zoom to filtered results including infrastructure positions
+            var anyFilterActive = opVal || infraVal || uoVal || tipoVal || estadoVal;
+            if (anyFilterActive) {
+                var bounds = [];
+
+                // Bounds from filtered photo records
+                filtered.forEach(function(r) {
+                    if (r.lat && r.lon) bounds.push([r.lat, r.lon]);
+                });
+
+                // Include matching infrastructure positions from infraData
+                if (typeof infraData !== 'undefined') {
+                    var filteredInfraIds = {};
+                    filtered.forEach(function(r) { filteredInfraIds[r.infra_id] = true; });
+
+                    infraData.forEach(function(inf) {
+                        if (!inf.lat || !inf.lon) return;
+                        // If specific infra selected, include it
+                        if (infraVal && inf.id === parseInt(infraVal)) {
+                            bounds.push([inf.lat, inf.lon]);
+                        }
+                        // If filtering by operator/UO/etc, include infras that have matching photos
+                        if (!infraVal && filteredInfraIds[inf.id]) {
+                            bounds.push([inf.lat, inf.lon]);
+                        }
+                    });
+                }
+
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
+                }
+            }
         }
 
         window.resetFilters = function() {
