@@ -680,30 +680,20 @@
     // ===================================================================
     // SAVE TO DEVICE GALLERY
     // ===================================================================
-    async function saveToDeviceGallery(blob, filename) {
+    function saveToDeviceGallery(blob, filename) {
         try {
-            const file = new File([blob], filename + '.jpg', { type: 'image/jpeg' });
-
-            // Try native share (best for mobile - offers "Save to Photos")
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file] });
-                return;
-            }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename + '.jpg';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
         } catch (err) {
-            // User cancelled share or not supported — fall through to download
-            if (err.name === 'AbortError') return;
+            console.warn('Error saving to gallery:', err);
         }
-
-        // Fallback: trigger download (saves to Downloads / Files on mobile)
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename + '.jpg';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
 
     // ===================================================================

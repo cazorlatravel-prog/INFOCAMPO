@@ -12,6 +12,27 @@ declare(strict_types=1);
 class CloudinaryHelper
 {
     /**
+     * Comprueba si Cloudinary está configurado con credenciales reales.
+     */
+    public static function isConfigured(): bool
+    {
+        $cloudName = CLOUDINARY_CLOUD_NAME;
+        $apiKey    = CLOUDINARY_API_KEY;
+        $apiSecret = CLOUDINARY_API_SECRET;
+
+        if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
+            return false;
+        }
+        $placeholders = ['your_cloud_name', 'your_api_key', 'your_api_secret', 'xxx', 'changeme'];
+        if (in_array(strtolower($cloudName), $placeholders, true)
+            || in_array(strtolower($apiKey), $placeholders, true)
+            || in_array(strtolower($apiSecret), $placeholders, true)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Sube un archivo a Cloudinary y devuelve la URL segura.
      *
      * @param string $filePath   Ruta local al archivo temporal
@@ -25,10 +46,10 @@ class CloudinaryHelper
         $apiKey    = CLOUDINARY_API_KEY;
         $apiSecret = CLOUDINARY_API_SECRET;
 
-        if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
+        if (!self::isConfigured()) {
             throw new \RuntimeException(
                 'Credenciales de Cloudinary no configuradas. '
-                . 'Define CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.'
+                . 'Define CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en .env'
             );
         }
 

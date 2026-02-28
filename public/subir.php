@@ -107,20 +107,49 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 }
 
 // ---------------------------------------------------------------
-// 2. Subir imagen a Cloudinary
+// 2. Subir imagen a Cloudinary (o guardar localmente si no está configurado)
 // ---------------------------------------------------------------
+$cloudinaryUrl = '';
 try {
-    // Determinar carpeta y public_id en Cloudinary
-    $folder = $tipoFoto === 'comparativo'
-        ? 'infocampo/comparativas'
-        : 'infocampo/aleatorias';
-    $publicId = $nombreArchivo ?: null;
+    if (CloudinaryHelper::isConfigured()) {
+        // Cloudinary configurado — subir
+        $folder = $tipoFoto === 'comparativo'
+            ? 'infocampo/comparativas'
+            : 'infocampo/aleatorias';
+        $publicId = $nombreArchivo ?: null;
 
-    $cloudinaryUrl = CloudinaryHelper::upload(
-        $_FILES['imagen']['tmp_name'],
-        $folder,
-        $publicId
-    );
+        $cloudinaryUrl = CloudinaryHelper::upload(
+            $_FILES['imagen']['tmp_name'],
+            $folder,
+            $publicId
+        );
+    } else {
+        // Cloudinary NO configurado — guardar en uploads/ local
+        $uploadsDir = __DIR__ . '/uploads';
+        if (!is_dir($uploadsDir)) {
+            mkdir($uploadsDir, 0755, true);
+        }
+        $subDir = $tipoFoto === 'comparativo' ? 'comparativas' : 'aleatorias';
+        $targetDir = $uploadsDir . '/' . $subDir;
+        if (!is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $safeName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $nombreArchivo ?: ('foto_' . time()));
+        $localFile = $safeName . '.jpg';
+        $destPath  = $targetDir . '/' . $localFile;
+
+        // Evitar sobrescribir
+        if (file_exists($destPath)) {
+            $localFile = $safeName . '_' . time() . '.jpg';
+            $destPath  = $targetDir . '/' . $localFile;
+        }
+
+        move_uploaded_file($_FILES['imagen']['tmp_name'], $destPath);
+
+        // Generar URL relativa accesible desde el navegador
+        $cloudinaryUrl = APP_URL . '/uploads/' . $subDir . '/' . $localFile;
+    }
 } catch (\Exception $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error al subir imagen: ' . $e->getMessage()]);
