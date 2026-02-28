@@ -225,15 +225,28 @@ if (isset($_GET['edit'])) {
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-semibold small">Latitud</label>
-                            <input type="number" step="0.0000001" name="lat_teorica" class="form-control"
+                            <input type="number" step="0.0000001" name="lat_teorica" id="lat_teorica" class="form-control"
                                    placeholder="37.3890531"
                                    value="<?= $editInfra['lat_teorica'] ?? '' ?>">
                         </div>
                         <div class="col-md-2">
                             <label class="form-label fw-semibold small">Longitud</label>
-                            <input type="number" step="0.0000001" name="lon_teorica" class="form-control"
+                            <input type="number" step="0.0000001" name="lon_teorica" id="lon_teorica" class="form-control"
                                    placeholder="-5.9844589"
                                    value="<?= $editInfra['lon_teorica'] ?? '' ?>">
+                        </div>
+                        <div class="col-12">
+                            <button type="button" id="btn-get-location" class="btn btn-sm btn-outline-info me-2" onclick="getMyLocation()">
+                                <i class="bi bi-crosshair"></i> Usar mi ubicación
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleMapPicker()">
+                                <i class="bi bi-map"></i> Elegir en mapa
+                            </button>
+                            <span id="geo-status" class="small text-muted ms-2"></span>
+                        </div>
+                        <div class="col-12" id="map-picker-wrapper" style="display:none;">
+                            <div id="map-picker" style="height:300px;border-radius:10px;border:2px solid #e5e7eb;"></div>
+                            <p class="small text-muted mt-1"><i class="bi bi-hand-index"></i> Haz clic en el mapa para colocar el marcador</p>
                         </div>
                         <div class="col-md-10">
                             <label class="form-label fw-semibold small">Descripción</label>
@@ -327,6 +340,82 @@ if (isset($_GET['edit'])) {
         <?php endif; ?>
     </div>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let pickerMap = null;
+        let pickerMarker = null;
+
+        function getMyLocation() {
+            const status = document.getElementById('geo-status');
+            if (!navigator.geolocation) {
+                status.textContent = 'Geolocalización no disponible en este navegador';
+                return;
+            }
+            status.textContent = 'Obteniendo ubicación...';
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    document.getElementById('lat_teorica').value = pos.coords.latitude.toFixed(7);
+                    document.getElementById('lon_teorica').value = pos.coords.longitude.toFixed(7);
+                    status.textContent = 'Ubicación obtenida';
+                    status.style.color = '#22c55e';
+                    updateMapMarker(pos.coords.latitude, pos.coords.longitude);
+                },
+                (err) => {
+                    status.textContent = 'Error: ' + err.message;
+                    status.style.color = '#ef4444';
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        function toggleMapPicker() {
+            const wrapper = document.getElementById('map-picker-wrapper');
+            const visible = wrapper.style.display !== 'none';
+            wrapper.style.display = visible ? 'none' : 'block';
+
+            if (!visible && !pickerMap) {
+                const lat = parseFloat(document.getElementById('lat_teorica').value) || 40.416775;
+                const lon = parseFloat(document.getElementById('lon_teorica').value) || -3.703790;
+                const zoom = (document.getElementById('lat_teorica').value) ? 15 : 6;
+
+                pickerMap = L.map('map-picker').setView([lat, lon], zoom);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OSM', maxZoom: 19,
+                }).addTo(pickerMap);
+
+                if (document.getElementById('lat_teorica').value) {
+                    pickerMarker = L.marker([lat, lon]).addTo(pickerMap);
+                }
+
+                pickerMap.on('click', function(e) {
+                    const { lat, lng } = e.latlng;
+                    document.getElementById('lat_teorica').value = lat.toFixed(7);
+                    document.getElementById('lon_teorica').value = lng.toFixed(7);
+
+                    if (pickerMarker) {
+                        pickerMarker.setLatLng([lat, lng]);
+                    } else {
+                        pickerMarker = L.marker([lat, lng]).addTo(pickerMap);
+                    }
+                });
+            }
+
+            if (!visible && pickerMap) {
+                setTimeout(() => pickerMap.invalidateSize(), 100);
+            }
+        }
+
+        function updateMapMarker(lat, lon) {
+            if (!pickerMap) return;
+            pickerMap.setView([lat, lon], 15);
+            if (pickerMarker) {
+                pickerMarker.setLatLng([lat, lon]);
+            } else {
+                pickerMarker = L.marker([lat, lon]).addTo(pickerMap);
+            }
+        }
+    </script>
 </body>
 </html>
