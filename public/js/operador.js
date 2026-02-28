@@ -107,6 +107,7 @@
     function init() {
         updateDate();
         setInterval(updateClock, 30000);
+        loadProvincias();
         loadUnidadesObra();
         bindEvents();
         initGPS();
@@ -268,6 +269,64 @@
     }
 
     // ===================================================================
+    // PROVINCIA / MUNICIPIO FILTERS
+    // ===================================================================
+    const filterProvincia = $('#filter-provincia');
+    const filterMunicipio = $('#filter-municipio');
+
+    async function loadProvincias() {
+        if (!CFG.empresaId) return;
+        try {
+            const res = await fetch(
+                `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&action=provincias`
+            );
+            const data = await res.json();
+            if (data.ok && data.provincias) {
+                let html = '<option value="">-- Todas las provincias --</option>';
+                data.provincias.forEach(p => {
+                    html += `<option value="${escHtml(p)}">${escHtml(p)}</option>`;
+                });
+                filterProvincia.innerHTML = html;
+            }
+        } catch (err) {
+            console.warn('Error loading provincias:', err);
+        }
+    }
+
+    async function loadMunicipios(provincia) {
+        if (!CFG.empresaId || !provincia) {
+            filterMunicipio.innerHTML = '<option value="">-- Todos los municipios --</option>';
+            filterMunicipio.disabled = true;
+            return;
+        }
+        try {
+            const res = await fetch(
+                `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&action=municipios&provincia=${encodeURIComponent(provincia)}`
+            );
+            const data = await res.json();
+            if (data.ok && data.municipios) {
+                let html = '<option value="">-- Todos los municipios --</option>';
+                data.municipios.forEach(m => {
+                    html += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
+                });
+                filterMunicipio.innerHTML = html;
+                filterMunicipio.disabled = false;
+            }
+        } catch (err) {
+            console.warn('Error loading municipios:', err);
+        }
+    }
+
+    function getFilterParams() {
+        let params = '';
+        const prov = filterProvincia ? filterProvincia.value : '';
+        const muni = filterMunicipio ? filterMunicipio.value : '';
+        if (prov) params += `&provincia=${encodeURIComponent(prov)}`;
+        if (muni) params += `&municipio=${encodeURIComponent(muni)}`;
+        return params;
+    }
+
+    // ===================================================================
     // INFRASTRUCTURE SEARCH
     // ===================================================================
     let searchTimeout = null;
@@ -282,7 +341,7 @@
         searchTimeout = setTimeout(async () => {
             try {
                 const res = await fetch(
-                    `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&q=${encodeURIComponent(query)}`
+                    `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&q=${encodeURIComponent(query)}${getFilterParams()}`
                 );
                 const data = await res.json();
 
@@ -290,8 +349,10 @@
 
                 let html = '';
                 data.infraestructuras.forEach(inf => {
+                    const loc = [inf.municipio, inf.provincia].filter(Boolean).join(', ');
                     html += `<div class="result-item" data-id="${inf.id}" data-name="${escHtml(inf.nombre)}" data-code="${escHtml(inf.codigo_unico)}">
                         ${escHtml(inf.nombre)} <span class="result-code">${escHtml(inf.codigo_unico)}</span>
+                        ${loc ? `<span class="result-location">${escHtml(loc)}</span>` : ''}
                     </div>`;
                 });
 
@@ -966,6 +1027,19 @@
     // EVENTS
     // ===================================================================
     function bindEvents() {
+        // Provincia / municipio filters
+        if (filterProvincia) {
+            filterProvincia.addEventListener('change', () => {
+                loadMunicipios(filterProvincia.value);
+                clearInfra();
+            });
+        }
+        if (filterMunicipio) {
+            filterMunicipio.addEventListener('change', () => {
+                clearInfra();
+            });
+        }
+
         // Infrastructure search
         infraSearch.addEventListener('input', (e) => searchInfra(e.target.value));
         infraSearch.addEventListener('focus', (e) => {

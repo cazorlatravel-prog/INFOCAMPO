@@ -68,6 +68,19 @@ if ($empresaId > 0) {
         </div>
 
         <div class="ficha-body">
+            <!-- Filtros provincia / municipio -->
+            <div class="ficha-field">
+                <label><i class="bi bi-pin-map"></i> Ubicación</label>
+                <div class="filter-row">
+                    <select id="filter-provincia" class="filter-select">
+                        <option value="">-- Todas las provincias --</option>
+                    </select>
+                    <select id="filter-municipio" class="filter-select" disabled>
+                        <option value="">-- Todos los municipios --</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Infraestructura -->
             <div class="ficha-field">
                 <label><i class="bi bi-geo-alt"></i> Infraestructura</label>

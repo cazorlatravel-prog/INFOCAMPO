@@ -31,6 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         $lat       = $_POST['lat_teorica'] !== '' ? (float) $_POST['lat_teorica'] : 0;
         $lon       = $_POST['lon_teorica'] !== '' ? (float) $_POST['lon_teorica'] : 0;
         $tipo      = trim($_POST['tipo'] ?? '');
+        $provincia = trim($_POST['provincia'] ?? '');
+        $municipio = trim($_POST['municipio'] ?? '');
         $desc      = trim($_POST['descripcion'] ?? '');
 
         if ($nombre === '') {
@@ -60,12 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                     $msgType = 'warning';
                 } else {
                     $stmt = $pdo->prepare(
-                        "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, descripcion, activa)
-                         VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :desc, 1)"
+                        "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, descripcion, activa)
+                         VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :desc, 1)"
                     );
                     $stmt->execute([
                         ':emp_id' => $empresaId, ':nombre' => $nombre, ':codigo' => $codigo,
-                        ':lat' => $lat, ':lon' => $lon, ':tipo' => $tipo ?: null, ':desc' => $desc ?: null,
+                        ':lat' => $lat, ':lon' => $lon, ':tipo' => $tipo ?: null,
+                        ':provincia' => $provincia ?: null, ':municipio' => $municipio ?: null,
+                        ':desc' => $desc ?: null,
                     ]);
                     $msg = 'Infraestructura creada correctamente.';
                     $msgType = 'success';
@@ -73,12 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             } else {
                 $stmt = $pdo->prepare(
                     "UPDATE infraestructuras SET nombre = :nombre, codigo_unico = :codigo,
-                     lat_teorica = :lat, lon_teorica = :lon, tipo = :tipo, descripcion = :desc
+                     lat_teorica = :lat, lon_teorica = :lon, tipo = :tipo,
+                     provincia = :provincia, municipio = :municipio, descripcion = :desc
                      WHERE id = :id AND empresa_id = :emp_id"
                 );
                 $stmt->execute([
                     ':nombre' => $nombre, ':codigo' => $codigo,
                     ':lat' => $lat, ':lon' => $lon, ':tipo' => $tipo ?: null,
+                    ':provincia' => $provincia ?: null, ':municipio' => $municipio ?: null,
                     ':desc' => $desc ?: null, ':id' => $id, ':emp_id' => $empresaId,
                 ]);
                 $msg = 'Infraestructura actualizada.';
@@ -224,6 +230,18 @@ if (isset($_GET['edit'])) {
                                    value="<?= htmlspecialchars($editInfra['tipo'] ?? '') ?>">
                         </div>
                         <div class="col-md-2">
+                            <label class="form-label fw-semibold small">Provincia</label>
+                            <input type="text" name="provincia" class="form-control"
+                                   placeholder="Sevilla, Madrid..."
+                                   value="<?= htmlspecialchars($editInfra['provincia'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold small">Municipio</label>
+                            <input type="text" name="municipio" class="form-control"
+                                   placeholder="Nombre del municipio"
+                                   value="<?= htmlspecialchars($editInfra['municipio'] ?? '') ?>">
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label fw-semibold small">Latitud</label>
                             <input type="number" step="0.0000001" name="lat_teorica" id="lat_teorica" class="form-control"
                                    placeholder="37.3890531"
@@ -286,7 +304,13 @@ if (isset($_GET['edit'])) {
                                 <span class="badge bg-danger" style="font-size:0.65rem;">Inactiva</span>
                             <?php endif; ?>
                         </div>
-                        <div class="d-flex gap-3">
+                        <div class="d-flex gap-3 flex-wrap">
+                            <?php if (!empty($inf['provincia']) || !empty($inf['municipio'])): ?>
+                                <span class="small text-muted">
+                                    <i class="bi bi-pin-map"></i>
+                                    <?= htmlspecialchars(trim(($inf['municipio'] ?? '') . ', ' . ($inf['provincia'] ?? ''), ', ')) ?>
+                                </span>
+                            <?php endif; ?>
                             <span class="coord-text">
                                 <i class="bi bi-geo-alt"></i>
                                 <?= $inf['lat_teorica'] ?>, <?= $inf['lon_teorica'] ?>
