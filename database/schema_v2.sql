@@ -17,11 +17,11 @@ ALTER TABLE usuarios
 -- 2. Modificar tabla EMPRESAS: añadir campos de licencia
 -- -----------------------------------------------------------
 ALTER TABLE empresas
-    ADD COLUMN licencia_inicio DATE DEFAULT NULL AFTER activa,
-    ADD COLUMN licencia_fin DATE DEFAULT NULL AFTER licencia_inicio,
-    ADD COLUMN max_usuarios INT UNSIGNED NOT NULL DEFAULT 10 AFTER licencia_fin,
-    ADD COLUMN max_infraestructuras INT UNSIGNED NOT NULL DEFAULT 50 AFTER max_usuarios,
-    ADD COLUMN logo_url VARCHAR(512) DEFAULT NULL AFTER max_infraestructuras;
+    ADD COLUMN IF NOT EXISTS licencia_inicio DATE DEFAULT NULL AFTER activa,
+    ADD COLUMN IF NOT EXISTS licencia_fin DATE DEFAULT NULL AFTER licencia_inicio,
+    ADD COLUMN IF NOT EXISTS max_usuarios INT UNSIGNED NOT NULL DEFAULT 10 AFTER licencia_fin,
+    ADD COLUMN IF NOT EXISTS max_infraestructuras INT UNSIGNED NOT NULL DEFAULT 50 AFTER max_usuarios,
+    ADD COLUMN IF NOT EXISTS logo_url VARCHAR(512) DEFAULT NULL AFTER max_infraestructuras;
 
 -- -----------------------------------------------------------
 -- 3. Tabla CAMPOS_FORMULARIO (campos dinámicos por empresa)
