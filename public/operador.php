@@ -302,19 +302,28 @@ if ($initials === '') $initials = 'OP';
         </div>
         <div id="op-map" class="op-map"></div>
 
+        <!-- Botón Volver fijo abajo -->
+        <button type="button" id="btn-mapa-volver" class="mapa-volver-btn">
+            <i class="bi bi-arrow-left-circle-fill"></i> Volver a Toma de Datos
+        </button>
+
         <div id="mapa-detail-panel" class="mapa-detail-panel hidden">
             <div class="mapa-detail-header">
                 <button type="button" id="btn-close-detail" class="modal-close"><i class="bi bi-x-lg"></i></button>
                 <h4 id="detail-infra-name">--</h4>
                 <code id="detail-infra-code">--</code>
+                <span id="detail-infra-distance" class="detail-distance hidden"></span>
             </div>
             <div class="mapa-detail-body" id="mapa-detail-body"></div>
             <div class="mapa-detail-actions">
+                <button type="button" id="btn-detail-navegar" class="mapa-action-btn mapa-action--navegar">
+                    <i class="bi bi-cursor-fill"></i> Ir a esta ubicación
+                </button>
                 <button type="button" id="btn-detail-aleatorio" class="mapa-action-btn mapa-action--aleatorio">
-                    <i class="bi bi-camera"></i> Foto Aleatoria
+                    <i class="bi bi-camera"></i> Foto
                 </button>
                 <button type="button" id="btn-detail-comparativo" class="mapa-action-btn mapa-action--comparativo">
-                    <i class="bi bi-layers"></i> Foto Comparativa
+                    <i class="bi bi-layers"></i> Comparativa
                 </button>
             </div>
         </div>
