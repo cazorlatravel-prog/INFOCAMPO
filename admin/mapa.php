@@ -71,6 +71,27 @@ if ($empresaId > 0) {
     $registros = $stmt->fetchAll();
 }
 
+// Preparar datos de infraestructuras con coordenadas teóricas para drag & drop
+$jsInfras = [];
+if ($empresaId > 0) {
+    $stmtInfra = $pdo->prepare(
+        "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo
+         FROM infraestructuras
+         WHERE empresa_id = :emp AND activa = 1 AND lat_teorica IS NOT NULL AND lon_teorica IS NOT NULL"
+    );
+    $stmtInfra->execute([':emp' => $empresaId]);
+    foreach ($stmtInfra->fetchAll() as $inf) {
+        $jsInfras[] = [
+            'id' => (int) $inf['id'],
+            'nombre' => $inf['nombre'],
+            'codigo' => $inf['codigo_unico'],
+            'lat' => (float) $inf['lat_teorica'],
+            'lon' => (float) $inf['lon_teorica'],
+            'tipo' => $inf['tipo'] ?? '',
+        ];
+    }
+}
+
 // Preparar datos para JS
 $jsRegistros = [];
 foreach ($registros as $r) {
@@ -131,6 +152,64 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         .map-filter-bar label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; margin-bottom: 0; }
         .filter-group { display: flex; flex-direction: column; gap: 2px; }
 
+        /* Responsive: mobile filter drawer */
+        .filter-toggle-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #1e3a5f;
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            #map { height: calc(100vh - 130px); min-height: 300px; }
+            .map-filter-bar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1100;
+                background: #fff;
+                padding: 20px;
+                flex-direction: column;
+                align-items: stretch;
+                overflow-y: auto;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .map-filter-bar.open {
+                transform: translateX(0);
+            }
+            .map-filter-bar .filter-group { width: 100%; }
+            .map-filter-bar .form-select, .map-filter-bar .form-control { width: 100% !important; }
+            .filter-toggle-btn { display: flex; align-items: center; justify-content: center; }
+            .map-stats-bar { flex-wrap: wrap; gap: 10px; padding: 6px 12px; }
+            .stat-pill { font-size: 0.72rem; }
+            .filter-close-btn {
+                display: flex;
+                align-self: flex-end;
+                background: none;
+                border: none;
+                font-size: 1.4rem;
+                color: #6b7280;
+                cursor: pointer;
+                margin-bottom: 10px;
+            }
+        }
+        @media (min-width: 769px) {
+            .filter-close-btn { display: none; }
+        }
+
         .map-stats-bar {
             background: #fff; padding: 8px 20px;
             border-bottom: 1px solid #e5e7eb;
@@ -162,6 +241,15 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         .popup-badge.aleatorio { background: #dbeafe; color: #1d4ed8; }
         .popup-badge.comparativo { background: #ede9fe; color: #6d28d9; }
 
+        /* Drag toast */
+        .drag-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #1e3a5f; color: #fff; padding: 10px 20px; border-radius: 10px;
+            font-size: 0.85rem; z-index: 9999; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
         /* Cluster override */
         .marker-cluster-small { background-color: rgba(45,106,159,0.3); }
         .marker-cluster-small div { background-color: rgba(45,106,159,0.7); color: #fff; }
@@ -176,8 +264,14 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
     <?php if ($empresaId > 0 && !empty($registros)): ?>
 
+    <!-- Mobile filter toggle -->
+    <button class="filter-toggle-btn" id="btn-filter-toggle" onclick="toggleFilterDrawer()">
+        <i class="bi bi-funnel-fill"></i>
+    </button>
+
     <!-- Filter bar -->
-    <div class="map-filter-bar">
+    <div class="map-filter-bar" id="filter-drawer">
+        <button class="filter-close-btn" onclick="toggleFilterDrawer()"><i class="bi bi-x-lg"></i> Cerrar filtros</button>
         <div class="filter-group">
             <label>Empresa</label>
             <form method="get" id="form-empresa">
@@ -233,6 +327,21 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 <option value="medio">Medio</option>
                 <option value="critico">Critico</option>
             </select>
+        </div>
+        <div class="filter-group">
+            <label>Infraestructuras</label>
+            <button class="btn btn-sm btn-outline-primary" id="btn-toggle-infra-markers" onclick="toggleInfraMarkers()" title="Mostrar/ocultar posiciones teóricas de infraestructuras (arrastrables)">
+                <i class="bi bi-pin-map"></i> Posiciones
+            </button>
+        </div>
+        <div class="filter-group">
+            <label>Capa KML</label>
+            <div class="d-flex gap-1">
+                <input type="file" id="kml-overlay-input" accept=".kml" class="form-control" style="font-size:0.8rem;height:34px;width:180px;">
+                <button class="btn btn-sm btn-outline-danger" id="btn-remove-kml" onclick="removeKmlLayer()" style="display:none;" title="Quitar capa KML">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
         </div>
         <div class="filter-group" style="margin-left:auto;">
             <label>&nbsp;</label>
@@ -308,7 +417,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 '<div class="legend-row"><div class="legend-dot" style="background:#ef4444;"></div> Critico</div>' +
                 '<hr style="margin:4px 0;">' +
                 '<div class="legend-row"><div class="legend-dot" style="background:#3b82f6;width:8px;height:8px;"></div> Aleatoria</div>' +
-                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Comparativa</div>';
+                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Comparativa</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#8b5cf6;"></div> Capa KML</div>';
             return div;
         };
         legend.addTo(map);
@@ -419,8 +529,275 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
         // Initial render
         renderMarkers(allData);
+
+        // ---------------------------------------------------------------
+        // Infraestructura Markers - Drag & Drop para reubicar
+        // ---------------------------------------------------------------
+        var infraData = <?= json_encode($jsInfras, JSON_UNESCAPED_UNICODE) ?>;
+        var csrfToken = '<?= csrfToken() ?>';
+        var infraLayerGroup = null;
+        var infraMarkersVisible = false;
+
+        window.toggleInfraMarkers = function() {
+            var btn = document.getElementById('btn-toggle-infra-markers');
+            if (infraMarkersVisible) {
+                // Hide
+                if (infraLayerGroup) map.removeLayer(infraLayerGroup);
+                infraMarkersVisible = false;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-primary');
+            } else {
+                // Show
+                renderInfraMarkers();
+                infraMarkersVisible = true;
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-primary');
+            }
+        };
+
+        function renderInfraMarkers() {
+            if (infraLayerGroup) map.removeLayer(infraLayerGroup);
+            infraLayerGroup = L.layerGroup().addTo(map);
+
+            infraData.forEach(function(inf) {
+                if (!inf.lat || !inf.lon) return;
+
+                var icon = L.divIcon({
+                    className: 'infra-drag-marker',
+                    html: '<div style="width:20px;height:20px;border-radius:4px;background:#1e3a5f;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;cursor:grab;">' +
+                          '<i class="bi bi-arrows-move" style="color:#fff;font-size:10px;"></i></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10],
+                });
+
+                var marker = L.marker([inf.lat, inf.lon], {
+                    icon: icon,
+                    draggable: true,
+                    title: inf.nombre + ' (' + inf.codigo + ') - Arrastra para reubicar',
+                });
+
+                marker.bindPopup(
+                    '<div style="min-width:180px;">' +
+                    '<strong>' + inf.nombre + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
+                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + inf.tipo + '</span>' : '') +
+                    '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
+                    '<br><small style="color:#059669;"><i class="bi bi-arrows-move"></i> Arrastra para reubicar</small>' +
+                    '</div>'
+                );
+
+                marker.on('dragend', function(e) {
+                    var newLatLng = e.target.getLatLng();
+                    updateInfraCoords(inf.id, inf.nombre, newLatLng.lat, newLatLng.lng, e.target);
+                });
+
+                marker.addTo(infraLayerGroup);
+            });
+        }
+
+        async function updateInfraCoords(infraId, nombre, lat, lon, marker) {
+            var formData = new FormData();
+            formData.append('infra_id', infraId);
+            formData.append('lat', lat.toFixed(7));
+            formData.append('lon', lon.toFixed(7));
+            formData.append('empresa_id', empresaId);
+            formData.append('csrf_token', csrfToken);
+
+            try {
+                var resp = await fetch('api/actualizar_coordenadas.php', {
+                    method: 'POST',
+                    body: formData,
+                });
+                var data = await resp.json();
+
+                if (data.ok) {
+                    // Actualizar datos locales
+                    infraData.forEach(function(inf) {
+                        if (inf.id === infraId) { inf.lat = lat; inf.lon = lon; }
+                    });
+
+                    // Actualizar popup
+                    marker.setPopupContent(
+                        '<div style="min-width:180px;">' +
+                        '<strong>' + nombre + '</strong><br>' +
+                        '<small class="text-muted"><i class="bi bi-geo-alt"></i> ' + lat.toFixed(7) + ', ' + lon.toFixed(7) + '</small>' +
+                        '<br><span style="color:#059669;font-size:0.75rem;"><i class="bi bi-check-circle"></i> Ubicación guardada</span>' +
+                        '</div>'
+                    );
+
+                    showDragToast(nombre + ' reubicada correctamente', 'success');
+                } else {
+                    showDragToast('Error: ' + (data.error || 'No se pudo guardar'), 'error');
+                }
+            } catch (err) {
+                showDragToast('Error de conexión al guardar', 'error');
+            }
+        }
+
+        function showDragToast(message, type) {
+            var existing = document.querySelector('.drag-toast');
+            if (existing) existing.remove();
+
+            var toast = document.createElement('div');
+            toast.className = 'drag-toast';
+            toast.style.background = type === 'success' ? '#059669' : '#dc2626';
+            toast.innerHTML = '<i class="bi bi-' + (type === 'success' ? 'check-circle' : 'x-circle') + ' me-1"></i>' + message;
+            document.body.appendChild(toast);
+
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
+
+        // ---------------------------------------------------------------
+        // KML Overlay - Visualización de capas KML en el mapa
+        // ---------------------------------------------------------------
+        var kmlLayerGroup = null;
+
+        document.getElementById('kml-overlay-input').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                loadKmlOverlay(ev.target.result);
+            };
+            reader.readAsText(file);
+        });
+
+        function loadKmlOverlay(kmlText) {
+            // Limpiar capa anterior
+            if (kmlLayerGroup) {
+                map.removeLayer(kmlLayerGroup);
+            }
+            kmlLayerGroup = L.layerGroup().addTo(map);
+
+            var parser = new DOMParser();
+            var xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+
+            var placemarks = xmlDoc.querySelectorAll('Placemark');
+            var bounds = [];
+            var pointCount = 0;
+            var lineCount = 0;
+            var polygonCount = 0;
+
+            placemarks.forEach(function(pm) {
+                var nameEl = pm.querySelector('name');
+                var nombre = nameEl ? nameEl.textContent.trim() : '';
+                var descEl = pm.querySelector('description');
+                var desc = descEl ? descEl.textContent.trim() : '';
+
+                var popupContent = '<div style="max-width:250px;">';
+                if (nombre) popupContent += '<strong style="color:#8b5cf6;">' + nombre + '</strong><br>';
+                if (desc) popupContent += '<small>' + desc.substring(0, 150) + '</small><br>';
+                popupContent += '<span class="badge" style="background:#8b5cf6;font-size:0.6rem;">KML</span>';
+                popupContent += '</div>';
+
+                // Points
+                var pointEl = pm.querySelector('Point coordinates');
+                if (pointEl) {
+                    var coords = pointEl.textContent.trim().split(',');
+                    if (coords.length >= 2) {
+                        var lat = parseFloat(coords[1]);
+                        var lon = parseFloat(coords[0]);
+                        if (!isNaN(lat) && !isNaN(lon)) {
+                            var icon = L.divIcon({
+                                className: 'kml-marker',
+                                html: '<div style="width:14px;height:14px;border-radius:50%;background:#8b5cf6;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
+                                iconSize: [14, 14],
+                                iconAnchor: [7, 7],
+                            });
+                            L.marker([lat, lon], { icon: icon })
+                                .bindPopup(popupContent)
+                                .addTo(kmlLayerGroup);
+                            bounds.push([lat, lon]);
+                            pointCount++;
+                        }
+                    }
+                }
+
+                // LineStrings
+                var lineEl = pm.querySelector('LineString coordinates');
+                if (lineEl) {
+                    var lineCoords = parseKmlCoordinates(lineEl.textContent);
+                    if (lineCoords.length > 0) {
+                        L.polyline(lineCoords, { color: '#8b5cf6', weight: 3, opacity: 0.8 })
+                            .bindPopup(popupContent)
+                            .addTo(kmlLayerGroup);
+                        lineCoords.forEach(function(c) { bounds.push(c); });
+                        lineCount++;
+                    }
+                }
+
+                // Polygons
+                var polyEl = pm.querySelector('Polygon outerBoundaryIs LinearRing coordinates');
+                if (polyEl) {
+                    var polyCoords = parseKmlCoordinates(polyEl.textContent);
+                    if (polyCoords.length > 0) {
+                        L.polygon(polyCoords, { color: '#8b5cf6', fillColor: '#8b5cf6', fillOpacity: 0.15, weight: 2 })
+                            .bindPopup(popupContent)
+                            .addTo(kmlLayerGroup);
+                        polyCoords.forEach(function(c) { bounds.push(c); });
+                        polygonCount++;
+                    }
+                }
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+            }
+
+            // Mostrar botón de quitar y actualizar leyenda
+            document.getElementById('btn-remove-kml').style.display = 'inline-block';
+
+            // Añadir info a la stats bar
+            var total = pointCount + lineCount + polygonCount;
+            var statKml = document.getElementById('stat-kml');
+            if (!statKml) {
+                var statsBar = document.getElementById('stats-bar');
+                var pill = document.createElement('div');
+                pill.className = 'stat-pill';
+                pill.id = 'stat-kml';
+                pill.style.color = '#8b5cf6';
+                pill.innerHTML = '<strong>' + total + '</strong> elementos KML';
+                statsBar.appendChild(pill);
+            } else {
+                statKml.innerHTML = '<strong>' + total + '</strong> elementos KML';
+            }
+        }
+
+        function parseKmlCoordinates(text) {
+            var coords = [];
+            var tuples = text.trim().split(/\s+/);
+            tuples.forEach(function(t) {
+                var parts = t.split(',');
+                if (parts.length >= 2) {
+                    var lon = parseFloat(parts[0]);
+                    var lat = parseFloat(parts[1]);
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        coords.push([lat, lon]);
+                    }
+                }
+            });
+            return coords;
+        }
+
+        window.removeKmlLayer = function() {
+            if (kmlLayerGroup) {
+                map.removeLayer(kmlLayerGroup);
+                kmlLayerGroup = null;
+            }
+            document.getElementById('kml-overlay-input').value = '';
+            document.getElementById('btn-remove-kml').style.display = 'none';
+            var statKml = document.getElementById('stat-kml');
+            if (statKml) statKml.remove();
+        };
     })();
     <?php endif; ?>
+
+    // Filter drawer toggle (mobile)
+    window.toggleFilterDrawer = function() {
+        var drawer = document.getElementById('filter-drawer');
+        if (drawer) drawer.classList.toggle('open');
+    };
     </script>
 </body>
 </html>

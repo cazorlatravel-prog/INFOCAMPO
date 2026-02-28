@@ -158,6 +158,115 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
         }
         .filter-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 700; margin-bottom: 4px; }
         .result-count { font-size: 0.8rem; color: #6b7280; padding: 8px 0; }
+
+        /* View toggle */
+        .view-toggle .btn { font-size: 0.75rem; padding: 4px 10px; }
+        .view-toggle .btn.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+
+        /* Gallery grid */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .gallery-item {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .gallery-item:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+        .gallery-item img {
+            width: 100%;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            display: block;
+        }
+        .gallery-item-info {
+            padding: 8px 10px;
+            font-size: 0.72rem;
+            color: #6b7280;
+        }
+        .gallery-item-info .badge-sm {
+            font-size: 0.6rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .gallery-item-info .badge-sm.bajo { background: #dcfce7; color: #166534; }
+        .gallery-item-info .badge-sm.medio { background: #fef9c3; color: #854d0e; }
+        .gallery-item-info .badge-sm.critico { background: #fee2e2; color: #dc2626; }
+
+        /* Lightbox */
+        .lightbox-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .lightbox-overlay.active { display: flex; }
+        .lightbox-img {
+            max-width: 90vw;
+            max-height: 75vh;
+            border-radius: 8px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: #fff;
+            font-size: 1.4rem;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lightbox-close:hover { background: rgba(255,255,255,0.25); }
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: #fff;
+            font-size: 1.6rem;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lightbox-nav:hover { background: rgba(255,255,255,0.25); }
+        .lightbox-prev { left: 16px; }
+        .lightbox-next { right: 16px; }
+        .lightbox-meta {
+            color: rgba(255,255,255,0.85);
+            text-align: center;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        .lightbox-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -235,6 +344,14 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2">
+                                    <a href="comparador.php?empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?>"
+                                       class="btn btn-outline-info btn-sm" title="Comparar fotos entre visitas">
+                                        <i class="bi bi-images"></i> Comparar
+                                    </a>
+                                    <a href="exportar_csv.php?tipo=registros&empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?><?= $filtroEstado ? '&estado=' . urlencode($filtroEstado) : '' ?><?= $filtroFechaDesde ? '&fecha_desde=' . urlencode($filtroFechaDesde) : '' ?><?= $filtroFechaHasta ? '&fecha_hasta=' . urlencode($filtroFechaHasta) : '' ?>"
+                                       class="btn btn-outline-secondary btn-sm" title="Exportar inspecciones a CSV">
+                                        <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                                    </a>
                                     <a href="descargar_fotos.php?infra_id=<?= $infraId ?>" class="btn btn-outline-success btn-sm">
                                         <i class="bi bi-file-earmark-zip"></i> ZIP
                                     </a>
@@ -292,13 +409,51 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                         </form>
                     </div>
 
-                    <div class="result-count">
-                        <?= count($registros) ?> inspeccione<?= count($registros) !== 1 ? 's' : '' ?> encontrada<?= count($registros) !== 1 ? 's' : '' ?>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="result-count">
+                            <?= count($registros) ?> inspeccione<?= count($registros) !== 1 ? 's' : '' ?> encontrada<?= count($registros) !== 1 ? 's' : '' ?>
+                        </div>
+                        <?php if (!empty($registros)): ?>
+                        <div class="btn-group view-toggle" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm active" id="btn-view-timeline" onclick="switchView('timeline')">
+                                <i class="bi bi-list-ul"></i> Timeline
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-view-gallery" onclick="switchView('gallery')">
+                                <i class="bi bi-grid-3x3-gap"></i> Galería
+                            </button>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Timeline de registros -->
                     <?php if ($registros): ?>
-                        <div class="timeline">
+                        <!-- Vista Gallery -->
+                        <div class="gallery-grid" id="view-gallery" style="display:none;">
+                            <?php foreach ($registros as $idx => $reg): ?>
+                                <?php
+                                $badgeClass2 = $reg['estado_incidencia'];
+                                ?>
+                                <div class="gallery-item" onclick="openLightbox(<?= $idx ?>)">
+                                    <img src="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
+                                         alt="Inspección <?= date('d/m/Y', strtotime($reg['fecha'])) ?>" loading="lazy">
+                                    <div class="gallery-item-info">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge-sm <?= $badgeClass2 ?>"><?= strtoupper($reg['estado_incidencia']) ?></span>
+                                            <small><?= date('d/m/Y H:i', strtotime($reg['fecha'])) ?></small>
+                                        </div>
+                                        <div class="mt-1">
+                                            <i class="bi bi-person"></i> <?= htmlspecialchars($reg['usuario_nombre']) ?>
+                                            <?php if (isset($reg['tipo_foto']) && $reg['tipo_foto']): ?>
+                                                | <?= strtoupper($reg['tipo_foto']) ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <!-- Vista Timeline -->
+                        <div class="timeline" id="view-timeline">
                             <?php foreach ($registros as $reg): ?>
                                 <div class="timeline-item">
                                     <div class="timeline-dot <?= $reg['estado_incidencia'] ?>"></div>
@@ -380,6 +535,104 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
         </div>
     </div>
 
+    <!-- Lightbox -->
+    <div class="lightbox-overlay" id="lightbox">
+        <button class="lightbox-close" onclick="closeLightbox()"><i class="bi bi-x-lg"></i></button>
+        <button class="lightbox-nav lightbox-prev" onclick="navLightbox(-1)"><i class="bi bi-chevron-left"></i></button>
+        <button class="lightbox-nav lightbox-next" onclick="navLightbox(1)"><i class="bi bi-chevron-right"></i></button>
+        <img id="lightbox-img" class="lightbox-img" src="" alt="Foto inspección">
+        <div id="lightbox-meta" class="lightbox-meta"></div>
+        <div id="lightbox-actions" class="lightbox-actions"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // View toggle
+    function switchView(view) {
+        var timeline = document.getElementById('view-timeline');
+        var gallery = document.getElementById('view-gallery');
+        var btnTimeline = document.getElementById('btn-view-timeline');
+        var btnGallery = document.getElementById('btn-view-gallery');
+
+        if (!timeline || !gallery) return;
+
+        if (view === 'gallery') {
+            timeline.style.display = 'none';
+            gallery.style.display = 'grid';
+            btnTimeline.classList.remove('active');
+            btnGallery.classList.add('active');
+        } else {
+            timeline.style.display = 'block';
+            gallery.style.display = 'none';
+            btnTimeline.classList.add('active');
+            btnGallery.classList.remove('active');
+        }
+    }
+
+    // Lightbox
+    var lightboxData = <?= json_encode(array_map(function($r) use ($empresaId) {
+        return [
+            'url' => $r['url_cloudinary'],
+            'fecha' => date('d/m/Y H:i', strtotime($r['fecha'])),
+            'operador' => $r['usuario_nombre'],
+            'estado' => $r['estado_incidencia'],
+            'tipo' => $r['tipo_foto'] ?? 'aleatorio',
+            'obs' => $r['observaciones'] ?? '',
+            'lat' => $r['lat_real'],
+            'lon' => $r['lon_real'],
+            'download' => preg_replace('#/upload/#', '/upload/fl_attachment/', $r['url_cloudinary'], 1),
+        ];
+    }, $registros), JSON_UNESCAPED_UNICODE) ?>;
+
+    var currentLightboxIdx = 0;
+
+    function openLightbox(idx) {
+        currentLightboxIdx = idx;
+        renderLightbox();
+        document.getElementById('lightbox').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+        document.getElementById('lightbox').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function navLightbox(dir) {
+        currentLightboxIdx += dir;
+        if (currentLightboxIdx < 0) currentLightboxIdx = lightboxData.length - 1;
+        if (currentLightboxIdx >= lightboxData.length) currentLightboxIdx = 0;
+        renderLightbox();
+    }
+
+    function renderLightbox() {
+        var d = lightboxData[currentLightboxIdx];
+        if (!d) return;
+        document.getElementById('lightbox-img').src = d.url;
+        document.getElementById('lightbox-meta').innerHTML =
+            '<strong>' + d.fecha + '</strong> | ' +
+            '<span style="text-transform:uppercase;">' + d.estado + '</span> | ' +
+            d.operador +
+            (d.obs ? '<br><em style="opacity:0.7;">' + d.obs.substring(0, 120) + '</em>' : '') +
+            '<br><small style="opacity:0.5;">' + (currentLightboxIdx + 1) + ' / ' + lightboxData.length + '</small>';
+        document.getElementById('lightbox-actions').innerHTML =
+            '<a href="' + d.download + '" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Descargar</a>' +
+            '<a href="' + d.url + '" target="_blank" class="btn btn-sm btn-outline-light"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir</a>';
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        var lb = document.getElementById('lightbox');
+        if (!lb || !lb.classList.contains('active')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft') navLightbox(-1);
+        if (e.key === 'ArrowRight') navLightbox(1);
+    });
+
+    // Click outside image to close
+    document.getElementById('lightbox').addEventListener('click', function(e) {
+        if (e.target === this) closeLightbox();
+    });
+    </script>
 </body>
 </html>

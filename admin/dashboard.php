@@ -143,6 +143,34 @@ if ($empresaId > 0) {
     );
     $stmt->execute([':id' => $empresaId]);
     $incidenciasCriticas = $stmt->fetchAll();
+
+    // Subidas fallidas pendientes
+    $subidasFallidas = [];
+    $stats['fallidas'] = 0;
+    try {
+        $tableCheck = $pdo->query("SHOW TABLES LIKE 'subidas_fallidas'")->fetchColumn();
+        if ($tableCheck) {
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM subidas_fallidas WHERE empresa_id = :id AND resuelta = 0"
+            );
+            $stmt->execute([':id' => $empresaId]);
+            $stats['fallidas'] = (int) $stmt->fetchColumn();
+
+            if ($stats['fallidas'] > 0) {
+                $stmt = $pdo->prepare(
+                    "SELECT sf.*, i.nombre AS infra_nombre, i.codigo_unico, u.nombre AS usuario_nombre
+                     FROM subidas_fallidas sf
+                     INNER JOIN infraestructuras i ON sf.infra_id = i.id
+                     INNER JOIN usuarios u ON sf.usuario_id = u.id
+                     WHERE sf.empresa_id = :id AND sf.resuelta = 0
+                     ORDER BY sf.fecha_fallo DESC
+                     LIMIT 10"
+                );
+                $stmt->execute([':id' => $empresaId]);
+                $subidasFallidas = $stmt->fetchAll();
+            }
+        }
+    } catch (\Exception $e) {}
 }
 
 // Preparar datos para gráfico
@@ -306,6 +334,53 @@ for ($i = 13; $i >= 0; $i--) {
                 </div>
             </div>
         </div>
+
+        <?php if (!empty($subidasFallidas)): ?>
+        <!-- Alerta de subidas fallidas -->
+        <div class="alert alert-warning alert-dismissible fade show d-flex align-items-start gap-3 mb-4" role="alert"
+             style="border-left:4px solid #f59e0b;border-radius:12px;">
+            <div style="font-size:1.6rem;color:#f59e0b;"><i class="bi bi-cloud-slash-fill"></i></div>
+            <div class="flex-grow-1">
+                <strong><?= $stats['fallidas'] ?> foto<?= $stats['fallidas'] > 1 ? 's' : '' ?> pendiente<?= $stats['fallidas'] > 1 ? 's' : '' ?> de subir</strong>
+                <p class="mb-2 small">
+                    Las siguientes fotos no se pudieron subir a la nube. Los operadores deben <strong>no eliminarlas</strong> de sus dispositivos
+                    hasta que se resuelva el problema.
+                </p>
+                <div class="table-responsive" style="max-height:200px;overflow-y:auto;">
+                    <table class="table table-sm table-striped small mb-0">
+                        <thead><tr><th>Operador</th><th>Infraestructura</th><th>Archivo</th><th>Error</th><th>Fecha</th><th></th></tr></thead>
+                        <tbody>
+                            <?php foreach ($subidasFallidas as $sf): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($sf['usuario_nombre']) ?></td>
+                                <td>
+                                    <code style="font-size:0.7rem;"><?= htmlspecialchars($sf['codigo_unico']) ?></code>
+                                    <?= htmlspecialchars($sf['infra_nombre']) ?>
+                                </td>
+                                <td><code style="font-size:0.7rem;"><?= htmlspecialchars($sf['nombre_archivo'] ?? '—') ?></code></td>
+                                <td><span class="text-danger" style="font-size:0.7rem;"><?= htmlspecialchars(mb_substr($sf['motivo_error'], 0, 60)) ?></span></td>
+                                <td style="white-space:nowrap;"><?= date('d/m H:i', strtotime($sf['fecha_fallo'])) ?></td>
+                                <td>
+                                    <form method="post" action="api/subidas_fallidas.php" class="d-inline">
+                                        <?= csrfField() ?>
+                                        <input type="hidden" name="action" value="resolver">
+                                        <input type="hidden" name="id" value="<?= $sf['id'] ?>">
+                                        <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-success py-0 px-1" title="Marcar como resuelta"
+                                                onclick="return confirm('¿Marcar esta subida como resuelta?')">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php endif; ?>
 
         <div class="row g-4">
             <!-- Columna izquierda: Gráfico + Actividad -->

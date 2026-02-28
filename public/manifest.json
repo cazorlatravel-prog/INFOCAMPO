@@ -1,0 +1,28 @@
+{
+    "name": "FotoGPS.app - Operador de Campo",
+    "short_name": "FotoGPS",
+    "description": "Captura fotos geolocalizadas con watermark GPS para inspecciones de campo",
+    "start_url": "./operador.php",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait",
+    "theme_color": "#4f6ef7",
+    "background_color": "#f5f7fa",
+    "icons": [
+        {
+            "src": "icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["business", "productivity"],
+    "lang": "es",
+    "dir": "ltr"
+}

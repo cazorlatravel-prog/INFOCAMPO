@@ -56,6 +56,27 @@ if ($_navEmpresaId > 0) {
         <?php endif; ?>
     </div>
     <div class="d-flex align-items-center gap-3">
+        <?php if ($_navEmpresaId > 0): ?>
+        <!-- Búsqueda global -->
+        <div class="position-relative" id="global-search-wrapper" style="width:280px;">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" id="global-search-input" class="form-control form-control-sm"
+                       placeholder="Buscar infraestructuras, registros..."
+                       autocomplete="off"
+                       data-empresa-id="<?= $_navEmpresaId ?>"
+                       style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:0.8rem;"
+                       aria-label="Búsqueda global">
+                <span class="input-group-text d-none d-md-flex" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.4);font-size:0.65rem;padding:2px 6px;">
+                    Ctrl+K
+                </span>
+            </div>
+            <div id="global-search-results" class="position-absolute w-100 mt-1" style="display:none;z-index:9999;max-height:400px;overflow-y:auto;background:#fff;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.2);"></div>
+        </div>
+        <?php endif; ?>
+
         <?php if ($_alertCount > 0): ?>
             <a href="index.php?empresa_id=<?= $_navEmpresaId ?>" class="position-relative" style="color:#fff;text-decoration:none;" title="Incidencias críticas (24h)">
                 <i class="bi bi-bell-fill" style="font-size:1.1rem;"></i>
@@ -78,6 +99,83 @@ if ($_navEmpresaId > 0) {
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Global Search Script -->
+<script>
+(function() {
+    const searchInput = document.getElementById('global-search-input');
+    const searchResults = document.getElementById('global-search-results');
+    if (!searchInput || !searchResults) return;
+
+    let debounceTimer = null;
+    const empresaId = searchInput.dataset.empresaId;
+
+    // Ctrl+K shortcut
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+        if (e.key === 'Escape') {
+            searchResults.style.display = 'none';
+            searchInput.blur();
+        }
+    });
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const q = this.value.trim();
+        if (q.length < 2) { searchResults.style.display = 'none'; return; }
+        debounceTimer = setTimeout(() => doSearch(q), 300);
+    });
+
+    searchInput.addEventListener('focus', function() {
+        if (this.value.trim().length >= 2) doSearch(this.value.trim());
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!document.getElementById('global-search-wrapper').contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+
+    async function doSearch(q) {
+        try {
+            const resp = await fetch('api/buscar.php?empresa_id=' + empresaId + '&q=' + encodeURIComponent(q));
+            const data = await resp.json();
+            if (!data.ok || data.results.length === 0) {
+                searchResults.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:0.85rem;"><i class="bi bi-search me-1"></i>Sin resultados para "' + q + '"</div>';
+                searchResults.style.display = 'block';
+                return;
+            }
+            let html = '';
+            let lastType = '';
+            const typeLabels = { infraestructura: 'Infraestructuras', registro: 'Inspecciones', usuario: 'Usuarios' };
+            const typeColors = { infraestructura: '#2563eb', registro: '#7c3aed', usuario: '#059669' };
+
+            data.results.forEach(function(r) {
+                if (r.type !== lastType) {
+                    html += '<div style="padding:6px 14px;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;color:#9ca3af;font-weight:700;background:#f9fafb;">' + (typeLabels[r.type] || r.type) + '</div>';
+                    lastType = r.type;
+                }
+                html += '<a href="' + r.url + '" style="display:flex;align-items:start;gap:10px;padding:10px 14px;text-decoration:none;color:#1f2937;border-bottom:1px solid #f3f4f6;transition:background 0.1s;" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'transparent\'">';
+                html += '<i class="bi ' + r.icon + '" style="color:' + (typeColors[r.type] || '#6b7280') + ';font-size:1rem;margin-top:2px;"></i>';
+                html += '<div style="min-width:0;flex:1;">';
+                html += '<div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.title + '</div>';
+                html += '<div style="font-size:0.72rem;color:#6b7280;">' + r.subtitle + '</div>';
+                if (r.extra) html += '<div style="font-size:0.68rem;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.extra + '</div>';
+                html += '</div></a>';
+            });
+
+            searchResults.innerHTML = html;
+            searchResults.style.display = 'block';
+        } catch (err) {
+            searchResults.style.display = 'none';
+        }
+    }
+})();
+</script>
 
 <!-- Navigation -->
 <nav class="nav-admin">

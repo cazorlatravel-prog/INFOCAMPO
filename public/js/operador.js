@@ -143,6 +143,20 @@
                     dot.className = 'offline-dot offline';
                     text.textContent = 'Sin conexión';
                 }
+
+                // Actualizar banner de cola offline
+                const banner = $('#offline-queue-banner');
+                if (banner && !banner.classList.contains('hidden')) {
+                    const statusEl = $('#oq-banner-status');
+                    if (!online) {
+                        banner.classList.add('offline-mode');
+                        banner.classList.remove('syncing');
+                        if (statusEl) statusEl.textContent = 'Sin conexión — se subirán al reconectar';
+                    } else {
+                        banner.classList.remove('offline-mode');
+                        if (statusEl) statusEl.textContent = 'Conexión disponible — listo para sincronizar';
+                    }
+                }
             },
             onQueueChange: (count) => {
                 const badge = $('#sync-queue-badge');
@@ -156,12 +170,50 @@
                     const syncCount = $('#sync-count');
                     if (syncCount) syncCount.textContent = count;
                 }
+
+                // Actualizar banner persistente de cola
+                const banner = $('#offline-queue-banner');
+                const countEl = $('#oq-banner-count');
+                const labelEl = $('#oq-banner-label');
+                const statusEl = $('#oq-banner-status');
+                if (banner) {
+                    if (count > 0) {
+                        banner.classList.remove('hidden');
+                        if (countEl) countEl.textContent = count;
+                        if (labelEl) labelEl.textContent = count === 1 ? 'foto pendiente' : 'fotos pendientes';
+                        if (statusEl && !navigator.onLine) {
+                            statusEl.textContent = 'Sin conexión — se subirán al reconectar';
+                            banner.classList.add('offline-mode');
+                        } else if (statusEl) {
+                            statusEl.textContent = 'Listo para sincronizar';
+                            banner.classList.remove('offline-mode');
+                        }
+                    } else {
+                        banner.classList.add('hidden');
+                        banner.classList.remove('syncing', 'offline-mode');
+                    }
+                }
             },
             onSyncProgress: ({ synced, total, current }) => {
                 const bar = $('#sync-progress-bar');
                 const text = $('#sync-progress-text');
                 if (bar) bar.style.width = ((synced / total) * 100) + '%';
                 if (text) text.textContent = `Subiendo ${synced + 1}/${total}: ${current}`;
+
+                // Actualizar banner con progreso
+                const banner = $('#offline-queue-banner');
+                const progressWrap = $('#oq-banner-progress');
+                const progressFill = $('#oq-banner-progress-fill');
+                const statusEl = $('#oq-banner-status');
+                const btnSync = $('#oq-banner-sync');
+                if (banner) {
+                    banner.classList.add('syncing');
+                    banner.classList.remove('offline-mode');
+                }
+                if (progressWrap) progressWrap.style.display = 'block';
+                if (progressFill) progressFill.style.width = ((synced / total) * 100) + '%';
+                if (statusEl) statusEl.textContent = `Subiendo ${synced + 1} de ${total}...`;
+                if (btnSync) btnSync.classList.add('spinning');
             },
             onSyncComplete: (results) => {
                 const ok = results.filter(r => r.ok).length;
@@ -170,6 +222,14 @@
                 if (bar) bar.style.width = '100%';
 
                 showSyncNotification(ok, fail);
+
+                // Limpiar banner de progreso
+                const banner = $('#offline-queue-banner');
+                const progressWrap = $('#oq-banner-progress');
+                const btnSync = $('#oq-banner-sync');
+                if (banner) banner.classList.remove('syncing');
+                if (progressWrap) progressWrap.style.display = 'none';
+                if (btnSync) btnSync.classList.remove('spinning');
 
                 // Reload gallery with synced photos
                 results.forEach(r => {
@@ -205,7 +265,34 @@
 
         notification.querySelector('.sync-notif-text').textContent = msg;
         notification.classList.remove('hidden');
-        setTimeout(() => notification.classList.add('hidden'), 5000);
+
+        // Si hay fallos, mostrar alerta persistente de no borrar fotos
+        if (fail > 0) {
+            showUploadFailAlert(fail);
+            // No auto-ocultar para que el operador lo vea
+            setTimeout(() => notification.classList.add('hidden'), 10000);
+        } else {
+            setTimeout(() => notification.classList.add('hidden'), 5000);
+        }
+    }
+
+    function showUploadFailAlert(failCount) {
+        // Crear o actualizar alerta persistente
+        let alert = $('#upload-fail-alert');
+        if (!alert) {
+            alert = document.createElement('div');
+            alert.id = 'upload-fail-alert';
+            alert.className = 'upload-fail-alert';
+            document.body.appendChild(alert);
+        }
+        alert.innerHTML =
+            '<div class="ufa-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>' +
+            '<div class="ufa-content">' +
+            '<strong>' + failCount + ' foto' + (failCount > 1 ? 's' : '') + ' no se ' + (failCount > 1 ? 'pudieron' : 'pudo') + ' subir</strong>' +
+            '<div class="ufa-detail">NO borres las fotos de tu galería. Se reintentará automáticamente. Tu administrador ha sido notificado.</div>' +
+            '</div>' +
+            '<button class="ufa-close" onclick="this.parentElement.classList.add(\'hidden\')"><i class="bi bi-x"></i></button>';
+        alert.classList.remove('hidden');
     }
 
     function registerServiceWorker() {
@@ -1547,8 +1634,89 @@
     }
 
     // ===================================================================
+    // PWA INSTALL
+    // ===================================================================
+    let deferredInstallPrompt = null;
+
+    function initPWAInstall() {
+        const banner = $('#install-banner');
+        const btnInstall = $('#btn-install-app');
+        const btnDismiss = $('#btn-install-dismiss');
+
+        if (!banner || !btnInstall) return;
+
+        // Listen for the browser's install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+
+            // Only show if user hasn't dismissed recently
+            const dismissed = localStorage.getItem('pwa-install-dismissed');
+            if (dismissed) {
+                const dismissedAt = parseInt(dismissed, 10);
+                // Show again after 7 days
+                if (Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return;
+            }
+
+            banner.classList.remove('hidden');
+        });
+
+        btnInstall.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) {
+                // Fallback: show instructions for iOS/Safari
+                showInstallInstructions();
+                return;
+            }
+
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+
+            if (outcome === 'accepted') {
+                banner.classList.add('hidden');
+                showNotification('App instalada correctamente');
+            }
+        });
+
+        if (btnDismiss) {
+            btnDismiss.addEventListener('click', () => {
+                banner.classList.add('hidden');
+                localStorage.setItem('pwa-install-dismissed', String(Date.now()));
+            });
+        }
+
+        // Detect if already installed (standalone mode)
+        if (window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true) {
+            banner.classList.add('hidden');
+            return;
+        }
+
+        // For iOS where beforeinstallprompt doesn't fire
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS && !window.navigator.standalone) {
+            const dismissed = localStorage.getItem('pwa-install-dismissed');
+            if (!dismissed || (Date.now() - parseInt(dismissed, 10)) > 7 * 24 * 60 * 60 * 1000) {
+                banner.classList.remove('hidden');
+            }
+        }
+    }
+
+    function showInstallInstructions() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+            alert('Para instalar FotoGPS en tu iPhone:\n\n1. Pulsa el botón Compartir (cuadrado con flecha)\n2. Desplázate y pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
+        } else {
+            alert('Para instalar FotoGPS:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
+        }
+    }
+
+    // ===================================================================
     // START
     // ===================================================================
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        init();
+        initPWAInstall();
+    });
 
 })();

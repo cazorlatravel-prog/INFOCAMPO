@@ -180,6 +180,113 @@ html, body {
 }
 
 
+/* --- Install Banner --- */
+.install-banner {
+    background: linear-gradient(135deg, #4f6ef7, #3b5de7);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(79, 110, 247, 0.3);
+}
+
+.install-banner.hidden { display: none !important; }
+
+.install-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.install-banner-icon {
+    width: 42px;
+    height: 42px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.install-banner-text {
+    min-width: 0;
+}
+
+.install-banner-text strong {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.install-banner-text small {
+    display: block;
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.75);
+    margin-top: 1px;
+}
+
+.install-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.install-btn {
+    background: #ffffff;
+    border: none;
+    color: #4f6ef7;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-height: 40px;
+    transition: all 0.15s;
+}
+
+.install-btn:hover {
+    background: #eef2ff;
+}
+
+.install-btn:active {
+    transform: scale(0.96);
+}
+
+.install-dismiss {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: rgba(255,255,255,0.7);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.install-dismiss:hover {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+
 /* --- Cards --- */
 .card {
     background: #ffffff;
@@ -1508,6 +1615,92 @@ select.input-field {
 .sync-notification.warning { background: #e5a000; color: #fff; }
 .sync-notification.error { background: #dc3545; color: #fff; }
 
+/* Offline Queue Banner */
+.offline-queue-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
+    color: #fff;
+    font-size: 0.82rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+.offline-queue-banner.hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+}
+.offline-queue-banner.syncing {
+    background: linear-gradient(135deg, #059669, #047857);
+}
+.offline-queue-banner.offline-mode {
+    background: linear-gradient(135deg, #dc3545, #b91c1c);
+}
+.oq-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.oq-banner-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+.oq-banner-info strong {
+    font-size: 1.1rem;
+}
+.oq-banner-status {
+    font-size: 0.68rem;
+    opacity: 0.8;
+}
+.oq-banner-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.oq-banner-progress {
+    width: 80px;
+    height: 6px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.oq-banner-progress-fill {
+    height: 100%;
+    background: #fff;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+.oq-banner-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.oq-banner-btn:active { background: rgba(255,255,255,0.3); }
+.oq-banner-btn.spinning i { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 .sync-notif-close {
     background: none;
     border: none;
@@ -1552,6 +1745,78 @@ select.input-field {
 .gallery-type.aleatorio.pending,
 .gallery-type.comparativo.pending {
     background: #e5a000;
+}
+
+/* Upload Fail Alert */
+.upload-fail-alert {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #dc3545, #b91c1c);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(220, 53, 69, 0.4);
+    animation: slideDownAlert 0.4s ease;
+}
+.upload-fail-alert.hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+@keyframes slideDownAlert {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.ufa-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+.ufa-content {
+    flex: 1;
+    min-width: 0;
+}
+.ufa-content strong {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 800;
+    line-height: 1.3;
+}
+.ufa-detail {
+    font-size: 0.72rem;
+    opacity: 0.9;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+.ufa-close {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.ufa-close:hover {
+    background: rgba(255,255,255,0.3);
 }
 
 /* Offline aware */

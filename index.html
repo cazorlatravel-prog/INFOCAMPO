@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FotoGPS.app - Tu APP de recogida de datos en Campo</title>
-    <meta name="description" content="FotoGPS.app - Tu APP de recogida de datos en Campo. Fotos geolocalizadas, comparativas y generación de informes.">
+    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark GPS, comparativas con ghosting, mapas interactivos, importación KML, informes PDF, exportación CSV y modo offline avanzado.">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -427,6 +427,12 @@
         .feature-icon--amber { background: rgba(245,158,11,0.12); color: #fbbf24; }
         .feature-icon--red { background: rgba(239,68,68,0.12); color: #f87171; }
         .feature-icon--teal { background: rgba(20,184,166,0.12); color: #2dd4bf; }
+        .feature-icon--cyan { background: rgba(6,182,212,0.12); color: #22d3ee; }
+        .feature-icon--rose { background: rgba(244,63,94,0.12); color: #fb7185; }
+        .feature-icon--indigo { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .feature-icon--lime { background: rgba(132,204,22,0.12); color: #a3e635; }
+        .feature-icon--orange { background: rgba(249,115,22,0.12); color: #fb923c; }
+        .feature-icon--sky { background: rgba(14,165,233,0.12); color: #38bdf8; }
 
         .feature-card h3 {
             font-size: 1rem; font-weight: 700;
@@ -437,6 +443,32 @@
             font-size: 0.85rem;
             color: var(--text-muted);
             line-height: 1.6;
+        }
+
+        /* ---- Sub-section titles ---- */
+        .subsection-header {
+            margin-top: 48px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .subsection-header::before,
+        .subsection-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+        }
+
+        .subsection-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: var(--text-muted);
+            white-space: nowrap;
         }
 
         /* ---- STEPS ---- */
@@ -474,7 +506,7 @@
         /* ---- STATS ---- */
         .stats-bar {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 20px;
             padding: 64px 0;
             border-top: 1px solid var(--border);
@@ -547,9 +579,33 @@
             font-size: 0.82rem;
             color: var(--text-muted);
             margin-bottom: 24px;
-            min-height: 44px;
             line-height: 1.5;
         }
+
+        .access-features {
+            text-align: left;
+            margin-bottom: 24px;
+            padding: 0;
+            list-style: none;
+        }
+
+        .access-features li {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .access-features li i {
+            font-size: 0.7rem;
+            flex-shrink: 0;
+        }
+
+        .access-card--operator .access-features li i { color: #60a5fa; }
+        .access-card--admin .access-features li i { color: #c084fc; }
+        .access-card--super .access-features li i { color: #fbbf24; }
 
         .access-btn {
             display: inline-flex; align-items: center; gap: 8px;
@@ -623,7 +679,7 @@
             .step-card:not(:last-child)::before { display: none; }
 
             .access-grid { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
-            .stats-bar { grid-template-columns: 1fr 1fr; gap: 32px; }
+            .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 32px; }
         }
 
         @media (max-width: 600px) {
@@ -635,6 +691,7 @@
 
             .features-grid { grid-template-columns: 1fr; }
             .steps-grid { grid-template-columns: 1fr; }
+            .stats-bar { grid-template-columns: 1fr 1fr; }
 
             .phone-mockup { width: 230px; }
             .float-card { display: none; }
@@ -674,7 +731,8 @@
                 FotoGPS.app
             </a>
             <div class="nav-links">
-                <a href="#funciones" class="nav-link">Funciones</a>
+                <a href="#funciones-campo" class="nav-link">Operador</a>
+                <a href="#funciones-admin" class="nav-link">Admin</a>
                 <a href="#proceso" class="nav-link">Proceso</a>
                 <a href="#acceso" class="nav-link nav-link--cta">
                     <i class="bi bi-box-arrow-in-right"></i> Acceder
@@ -698,14 +756,14 @@
                     </h1>
                     <p class="hero-desc">
                         Captura fotos con coordenadas ETRS89, compara el estado de infraestructuras
-                        con ghosting visual, genera informes automáticos y trabaja incluso sin
-                        conexión a Internet.
+                        con ghosting visual, importa datos KML, genera informes PDF y exporta a CSV.
+                        App instalable con modo offline avanzado.
                     </p>
                     <div class="hero-actions">
                         <a href="#acceso" class="btn btn--primary">
                             <i class="bi bi-rocket-takeoff"></i> Comenzar ahora
                         </a>
-                        <a href="#funciones" class="btn btn--outline">
+                        <a href="#funciones-campo" class="btn btn--outline">
                             <i class="bi bi-play-circle"></i> Descubrir funciones
                         </a>
                     </div>
@@ -754,21 +812,21 @@
                     <div class="float-card float-card--offline">
                         <div class="float-card-icon" style="color: var(--amber)"><i class="bi bi-cloud-arrow-down"></i></div>
                         <div class="float-card-label">Modo Offline</div>
-                        <div class="float-card-value">3 fotos precargadas</div>
+                        <div class="float-card-value">Sincronización automática</div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ===== FEATURES ===== -->
-    <section class="section" id="funciones">
+    <!-- ===== FEATURES: OPERADOR ===== -->
+    <section class="section" id="funciones-campo">
         <div class="container">
-            <div class="section-label reveal"><i class="bi bi-stars"></i> Funcionalidades</div>
-            <h2 class="section-title reveal">Todo lo que necesitas para inspecciones en campo</h2>
+            <div class="section-label reveal"><i class="bi bi-phone-fill"></i> Herramientas de Campo</div>
+            <h2 class="section-title reveal">Operador de campo: captura y sincronización</h2>
             <p class="section-desc reveal">
-                Herramientas diseñadas para operadores de campo, administradores de empresa
-                y supervisores de infraestructuras.
+                Interfaz mobile-first diseñada para operadores en campo. Funciona como app instalable
+                con soporte offline completo.
             </p>
 
             <div class="features-grid">
@@ -786,26 +844,126 @@
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--green"><i class="bi bi-map-fill"></i></div>
-                    <h3>Mapa Interactivo</h3>
-                    <p>Visualiza todas las inspecciones geolocalizadas en mapa con OpenStreetMap. Filtra por operario, infraestructura o nivel de incidencia.</p>
+                    <h3>Mapa de Visitas</h3>
+                    <p>Mapa interactivo con todas las infraestructuras geolocalizadas del operador. Navega directamente a cada punto con Google Maps.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--amber"><i class="bi bi-cloud-slash-fill"></i></div>
-                    <h3>Modo Offline</h3>
-                    <p>Trabaja sin cobertura: las fotos se guardan en el dispositivo y se sincronizan automáticamente cuando recuperas la conexión a Internet.</p>
+                    <h3>Modo Offline Avanzado</h3>
+                    <p>Captura fotos sin cobertura: se almacenan en IndexedDB y se sincronizan automáticamente al recuperar conexión, con barra de progreso en tiempo real.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--teal"><i class="bi bi-download"></i></div>
+                    <h3>App Instalable (PWA)</h3>
+                    <p>Instala FotoGPS.app como aplicación nativa en Android e iOS. Acceso directo desde la pantalla de inicio sin necesidad de tiendas de aplicaciones.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--red"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                    <h3>Alertas de Subida</h3>
+                    <p>Si falla la subida a Cloudinary, el operador recibe alerta visual para no borrar las fotos. El administrador es notificado para resolver el problema.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FEATURES: ADMIN ===== -->
+    <section class="section" id="funciones-admin">
+        <div class="container">
+            <div class="section-label reveal"><i class="bi bi-speedometer2"></i> Panel de Administración</div>
+            <h2 class="section-title reveal">Administrador: gestión, análisis e informes</h2>
+            <p class="section-desc reveal">
+                Panel completo para administradores y supervisores de empresa con herramientas
+                de gestión, análisis visual y generación de informes.
+            </p>
+
+            <div class="features-grid">
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--purple"><i class="bi bi-grid-1x2-fill"></i></div>
+                    <h3>Dashboard con Métricas</h3>
+                    <p>Vista general con contadores de infraestructuras, operadores activos, inspecciones realizadas, incidencias críticas y alertas de subidas fallidas.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--blue"><i class="bi bi-clock-history"></i></div>
+                    <h3>Timeline de Inspecciones</h3>
+                    <p>Historial cronológico de todas las inspecciones con filtros por operador, infraestructura, severidad y rango de fechas. Galería de fotos con lightbox.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--green"><i class="bi bi-pin-map-fill"></i></div>
+                    <h3>Mapa Interactivo con KML</h3>
+                    <p>Mapa con clustering de marcadores, filtros dinámicos, capas KML/KMZ importadas y drag & drop para reubicar infraestructuras directamente en el mapa.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--cyan"><i class="bi bi-arrows-fullscreen"></i></div>
+                    <h3>Comparador de Fotos</h3>
+                    <p>Compara visitas en modo slider (arrastrar para revelar) o side-by-side. Ideal para evaluar la evolución de infraestructuras entre diferentes fechas.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--red"><i class="bi bi-file-earmark-pdf-fill"></i></div>
                     <h3>Informes PDF</h3>
-                    <p>Genera informes profesionales con fotos comparativas lado a lado, tablas de incidencias y datos técnicos de cada infraestructura.</p>
+                    <p>Genera informes profesionales con fotos comparativas lado a lado, tablas de incidencias, datos técnicos y coordenadas de cada infraestructura.</p>
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--teal"><i class="bi bi-building-fill"></i></div>
-                    <h3>Multi-empresa (SaaS)</h3>
-                    <p>Arquitectura multi-tenant con aislamiento total por empresa. Cada compañía gestiona sus propios operarios, infraestructuras y datos.</p>
+                    <div class="feature-icon feature-icon--lime"><i class="bi bi-file-earmark-spreadsheet"></i></div>
+                    <h3>Exportar a CSV / Excel</h3>
+                    <p>Descarga todos los registros filtrados en formato CSV compatible con Excel. Incluye datos GPS, operador, severidad, observaciones y enlaces a fotos.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--orange"><i class="bi bi-search"></i></div>
+                    <h3>Búsqueda Global</h3>
+                    <p>Buscador instantáneo con Ctrl+K que busca en infraestructuras, registros y operadores simultáneamente. Filtros combinados por tipo de resultado.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-geo-fill"></i></div>
+                    <h3>Importación KML / KMZ</h3>
+                    <p>Carga masiva de infraestructuras desde archivos KML o KMZ. Vista previa en mapa antes de importar con puntos, líneas y polígonos.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--sky"><i class="bi bi-activity"></i></div>
+                    <h3>Indicadores de Estado</h3>
+                    <p>Cada infraestructura muestra indicadores visuales: estado de última inspección, conteo de incidencias críticas y tiempo desde la última visita.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== PLATFORM FEATURES ===== -->
+    <section class="section" id="plataforma">
+        <div class="container">
+            <div class="section-label reveal"><i class="bi bi-building-fill"></i> Plataforma</div>
+            <h2 class="section-title reveal">Arquitectura multi-empresa segura</h2>
+            <p class="section-desc reveal">
+                Plataforma SaaS con aislamiento total de datos por empresa, gestión de licencias
+                y configuración personalizada por tenant.
+            </p>
+
+            <div class="features-grid">
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--amber"><i class="bi bi-buildings"></i></div>
+                    <h3>Multi-Tenant (SaaS)</h3>
+                    <p>Cada empresa opera en su propio espacio aislado. Operadores, infraestructuras, fotos y reportes son completamente independientes entre compañías.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--rose"><i class="bi bi-ui-checks-grid"></i></div>
+                    <h3>Formularios Dinámicos</h3>
+                    <p>El super administrador configura campos personalizados por empresa: textos, selectores, checkboxes. Cada operador ve solo los campos de su compañía.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--teal"><i class="bi bi-shield-check"></i></div>
+                    <h3>Seguridad y Roles</h3>
+                    <p>Cuatro niveles de acceso (superadmin, admin, supervisor, operador) con autenticación por sesiones, protección CSRF y contraseñas cifradas con bcrypt.</p>
                 </div>
             </div>
         </div>
@@ -815,31 +973,31 @@
     <section class="section" id="proceso">
         <div class="container">
             <div class="section-label reveal"><i class="bi bi-arrow-right-circle"></i> Proceso</div>
-            <h2 class="section-title reveal">Inspecciones en 4 pasos</h2>
+            <h2 class="section-title reveal">De la captura al informe en 4 pasos</h2>
             <p class="section-desc reveal">
-                Flujo simplificado desde el campo hasta el informe final.
+                Flujo simplificado desde el campo hasta el informe final, con sincronización automática.
             </p>
 
             <div class="steps-grid">
                 <div class="step-card reveal">
                     <div class="step-number">1</div>
                     <h4>Selecciona Infraestructura</h4>
-                    <p>Busca o crea la infraestructura y selecciona la unidad de obra a inspeccionar.</p>
+                    <p>Filtra por provincia y municipio, busca o crea la infraestructura y selecciona la unidad de obra a inspeccionar.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">2</div>
                     <h4>Captura Fotos</h4>
-                    <p>Toma fotos aleatorias o comparativas con ghosting. El watermark GPS se aplica automáticamente.</p>
+                    <p>Toma fotos aleatorias o comparativas con ghosting. El watermark GPS con coordenadas ETRS89 se aplica automáticamente.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">3</div>
                     <h4>Sincronización</h4>
-                    <p>Las fotos se suben a la nube automáticamente. Sin red, se guardan localmente y se sincronizan después.</p>
+                    <p>Las fotos se suben a Cloudinary automáticamente. Sin red, se guardan en IndexedDB y se sincronizan al recuperar conexión.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">4</div>
-                    <h4>Informes y Mapas</h4>
-                    <p>El administrador accede al timeline, mapas interactivos y genera informes PDF comparativos.</p>
+                    <h4>Análisis e Informes</h4>
+                    <p>El admin accede al timeline, mapas interactivos, comparador de fotos, exporta CSV o genera informes PDF profesionales.</p>
                 </div>
             </div>
         </div>
@@ -861,8 +1019,12 @@
                 <div class="stat-label">Informes automáticos</div>
             </div>
             <div class="stat reveal">
-                <div class="stat-value">SaaS</div>
-                <div class="stat-label">Multi-empresa</div>
+                <div class="stat-value">CSV</div>
+                <div class="stat-label">Exportación de datos</div>
+            </div>
+            <div class="stat reveal">
+                <div class="stat-value">KML</div>
+                <div class="stat-label">Importación geodatos</div>
             </div>
         </div>
     </div>
@@ -881,7 +1043,15 @@
                 <div class="access-card access-card--operator reveal">
                     <div class="access-icon"><i class="bi bi-phone-fill"></i></div>
                     <h3>Operador de Campo</h3>
-                    <p>Interfaz móvil para captura de fotos con GPS, ghosting comparativo y modo offline.</p>
+                    <p>Interfaz móvil optimizada para captura de fotos geolocalizadas en campo.</p>
+                    <ul class="access-features">
+                        <li><i class="bi bi-check-circle-fill"></i> Fotos con watermark GPS (ETRS89)</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Ghosting comparativo entre visitas</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Modo offline con auto-sincronización</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Mapa de visitas con navegación GPS</li>
+                        <li><i class="bi bi-check-circle-fill"></i> App instalable (PWA)</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Alertas de fallos de subida</li>
+                    </ul>
                     <a href="/public/login.php" class="access-btn">
                         <i class="bi bi-camera"></i> Acceder como Operador
                     </a>
@@ -891,7 +1061,17 @@
                 <div class="access-card access-card--admin reveal">
                     <div class="access-icon"><i class="bi bi-speedometer2"></i></div>
                     <h3>Administrador de Empresa</h3>
-                    <p>Dashboard, timeline, mapa de operarios, gestión de infraestructuras e informes PDF.</p>
+                    <p>Panel completo de gestión, análisis visual y generación de informes.</p>
+                    <ul class="access-features">
+                        <li><i class="bi bi-check-circle-fill"></i> Dashboard con métricas en tiempo real</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Timeline y galería de inspecciones</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Mapa interactivo con capas KML</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Comparador de fotos side-by-side</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Informes PDF y exportación CSV</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Importación KML/KMZ masiva</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Búsqueda global con Ctrl+K</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Gestión de infraestructuras y usuarios</li>
+                    </ul>
                     <a href="/admin/login.php" class="access-btn">
                         <i class="bi bi-box-arrow-in-right"></i> Panel de Administración
                     </a>
@@ -901,7 +1081,14 @@
                 <div class="access-card access-card--super reveal">
                     <div class="access-icon"><i class="bi bi-shield-lock-fill"></i></div>
                     <h3>Super Administrador</h3>
-                    <p>Gestión global de empresas, licencias, usuarios y configuración de la plataforma.</p>
+                    <p>Gestión global de la plataforma, empresas y configuración.</p>
+                    <ul class="access-features">
+                        <li><i class="bi bi-check-circle-fill"></i> Gestión de empresas y licencias</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Administración global de usuarios</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Configuración de formularios dinámicos</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Impersonación de usuarios (soporte)</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Métricas globales de la plataforma</li>
+                    </ul>
                     <a href="/superadmin/" class="access-btn">
                         <i class="bi bi-gear"></i> Panel Super Admin
                     </a>

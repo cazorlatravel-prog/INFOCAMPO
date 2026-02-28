@@ -151,8 +151,45 @@ try {
         $cloudinaryUrl = APP_URL . '/uploads/' . $subDir . '/' . $localFile;
     }
 } catch (\Exception $e) {
+    // Registrar la subida fallida para notificar al admin
+    try {
+        $pdo = getDB();
+        // Obtener empresa_id de la infraestructura
+        $empStmt = $pdo->prepare("SELECT empresa_id FROM infraestructuras WHERE id = :id");
+        $empStmt->execute([':id' => $infraId]);
+        $empRow = $empStmt->fetch();
+        $failEmpresaId = $empRow ? (int) $empRow['empresa_id'] : 0;
+
+        if ($failEmpresaId > 0) {
+            // Verificar si la tabla existe (puede no existir si no se ha migrado)
+            $tableCheck = $pdo->query("SHOW TABLES LIKE 'subidas_fallidas'")->fetchColumn();
+            if ($tableCheck) {
+                $failStmt = $pdo->prepare(
+                    "INSERT INTO subidas_fallidas (empresa_id, usuario_id, infra_id, nombre_archivo, estado_incidencia, tipo_foto, motivo_error)
+                     VALUES (:emp, :usr, :infra, :nombre, :estado, :tipo, :motivo)"
+                );
+                $failStmt->execute([
+                    ':emp'    => $failEmpresaId,
+                    ':usr'    => $usuarioId,
+                    ':infra'  => $infraId,
+                    ':nombre' => $nombreArchivo,
+                    ':estado' => $incidencia,
+                    ':tipo'   => $tipoFoto,
+                    ':motivo' => $e->getMessage(),
+                ]);
+            }
+        }
+    } catch (\Exception $logErr) {
+        // Silenciar error de logging para no enmascarar el original
+    }
+
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Error al subir imagen: ' . $e->getMessage()]);
+    echo json_encode([
+        'ok' => false,
+        'error' => 'Error al subir imagen: ' . $e->getMessage(),
+        'upload_failed' => true,
+        'keep_photo' => true,
+    ]);
     exit;
 }
 
