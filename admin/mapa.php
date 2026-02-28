@@ -437,7 +437,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
             }),
             ortofoto: L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
-                layers: 'ortofoto_2020',
+                layers: 'orto_RGBlr_2020_raster',
                 format: 'image/png',
                 transparent: false,
                 attribution: '&copy; Junta de Andalucía - Ortofoto 2020',

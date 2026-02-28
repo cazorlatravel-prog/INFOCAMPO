@@ -1363,7 +1363,7 @@
                 attribution: '&copy; OSM', maxZoom: 19,
             });
             mapBaseLayers.ortofoto = L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
-                layers: 'ortofoto_2020', format: 'image/png', transparent: false,
+                layers: 'orto_RGBlr_2020_raster', format: 'image/png', transparent: false,
                 attribution: '&copy; Junta de Andalucía', maxZoom: 20,
             });
             mapBaseLayers.topografico = L.tileLayer.wms('https://www.ideandalucia.es/wms/mta10r_2001-2013?', {
