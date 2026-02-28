@@ -42,6 +42,7 @@ if ($empresaId > 0) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>INFOCAMPO - Operador de Campo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="css/operador.css">
 </head>
 <body>
@@ -114,6 +115,15 @@ if ($empresaId > 0) {
                         <small>Ghosting con foto anterior al 50%</small>
                     </div>
                     <span class="foto-count" id="count-comparativas">0</span>
+                </button>
+
+                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa">
+                    <div class="foto-btn-icon"><i class="bi bi-map"></i></div>
+                    <div class="foto-btn-text">
+                        <strong>Ver Mapa de Visitas</strong>
+                        <small>Ubicación de fotos anteriores</small>
+                    </div>
+                    <span class="foto-count"><i class="bi bi-chevron-right"></i></span>
                 </button>
             </div>
 
@@ -198,6 +208,43 @@ if ($empresaId > 0) {
     </div>
 
     <!-- ========================================================
+         PANTALLA 4: MAPA DE VISITAS
+         ======================================================== -->
+    <div id="screen-mapa" class="screen">
+        <div class="mapa-topbar">
+            <button type="button" id="btn-mapa-back" class="cam-btn-back">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <div class="mapa-title">
+                <strong>Mapa de Visitas</strong>
+                <span id="mapa-subtitle">Todas las infraestructuras</span>
+            </div>
+            <div style="width:40px;"></div>
+        </div>
+        <div id="op-map" class="op-map"></div>
+
+        <!-- Panel lateral de detalle -->
+        <div id="mapa-detail-panel" class="mapa-detail-panel hidden">
+            <div class="mapa-detail-header">
+                <button type="button" id="btn-close-detail" class="modal-close"><i class="bi bi-x-lg"></i></button>
+                <h4 id="detail-infra-name">--</h4>
+                <code id="detail-infra-code">--</code>
+            </div>
+            <div class="mapa-detail-body" id="mapa-detail-body">
+                <!-- Se rellena dinámicamente -->
+            </div>
+            <div class="mapa-detail-actions">
+                <button type="button" id="btn-detail-aleatorio" class="mapa-action-btn mapa-action--aleatorio">
+                    <i class="bi bi-camera"></i> Nueva Foto Aleatoria
+                </button>
+                <button type="button" id="btn-detail-comparativo" class="mapa-action-btn mapa-action--comparativo">
+                    <i class="bi bi-layers"></i> Nueva Foto Comparativa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================
          OVERLAY: Subiendo foto
          ======================================================== -->
     <div id="upload-overlay" class="overlay hidden">
@@ -237,9 +284,11 @@ if ($empresaId > 0) {
                 infraestructuras: 'api/infraestructuras.php',
                 unidadesObra: 'api/unidades_obra.php',
                 fotosComparativas: 'api/fotos_comparativas.php',
+                registrosMapa: 'api/registros_mapa.php',
             }
         };
     </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="js/operador.js"></script>
 </body>
 </html>

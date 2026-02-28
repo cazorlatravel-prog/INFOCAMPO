@@ -42,6 +42,7 @@
         ficha:   $('#screen-ficha'),
         camera:  $('#screen-camera'),
         preview: $('#screen-preview'),
+        mapa:    $('#screen-mapa'),
     };
 
     // Ficha
@@ -59,6 +60,7 @@
     const countComparativas = $('#count-comparativas');
     const gallerySection   = $('#gallery-section');
     const galleryGrid      = $('#gallery-grid');
+    const btnVerMapa       = $('#btn-ver-mapa');
 
     // Camera
     const camVideo       = $('#cam-video');
@@ -81,6 +83,16 @@
     const previewFilename = $('#preview-filename');
     const btnRetake      = $('#btn-retake');
     const btnAccept      = $('#btn-accept');
+
+    // Map
+    const mapaDetailPanel = $('#mapa-detail-panel');
+    const mapaDetailBody  = $('#mapa-detail-body');
+    const detailInfraName = $('#detail-infra-name');
+    const detailInfraCode = $('#detail-infra-code');
+    const btnMapaBack     = $('#btn-mapa-back');
+    const btnCloseDetail  = $('#btn-close-detail');
+    const btnDetailAleatorio   = $('#btn-detail-aleatorio');
+    const btnDetailComparativo = $('#btn-detail-comparativo');
 
     // Overlay / Modal
     const uploadOverlay  = $('#upload-overlay');
@@ -684,6 +696,15 @@
         btnAleatorias.addEventListener('click', () => openCamera('aleatorio'));
         btnComparativas.addEventListener('click', () => openCamera('comparativo'));
 
+        // Map button
+        btnVerMapa.addEventListener('click', openMapScreen);
+
+        // Map events
+        btnMapaBack.addEventListener('click', closeMapScreen);
+        btnCloseDetail.addEventListener('click', () => mapaDetailPanel.classList.add('hidden'));
+        btnDetailAleatorio.addEventListener('click', () => startVisitFromMap('aleatorio'));
+        btnDetailComparativo.addEventListener('click', () => startVisitFromMap('comparativo'));
+
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
@@ -706,6 +727,223 @@
         // Preview
         btnRetake.addEventListener('click', retakePhoto);
         btnAccept.addEventListener('click', acceptPhoto);
+    }
+
+    // ===================================================================
+    // MAP SCREEN
+    // ===================================================================
+    let leafletMap = null;
+    let mapMarkers = [];
+    let mapSelectedInfra = null; // { id, nombre, codigo }
+
+    async function openMapScreen() {
+        showScreen('mapa');
+        mapaDetailPanel.classList.add('hidden');
+
+        // Initialize map if needed
+        if (!leafletMap) {
+            leafletMap = L.map('op-map', { zoomControl: false });
+            L.control.zoom({ position: 'topright' }).addTo(leafletMap);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OSM',
+                maxZoom: 19,
+            }).addTo(leafletMap);
+
+            // Set initial view to current GPS or Spain center
+            if (state.gps.lat && state.gps.lon) {
+                leafletMap.setView([state.gps.lat, state.gps.lon], 14);
+            } else {
+                leafletMap.setView([40.416775, -3.703790], 6);
+            }
+        }
+
+        // Load data
+        await loadMapData();
+    }
+
+    function closeMapScreen() {
+        showScreen('ficha');
+    }
+
+    async function loadMapData() {
+        try {
+            const url = `${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=500`;
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (!data.ok) return;
+
+            // Clear old markers
+            mapMarkers.forEach(m => leafletMap.removeLayer(m));
+            mapMarkers = [];
+
+            // Group by infrastructure
+            const byInfra = {};
+            data.registros.forEach(r => {
+                if (!byInfra[r.infra_id]) {
+                    byInfra[r.infra_id] = {
+                        id: r.infra_id,
+                        nombre: r.infra_nombre,
+                        codigo: r.codigo_unico,
+                        tipo: r.infra_tipo,
+                        lat: parseFloat(r.lat_teorica),
+                        lon: parseFloat(r.lon_teorica),
+                        registros: [],
+                    };
+                }
+                byInfra[r.infra_id].registros.push(r);
+            });
+
+            const bounds = [];
+            const stateColors = {
+                'bajo': '#22c55e', 'medio': '#eab308', 'critico': '#ef4444',
+            };
+
+            Object.values(byInfra).forEach(infra => {
+                if (!infra.lat || !infra.lon) return;
+                bounds.push([infra.lat, infra.lon]);
+
+                // Latest state
+                const lastState = infra.registros[0]?.estado_incidencia || 'bajo';
+                const color = stateColors[lastState] || '#9ca3af';
+                const numPhotos = infra.registros.length;
+                const numComp = infra.registros.filter(r => r.tipo_foto === 'comparativo').length;
+
+                const icon = L.divIcon({
+                    className: 'op-marker',
+                    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};
+                            border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.4);
+                            display:flex;align-items:center;justify-content:center;
+                            font-size:10px;font-weight:800;color:#fff;">${numPhotos}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                });
+
+                const marker = L.marker([infra.lat, infra.lon], { icon }).addTo(leafletMap);
+                marker.on('click', () => showInfraDetail(infra));
+                mapMarkers.push(marker);
+            });
+
+            // Also add markers for individual photo locations (smaller dots)
+            data.registros.forEach(r => {
+                const lat = parseFloat(r.lat_real);
+                const lon = parseFloat(r.lon_real);
+                if (!lat || !lon) return;
+
+                const isComp = r.tipo_foto === 'comparativo';
+                const dotColor = isComp ? 'rgba(168,85,247,0.7)' : 'rgba(59,130,246,0.5)';
+                const dotSize = 10;
+
+                const icon = L.divIcon({
+                    className: 'photo-dot',
+                    html: `<div style="width:${dotSize}px;height:${dotSize}px;border-radius:50%;
+                            background:${dotColor};border:1px solid rgba(255,255,255,0.5);"></div>`,
+                    iconSize: [dotSize, dotSize],
+                    iconAnchor: [dotSize/2, dotSize/2],
+                });
+
+                const m = L.marker([lat, lon], { icon, zIndexOffset: -100 }).addTo(leafletMap);
+                m.bindTooltip(
+                    `<span style="font-size:0.75rem;">${escHtml(r.infra_nombre)}<br>${r.fecha}</span>`,
+                    { direction: 'top', offset: [0, -6] }
+                );
+                m.on('click', () => {
+                    const infra = byInfra[r.infra_id];
+                    if (infra) showInfraDetail(infra);
+                });
+                mapMarkers.push(m);
+            });
+
+            // Fit bounds
+            if (bounds.length > 0) {
+                leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+            }
+
+            // Update subtitle
+            const sub = $('#mapa-subtitle');
+            if (sub) {
+                const totalInfra = Object.keys(byInfra).length;
+                const totalReg = data.registros.length;
+                sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
+            }
+
+        } catch (err) {
+            console.warn('Error loading map data:', err);
+        }
+    }
+
+    function showInfraDetail(infra) {
+        mapSelectedInfra = infra;
+        detailInfraName.textContent = infra.nombre;
+        detailInfraCode.textContent = infra.codigo;
+
+        // Build detail body
+        let html = '';
+        const regs = infra.registros;
+
+        // Show comparativas first, then aleatorias
+        const comparativas = regs.filter(r => r.tipo_foto === 'comparativo');
+        const aleatorias = regs.filter(r => r.tipo_foto !== 'comparativo');
+
+        if (comparativas.length > 0) {
+            html += `<div class="mapa-detail-meta" style="margin-top:4px;color:#c084fc;">
+                <strong>${comparativas.length} foto${comparativas.length !== 1 ? 's' : ''} comparativa${comparativas.length !== 1 ? 's' : ''}</strong>
+            </div>`;
+            comparativas.forEach(r => { html += buildPhotoCard(r); });
+        }
+
+        if (aleatorias.length > 0) {
+            html += `<div class="mapa-detail-meta" style="margin-top:8px;color:#60a5fa;">
+                <strong>${aleatorias.length} foto${aleatorias.length !== 1 ? 's' : ''} aleatoria${aleatorias.length !== 1 ? 's' : ''}</strong>
+            </div>`;
+            aleatorias.slice(0, 6).forEach(r => { html += buildPhotoCard(r); });
+            if (aleatorias.length > 6) {
+                html += `<div class="mapa-detail-meta">y ${aleatorias.length - 6} más...</div>`;
+            }
+        }
+
+        if (regs.length === 0) {
+            html = '<div class="mapa-detail-meta" style="text-align:center;padding:20px;">Sin fotos registradas</div>';
+        }
+
+        mapaDetailBody.innerHTML = html;
+        mapaDetailPanel.classList.remove('hidden');
+
+        // Center map on infra
+        if (infra.lat && infra.lon) {
+            leafletMap.setView([infra.lat, infra.lon], 16, { animate: true });
+        }
+    }
+
+    function buildPhotoCard(r) {
+        const fecha = new Date(r.fecha).toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+        });
+        const isComp = r.tipo_foto === 'comparativo';
+        const seqLabel = isComp && r.secuencia_comparativa ? `W${r.secuencia_comparativa}` : '';
+        return `<div class="mapa-detail-photo">
+            <img src="${escHtml(r.url_cloudinary)}" alt="${escHtml(r.nombre_archivo || '')}" loading="lazy">
+            <div class="mapa-detail-photo-info">
+                <span>${fecha} · ${escHtml(r.usuario_nombre)} ${seqLabel ? '· ' + seqLabel : ''}</span>
+                <span class="estado-badge ${r.estado_incidencia}">${r.estado_incidencia.toUpperCase()}</span>
+            </div>
+        </div>
+        ${r.observaciones ? '<div class="mapa-detail-obs">' + escHtml(r.observaciones) + '</div>' : ''}`;
+    }
+
+    function startVisitFromMap(mode) {
+        if (!mapSelectedInfra) return;
+
+        // Select the infrastructure in the ficha
+        selectInfra(mapSelectedInfra.id, mapSelectedInfra.nombre, mapSelectedInfra.codigo);
+
+        // Close map and detail panel
+        mapaDetailPanel.classList.add('hidden');
+        showScreen('ficha');
+
+        // Auto-open camera after a brief delay for the screen transition
+        setTimeout(() => openCamera(mode), 200);
     }
 
     // ===================================================================

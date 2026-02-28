@@ -1,10 +1,13 @@
 <?php
 /**
- * INFOCAMPO SaaS - Mapa de Infraestructuras (Admin)
+ * INFOCAMPO SaaS - Mapa Avanzado de Fotos (Admin)
  *
- * Visualización geográfica de todas las infraestructuras
- * de la empresa usando Leaflet + OpenStreetMap.
- * Muestra el estado de incidencia de la última inspección.
+ * Visualiza TODAS las fotos de campo geolocalizadas:
+ * - Marcadores por infraestructura (agrupados)
+ * - Marcadores individuales por foto
+ * - Filtros por operador, unidad de obra, infraestructura, tipo de foto
+ * - Popups con preview de fotos y descarga
+ * - Enlace a generar informes por infraestructura
  */
 
 declare(strict_types=1);
@@ -20,214 +23,402 @@ $empresas = $pdo->query(
     "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
 )->fetchAll();
 
+// Cargar datos para filtros
+$operadores = [];
+$unidadesObra = [];
 $infraestructuras = [];
+$registros = [];
 $empresaNombre = '';
+
 if ($empresaId > 0) {
     $stmt = $pdo->prepare("SELECT nombre FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) $empresaNombre = $row['nombre'];
 
-    $stmt = $pdo->prepare(
-        "SELECT i.*,
-                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id) AS num_registros,
-                (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado,
-                (SELECT r3.fecha FROM registros r3 WHERE r3.infra_id = i.id ORDER BY r3.fecha DESC LIMIT 1) AS ultima_fecha
-         FROM infraestructuras i
-         WHERE i.empresa_id = :emp_id AND i.activa = 1
-         ORDER BY i.nombre ASC"
-    );
-    $stmt->execute([':emp_id' => $empresaId]);
+    // Operadores
+    $stmt = $pdo->prepare("SELECT id, nombre FROM usuarios WHERE empresa_id = :emp AND activo = 1 ORDER BY nombre");
+    $stmt->execute([':emp' => $empresaId]);
+    $operadores = $stmt->fetchAll();
+
+    // Unidades de obra
+    $stmt = $pdo->prepare("SELECT id, nombre, codigo FROM unidades_obra WHERE empresa_id = :emp AND activa = 1 ORDER BY nombre");
+    $stmt->execute([':emp' => $empresaId]);
+    $unidadesObra = $stmt->fetchAll();
+
+    // Infraestructuras
+    $stmt = $pdo->prepare("SELECT id, nombre, codigo_unico FROM infraestructuras WHERE empresa_id = :emp AND activa = 1 ORDER BY nombre");
+    $stmt->execute([':emp' => $empresaId]);
     $infraestructuras = $stmt->fetchAll();
+
+    // Todos los registros con GPS
+    $stmt = $pdo->prepare(
+        "SELECT r.id, r.infra_id, r.usuario_id, r.fecha, r.lat_real, r.lon_real,
+                r.url_cloudinary, r.estado_incidencia, r.observaciones,
+                r.tipo_foto, r.secuencia_comparativa, r.nombre_archivo, r.unidad_obra_id,
+                i.nombre AS infra_nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica,
+                u.nombre AS usuario_nombre,
+                uo.nombre AS unidad_obra_nombre
+         FROM registros r
+         INNER JOIN infraestructuras i ON r.infra_id = i.id
+         INNER JOIN usuarios u ON r.usuario_id = u.id
+         LEFT JOIN unidades_obra uo ON r.unidad_obra_id = uo.id
+         WHERE i.empresa_id = :emp
+         ORDER BY r.fecha DESC
+         LIMIT 1000"
+    );
+    $stmt->execute([':emp' => $empresaId]);
+    $registros = $stmt->fetchAll();
 }
 
 // Preparar datos para JS
-$mapData = [];
-foreach ($infraestructuras as $inf) {
-    $mapData[] = [
-        'id' => (int) $inf['id'],
-        'nombre' => $inf['nombre'],
-        'codigo' => $inf['codigo_unico'],
-        'lat' => (float) $inf['lat_teorica'],
-        'lon' => (float) $inf['lon_teorica'],
-        'tipo' => $inf['tipo'] ?? '',
-        'registros' => (int) $inf['num_registros'],
-        'estado' => $inf['ultimo_estado'] ?? 'sin_datos',
-        'fecha' => $inf['ultima_fecha'] ? date('d/m/Y H:i', strtotime($inf['ultima_fecha'])) : 'Sin inspecciones',
+$jsRegistros = [];
+foreach ($registros as $r) {
+    $jsRegistros[] = [
+        'id'         => (int)$r['id'],
+        'infra_id'   => (int)$r['infra_id'],
+        'usuario_id' => (int)$r['usuario_id'],
+        'fecha'      => date('d/m/Y H:i', strtotime($r['fecha'])),
+        'lat'        => (float)$r['lat_real'],
+        'lon'        => (float)$r['lon_real'],
+        'url'        => $r['url_cloudinary'],
+        'estado'     => $r['estado_incidencia'],
+        'tipo'       => $r['tipo_foto'] ?? 'aleatorio',
+        'seq'        => (int)($r['secuencia_comparativa'] ?? 0),
+        'archivo'    => $r['nombre_archivo'] ?? '',
+        'obs'        => $r['observaciones'] ?? '',
+        'infra'      => $r['infra_nombre'],
+        'codigo'     => $r['codigo_unico'],
+        'operador'   => $r['usuario_nombre'],
+        'uo_id'      => (int)($r['unidad_obra_id'] ?? 0),
+        'uo_nombre'  => $r['unidad_obra_nombre'] ?? '',
     ];
 }
+
+// Stats
+$totalFotos = count($registros);
+$totalComp = count(array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') === 'comparativo'));
+$totalCriticas = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'critico'));
+$totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Mapa</title>
+    <title>INFOCAMPO - Mapa de Fotos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
     <style>
-        body { background: #f4f6f9; }
+        body { background: #f4f6f9; margin: 0; }
         .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
-        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-radius: 12px; }
         .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
         .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
         .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
-        #map { height: calc(100vh - 200px); min-height: 500px; border-radius: 12px; }
-        .map-legend {
-            background: #fff; border-radius: 10px; padding: 12px 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-size: 0.8rem;
+
+        .map-container { position: relative; }
+        #map { height: calc(100vh - 190px); min-height: 500px; }
+
+        .map-filter-bar {
+            background: #fff; padding: 10px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
         }
-        .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-        .legend-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-        .map-stats { display: flex; gap: 16px; flex-wrap: wrap; }
-        .map-stat { background: #fff; border-radius: 10px; padding: 12px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .map-stat .num { font-size: 1.3rem; font-weight: 800; color: #1e3a5f; }
-        .map-stat .label { font-size: 0.7rem; color: #6b7280; text-transform: uppercase; }
+        .map-filter-bar .form-select, .map-filter-bar .form-control { font-size: 0.8rem; height: 34px; }
+        .map-filter-bar label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; margin-bottom: 0; }
+        .filter-group { display: flex; flex-direction: column; gap: 2px; }
+
+        .map-stats-bar {
+            background: #fff; padding: 8px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex; gap: 20px; align-items: center; font-size: 0.8rem;
+        }
+        .stat-pill {
+            display: flex; align-items: center; gap: 6px; color: #6b7280;
+        }
+        .stat-pill strong { color: #1e3a5f; font-size: 1rem; }
+
+        .map-legend {
+            background: #fff; border-radius: 10px; padding: 10px 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-size: 0.75rem;
+        }
+        .legend-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
+        /* Photo popup */
+        .popup-photo { width: 280px; }
+        .popup-photo img { width: 100%; border-radius: 6px; margin-bottom: 6px; }
+        .popup-photo .popup-meta { font-size: 0.75rem; color: #666; line-height: 1.5; }
+        .popup-photo .popup-meta strong { color: #333; }
+        .popup-photo .popup-actions { margin-top: 6px; display: flex; gap: 4px; }
+        .popup-photo .popup-actions a { font-size: 0.7rem; }
+        .popup-badge { display: inline-block; font-size: 0.6rem; font-weight: 800; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
+        .popup-badge.bajo { background: #dcfce7; color: #166534; }
+        .popup-badge.medio { background: #fef9c3; color: #854d0e; }
+        .popup-badge.critico { background: #fee2e2; color: #dc2626; }
+        .popup-badge.aleatorio { background: #dbeafe; color: #1d4ed8; }
+        .popup-badge.comparativo { background: #ede9fe; color: #6d28d9; }
+
+        /* Cluster override */
+        .marker-cluster-small { background-color: rgba(45,106,159,0.3); }
+        .marker-cluster-small div { background-color: rgba(45,106,159,0.7); color: #fff; }
+        .marker-cluster-medium { background-color: rgba(234,179,8,0.3); }
+        .marker-cluster-medium div { background-color: rgba(234,179,8,0.7); color: #fff; }
+        .marker-cluster-large { background-color: rgba(239,68,68,0.3); }
+        .marker-cluster-large div { background-color: rgba(239,68,68,0.7); color: #fff; }
     </style>
 </head>
 <body>
     <?php include __DIR__ . '/includes/header.php'; ?>
 
-    <div class="container-fluid py-4">
-        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <h4 class="mb-0"><i class="bi bi-map me-2"></i>Mapa de Infraestructuras</h4>
-            <div class="d-flex gap-2 align-items-center">
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Empresa --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-            </div>
+    <?php if ($empresaId > 0 && !empty($registros)): ?>
+
+    <!-- Filter bar -->
+    <div class="map-filter-bar">
+        <div class="filter-group">
+            <label>Empresa</label>
+            <form method="get" id="form-empresa">
+                <select name="empresa_id" class="form-select" style="width:180px;" onchange="this.form.submit()">
+                    <?php foreach ($empresas as $emp): ?>
+                        <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($emp['nombre']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
         </div>
-
-        <?php if ($empresaId > 0 && !empty($infraestructuras)): ?>
-
-        <!-- Stats rápidos -->
-        <div class="map-stats mb-3">
-            <?php
-            $conRegistros = array_filter($infraestructuras, fn($i) => $i['num_registros'] > 0);
-            $criticas = array_filter($infraestructuras, fn($i) => $i['ultimo_estado'] === 'critico');
-            ?>
-            <div class="map-stat"><div class="num"><?= count($infraestructuras) ?></div><div class="label">Infraestructuras</div></div>
-            <div class="map-stat"><div class="num"><?= count($conRegistros) ?></div><div class="label">Con inspecciones</div></div>
-            <div class="map-stat"><div class="num"><?= count($criticas) ?></div><div class="label">Estado crítico</div></div>
+        <div class="filter-group">
+            <label>Operador</label>
+            <select id="filter-operador" class="form-select" style="width:160px;">
+                <option value="">Todos</option>
+                <?php foreach ($operadores as $op): ?>
+                    <option value="<?= $op['id'] ?>"><?= htmlspecialchars($op['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
-
-        <!-- Mapa -->
-        <div class="card">
-            <div class="card-body p-0" style="border-radius:12px;overflow:hidden;">
-                <div id="map"></div>
-            </div>
+        <div class="filter-group">
+            <label>Infraestructura</label>
+            <select id="filter-infra" class="form-select" style="width:180px;">
+                <option value="">Todas</option>
+                <?php foreach ($infraestructuras as $inf): ?>
+                    <option value="<?= $inf['id'] ?>"><?= htmlspecialchars($inf['codigo_unico'] . ' - ' . $inf['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
+        <div class="filter-group">
+            <label>Unidad de Obra</label>
+            <select id="filter-uo" class="form-select" style="width:160px;">
+                <option value="">Todas</option>
+                <?php foreach ($unidadesObra as $uo): ?>
+                    <option value="<?= $uo['id'] ?>"><?= htmlspecialchars(($uo['codigo'] ? $uo['codigo'] . ' - ' : '') . $uo['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Tipo Foto</label>
+            <select id="filter-tipo" class="form-select" style="width:130px;">
+                <option value="">Todas</option>
+                <option value="aleatorio">Aleatorias</option>
+                <option value="comparativo">Comparativas</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Estado</label>
+            <select id="filter-estado" class="form-select" style="width:110px;">
+                <option value="">Todos</option>
+                <option value="bajo">Bajo</option>
+                <option value="medio">Medio</option>
+                <option value="critico">Critico</option>
+            </select>
+        </div>
+        <div class="filter-group" style="margin-left:auto;">
+            <label>&nbsp;</label>
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetFilters()">
+                <i class="bi bi-x-lg"></i> Limpiar
+            </button>
+        </div>
+    </div>
 
-        <?php elseif ($empresaId > 0): ?>
-            <div class="text-center py-5">
-                <i class="bi bi-map" style="font-size:3rem;color:#adb5bd;"></i>
-                <h5 class="mt-3 text-muted">Sin infraestructuras</h5>
-                <p class="text-muted">No hay infraestructuras activas para mostrar en el mapa.</p>
-            </div>
-        <?php else: ?>
+    <!-- Stats bar -->
+    <div class="map-stats-bar" id="stats-bar">
+        <div class="stat-pill"><strong id="stat-fotos"><?= $totalFotos ?></strong> fotos</div>
+        <div class="stat-pill"><strong id="stat-infras"><?= $totalInfras ?></strong> infraestructuras</div>
+        <div class="stat-pill" style="color:#7c3aed;"><strong id="stat-comp"><?= $totalComp ?></strong> comparativas</div>
+        <div class="stat-pill" style="color:#dc2626;"><strong id="stat-criticas"><?= $totalCriticas ?></strong> criticas</div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+
+    <?php elseif ($empresaId > 0): ?>
+        <div class="text-center py-5">
+            <i class="bi bi-camera" style="font-size:3rem;color:#adb5bd;"></i>
+            <h5 class="mt-3 text-muted">Sin fotos registradas</h5>
+            <p class="text-muted">Los operadores aún no han subido fotos para esta empresa.</p>
+        </div>
+    <?php else: ?>
+        <div class="container-fluid py-4">
             <div class="text-center py-5">
                 <i class="bi bi-map" style="font-size:3rem;color:#adb5bd;"></i>
                 <h5 class="mt-3 text-muted">Selecciona una empresa</h5>
+                <form method="get" class="d-inline-flex gap-2 mt-3">
+                    <select name="empresa_id" class="form-select" style="width:280px;">
+                        <option value="">-- Seleccionar empresa --</option>
+                        <?php foreach ($empresas as $emp): ?>
+                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nombre']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-primary">Ir</button>
+                </form>
             </div>
-        <?php endif; ?>
-    </div>
+        </div>
+    <?php endif; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
-    <?php if ($empresaId > 0 && !empty($infraestructuras)): ?>
+    <?php if ($empresaId > 0 && !empty($registros)): ?>
     (function() {
-        var data = <?= json_encode($mapData, JSON_UNESCAPED_UNICODE) ?>;
+        var allData = <?= json_encode($jsRegistros, JSON_UNESCAPED_UNICODE) ?>;
         var empresaId = <?= $empresaId ?>;
-
-        // Colores por estado
-        var stateColors = {
-            'bajo': '#22c55e',
-            'medio': '#eab308',
-            'critico': '#ef4444',
-            'sin_datos': '#9ca3af'
-        };
-
-        // Centrar mapa
-        var bounds = [];
-        data.forEach(function(d) {
-            if (d.lat !== 0 && d.lon !== 0) bounds.push([d.lat, d.lon]);
-        });
-
         var map = L.map('map');
+        var clusterGroup = null;
 
-        if (bounds.length > 0) {
-            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-        } else {
-            map.setView([40.416775, -3.703790], 6); // España centro
-        }
+        var stateColors = { 'bajo': '#22c55e', 'medio': '#eab308', 'critico': '#ef4444' };
 
-        // Capa base
+        // Tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
         }).addTo(map);
 
-        // Marcadores
-        data.forEach(function(d) {
-            if (d.lat === 0 && d.lon === 0) return;
-
-            var color = stateColors[d.estado] || stateColors.sin_datos;
-            var icon = L.divIcon({
-                className: 'custom-marker',
-                html: '<div style="width:20px;height:20px;border-radius:50%;background:' + color +
-                      ';border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);"></div>',
-                iconSize: [20, 20],
-                iconAnchor: [10, 10],
-            });
-
-            var marker = L.marker([d.lat, d.lon], { icon: icon }).addTo(map);
-
-            var estadoLabel = {
-                'bajo': '<span style="color:#22c55e;font-weight:700;">BAJO</span>',
-                'medio': '<span style="color:#eab308;font-weight:700;">MEDIO</span>',
-                'critico': '<span style="color:#ef4444;font-weight:700;">CRITICO</span>',
-                'sin_datos': '<span style="color:#9ca3af;">Sin datos</span>'
-            };
-
-            marker.bindPopup(
-                '<div style="min-width:200px;">' +
-                '<strong>' + d.nombre + '</strong><br>' +
-                '<code style="font-size:0.75rem;color:#2d6a9f;">' + d.codigo + '</code>' +
-                (d.tipo ? ' <span style="font-size:0.7rem;background:#e0e7ff;color:#4338ca;padding:1px 6px;border-radius:4px;">' + d.tipo + '</span>' : '') +
-                '<hr style="margin:6px 0;">' +
-                '<div style="font-size:0.8rem;">' +
-                'Estado: ' + (estadoLabel[d.estado] || d.estado) + '<br>' +
-                'Inspecciones: <strong>' + d.registros + '</strong><br>' +
-                'Última: ' + d.fecha +
-                '</div>' +
-                '<div style="margin-top:8px;">' +
-                '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + d.id + '" class="btn btn-sm btn-primary" style="font-size:0.75rem;">Ver Timeline</a>' +
-                '</div></div>'
-            );
-        });
-
-        // Leyenda
+        // Legend
         var legend = L.control({ position: 'bottomright' });
         legend.onAdd = function() {
             var div = L.DomUtil.create('div', 'map-legend');
             div.innerHTML =
-                '<strong style="font-size:0.85rem;">Estado</strong><br>' +
-                '<div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div> Bajo</div>' +
-                '<div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div> Medio</div>' +
-                '<div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div> Crítico</div>' +
-                '<div class="legend-item"><div class="legend-dot" style="background:#9ca3af;"></div> Sin datos</div>';
+                '<strong style="font-size:0.8rem;">Leyenda</strong><br>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#22c55e;"></div> Bajo</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#eab308;"></div> Medio</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#ef4444;"></div> Critico</div>' +
+                '<hr style="margin:4px 0;">' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#3b82f6;width:8px;height:8px;"></div> Aleatoria</div>' +
+                '<div class="legend-row"><div class="legend-dot" style="background:#a855f7;width:8px;height:8px;"></div> Comparativa</div>';
             return div;
         };
         legend.addTo(map);
+
+        function renderMarkers(data) {
+            if (clusterGroup) { map.removeLayer(clusterGroup); }
+            clusterGroup = L.markerClusterGroup({
+                maxClusterRadius: 40,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+            });
+
+            var bounds = [];
+
+            data.forEach(function(r) {
+                if (!r.lat || !r.lon) return;
+                bounds.push([r.lat, r.lon]);
+
+                var isComp = r.tipo === 'comparativo';
+                var color = stateColors[r.estado] || '#9ca3af';
+                var size = isComp ? 16 : 12;
+
+                var icon = L.divIcon({
+                    className: 'photo-marker',
+                    html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;' +
+                          'background:' + color + ';border:2px solid #fff;' +
+                          'box-shadow:0 1px 4px rgba(0,0,0,0.3);' +
+                          (isComp ? 'outline:2px solid rgba(168,85,247,0.5);' : '') + '"></div>',
+                    iconSize: [size, size],
+                    iconAnchor: [size/2, size/2],
+                });
+
+                var marker = L.marker([r.lat, r.lon], { icon: icon });
+
+                var downloadUrl = r.url.replace('/upload/', '/upload/fl_attachment/');
+                var popupHtml =
+                    '<div class="popup-photo">' +
+                    '<img src="' + r.url + '" alt="" loading="lazy">' +
+                    '<div class="popup-meta">' +
+                    '<strong>' + r.infra + '</strong> <code style="font-size:0.7rem;color:#2d6a9f;">' + r.codigo + '</code><br>' +
+                    '<span class="popup-badge ' + r.estado + '">' + r.estado.toUpperCase() + '</span> ' +
+                    '<span class="popup-badge ' + r.tipo + '">' + (isComp ? 'COMP W' + r.seq : 'ALEA') + '</span><br>' +
+                    '<i class="bi bi-person"></i> ' + r.operador + '<br>' +
+                    '<i class="bi bi-calendar3"></i> ' + r.fecha + '<br>' +
+                    '<i class="bi bi-geo-alt"></i> ' + r.lat.toFixed(7) + ', ' + r.lon.toFixed(7) +
+                    (r.uo_nombre ? '<br><i class="bi bi-tools"></i> ' + r.uo_nombre : '') +
+                    (r.obs ? '<br><em style="color:#999;">' + r.obs.substring(0, 80) + '</em>' : '') +
+                    '</div>' +
+                    '<div class="popup-actions">' +
+                    '<a href="' + downloadUrl + '" class="btn btn-sm btn-outline-success" style="font-size:0.7rem;"><i class="bi bi-download"></i> Descargar</a> ' +
+                    '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + r.infra_id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;"><i class="bi bi-clock-history"></i> Timeline</a> ' +
+                    '<a href="generar_pdf.php?infra_id=' + r.infra_id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;"><i class="bi bi-file-pdf"></i> PDF</a>' +
+                    '</div></div>';
+
+                marker.bindPopup(popupHtml, { maxWidth: 300 });
+                clusterGroup.addLayer(marker);
+            });
+
+            map.addLayer(clusterGroup);
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+            } else {
+                map.setView([40.416775, -3.703790], 6);
+            }
+
+            // Update stats
+            var infras = {};
+            data.forEach(function(r) { infras[r.infra_id] = true; });
+            document.getElementById('stat-fotos').textContent = data.length;
+            document.getElementById('stat-infras').textContent = Object.keys(infras).length;
+            document.getElementById('stat-comp').textContent = data.filter(function(r) { return r.tipo === 'comparativo'; }).length;
+            document.getElementById('stat-criticas').textContent = data.filter(function(r) { return r.estado === 'critico'; }).length;
+        }
+
+        function applyFilters() {
+            var opVal = document.getElementById('filter-operador').value;
+            var infraVal = document.getElementById('filter-infra').value;
+            var uoVal = document.getElementById('filter-uo').value;
+            var tipoVal = document.getElementById('filter-tipo').value;
+            var estadoVal = document.getElementById('filter-estado').value;
+
+            var filtered = allData.filter(function(r) {
+                if (opVal && r.usuario_id !== parseInt(opVal)) return false;
+                if (infraVal && r.infra_id !== parseInt(infraVal)) return false;
+                if (uoVal && r.uo_id !== parseInt(uoVal)) return false;
+                if (tipoVal && r.tipo !== tipoVal) return false;
+                if (estadoVal && r.estado !== estadoVal) return false;
+                return true;
+            });
+
+            renderMarkers(filtered);
+        }
+
+        window.resetFilters = function() {
+            document.getElementById('filter-operador').value = '';
+            document.getElementById('filter-infra').value = '';
+            document.getElementById('filter-uo').value = '';
+            document.getElementById('filter-tipo').value = '';
+            document.getElementById('filter-estado').value = '';
+            renderMarkers(allData);
+        };
+
+        // Bind filter changes
+        ['filter-operador', 'filter-infra', 'filter-uo', 'filter-tipo', 'filter-estado'].forEach(function(id) {
+            document.getElementById(id).addEventListener('change', applyFilters);
+        });
+
+        // Initial render
+        renderMarkers(allData);
     })();
     <?php endif; ?>
     </script>
