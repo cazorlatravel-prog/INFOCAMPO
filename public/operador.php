@@ -110,6 +110,12 @@ if ($empresaId > 0) {
                 <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2"></textarea>
             </div>
 
+            <!-- Aviso: seleccionar infraestructura -->
+            <div id="hint-select-infra" class="hint-box">
+                <i class="bi bi-info-circle"></i>
+                <span>Busca o crea una infraestructura arriba para habilitar las fotos</span>
+            </div>
+
             <!-- Botones de fotos -->
             <div class="foto-buttons">
                 <button type="button" id="btn-fotos-aleatorias" class="foto-btn foto-btn--aleatorio" disabled>

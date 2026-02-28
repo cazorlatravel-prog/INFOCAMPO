@@ -398,6 +398,12 @@
         const enabled = state.infraId !== null;
         btnAleatorias.disabled = !enabled;
         btnComparativas.disabled = !enabled;
+
+        // Show/hide hint
+        const hint = $('#hint-select-infra');
+        if (hint) {
+            hint.classList.toggle('hidden', enabled);
+        }
     }
 
     // ===================================================================
@@ -1173,11 +1179,17 @@
             if (sub) {
                 const totalInfra = Object.keys(byInfra).length;
                 const totalReg = data.registros.length;
-                sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
+                if (totalReg === 0) {
+                    sub.textContent = 'Aún no hay fotos registradas';
+                } else {
+                    sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
+                }
             }
 
         } catch (err) {
             console.warn('Error loading map data:', err);
+            const sub = $('#mapa-subtitle');
+            if (sub) sub.textContent = 'Error al cargar datos del mapa';
         }
     }
 

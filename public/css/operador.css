@@ -143,6 +143,24 @@ html, body {
 }
 
 /* Foto buttons */
+.hint-box {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(251,191,36,0.12);
+    border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: #fbbf24;
+    animation: hint-pulse 2s ease-in-out infinite;
+}
+.hint-box i { font-size: 1.1rem; flex-shrink: 0; }
+.hint-box.hidden { display: none !important; }
+@keyframes hint-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 .foto-buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
 
 .foto-btn {
