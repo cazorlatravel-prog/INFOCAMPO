@@ -1993,12 +1993,87 @@ select.input-field {
 }
 
 /* ==========================================================
-   BOTÓN GUARDAR VISITA
+   SELECTOR SITUACIÓN (Ficha)
    ========================================================== */
-#guardar-visita-section {
-    padding: 0 16px 8px;
+.situacion-selector {
+    display: flex;
+    gap: 6px;
 }
 
+.situacion-option {
+    flex: 1;
+    padding: 10px 6px;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #6b7280;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.situacion-option i {
+    font-size: 1.1rem;
+}
+
+.situacion-option.active[data-sit="0"] {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.situacion-option.active[data-sit="1"] {
+    border-color: #f59e0b;
+    background: #fefce8;
+    color: #b45309;
+}
+
+.situacion-option.active[data-sit="2"] {
+    border-color: #22c55e;
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+/* ==========================================================
+   BOTÓN FINALIZAR VISITA (rojo, fijo abajo)
+   ========================================================== */
+.guardar-visita-fixed {
+    padding: 16px;
+    background: transparent;
+}
+
+.btn-finalizar-visita {
+    width: 100%;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+}
+
+.btn-finalizar-visita:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+/* ==========================================================
+   BOTÓN GUARDAR EDICIÓN (verde, en editar visita)
+   ========================================================== */
 .btn-guardar-visita {
     width: 100%;
     padding: 14px 20px;
@@ -2019,6 +2094,37 @@ select.input-field {
 
 .btn-guardar-visita:active {
     transform: scale(0.97);
+}
+
+/* ==========================================================
+   BOTÓN VOLVER ROJO (Mis Visitas footer)
+   ========================================================== */
+.visitas-footer {
+    padding: 12px 16px;
+    background: #fff;
+    border-top: 1px solid #e8ecf1;
+}
+
+.btn-volver-rojo {
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+    transition: all 0.2s ease;
+}
+
+.btn-volver-rojo:active {
+    transform: scale(0.96);
 }
 
 /* ==========================================================

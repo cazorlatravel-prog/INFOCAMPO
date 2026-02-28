@@ -182,6 +182,22 @@ if ($initials === '') $initials = 'OP';
                 <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="input-field input-textarea"></textarea>
             </div>
 
+            <!-- Card: Situación de la obra -->
+            <div class="card">
+                <div class="card-label"><i class="bi bi-flag-fill"></i> Situación de la obra</div>
+                <div class="situacion-selector" id="situacion-selector">
+                    <button type="button" class="situacion-option active" data-sit="0">
+                        <i class="bi bi-clock"></i> Antes
+                    </button>
+                    <button type="button" class="situacion-option" data-sit="1">
+                        <i class="bi bi-exclamation-triangle"></i> Durante
+                    </button>
+                    <button type="button" class="situacion-option" data-sit="2">
+                        <i class="bi bi-check-circle"></i> Después
+                    </button>
+                </div>
+            </div>
+
             <!-- Hint -->
             <div id="hint-select-infra" class="hint-box">
                 <i class="bi bi-info-circle"></i>
@@ -235,13 +251,6 @@ if ($initials === '') $initials = 'OP';
                 </button>
             </div>
 
-            <!-- Botón Guardar Visita (visible solo cuando hay infra seleccionada y fotos) -->
-            <div id="guardar-visita-section" class="hidden">
-                <button type="button" id="btn-guardar-visita" class="btn-guardar-visita">
-                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
-                </button>
-            </div>
-
             <!-- Sync bar -->
             <div id="sync-bar" class="sync-bar hidden">
                 <div class="sync-bar-info">
@@ -263,6 +272,13 @@ if ($initials === '') $initials = 'OP';
             <div id="gallery-section" class="hidden">
                 <h3 class="gallery-title"><i class="bi bi-images"></i> Fotos de esta visita</h3>
                 <div id="gallery-grid" class="gallery-grid"></div>
+            </div>
+
+            <!-- Botón Finalizar Visita (fijo abajo, rojo, visible con infra + fotos) -->
+            <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
+                <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita">
+                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
+                </button>
             </div>
         </div>
     </div>
@@ -415,6 +431,11 @@ if ($initials === '') $initials = 'OP';
                 <div class="spinner"></div>
                 <span>Cargando visitas...</span>
             </div>
+        </div>
+        <div class="visitas-footer">
+            <button type="button" id="btn-visitas-volver" class="btn-volver-rojo">
+                <i class="bi bi-arrow-left-circle-fill"></i> Volver
+            </button>
         </div>
     </div>
 

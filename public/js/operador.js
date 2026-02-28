@@ -561,6 +561,7 @@
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;
+        state.situacionIdx = 0;
         infraIdInput.value = '';
         infraSearch.value = '';
         infraSearch.classList.remove('hidden');
@@ -569,6 +570,13 @@
         countComparativas.textContent = '0';
         galleryGrid.innerHTML = '';
         gallerySection.classList.add('hidden');
+        // Reset situación selector in Ficha
+        const sitSel = $('#situacion-selector');
+        if (sitSel) {
+            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+            const firstBtn = sitSel.querySelector('[data-sit="0"]');
+            if (firstBtn) firstBtn.classList.add('active');
+        }
         const obsField = $('#observaciones-general');
         if (obsField) obsField.value = '';
         updateButtonState();
@@ -1291,12 +1299,14 @@
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
 
-        // Situación toggle
+        // Situación toggle (camera)
         if (btnSituacion) {
             btnSituacion.addEventListener('click', () => {
                 state.situacionIdx = (state.situacionIdx + 1) % SITUACIONES.length;
                 situacionLabel.textContent = SITUACIONES_UI[state.situacionIdx];
                 btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[state.situacionIdx];
+                // Sync Ficha selector
+                syncFichaSituacion();
             });
         }
 
@@ -1344,9 +1354,28 @@
         // Guardar visita (finalizar y resetear)
         if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
 
+        // Selector de situación en Ficha
+        const situacionSelector = $('#situacion-selector');
+        if (situacionSelector) {
+            situacionSelector.querySelectorAll('.situacion-option').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const sitIdx = parseInt(btn.dataset.sit);
+                    state.situacionIdx = sitIdx;
+                    // Update active state in Ficha selector
+                    situacionSelector.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    // Sync camera situacion label too
+                    if (situacionLabel) situacionLabel.textContent = SITUACIONES_UI[sitIdx];
+                    if (btnSituacion) btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[sitIdx];
+                });
+            });
+        }
+
         // Mis Visitas
         if (btnMisVisitas) btnMisVisitas.addEventListener('click', openVisitasScreen);
         if (btnVisitasBack) btnVisitasBack.addEventListener('click', () => showScreen('ficha'));
+        const btnVisitasVolver = $('#btn-visitas-volver');
+        if (btnVisitasVolver) btnVisitasVolver.addEventListener('click', () => showScreen('ficha'));
 
         // Editar visita
         if (btnEditarBack) btnEditarBack.addEventListener('click', () => {
@@ -2074,6 +2103,17 @@
     }
 
     // ===================================================================
+    // SYNC SITUACION FICHA <-> CAMERA
+    // ===================================================================
+    function syncFichaSituacion() {
+        const sitSel = $('#situacion-selector');
+        if (!sitSel) return;
+        sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+        const target = sitSel.querySelector(`[data-sit="${state.situacionIdx}"]`);
+        if (target) target.classList.add('active');
+    }
+
+    // ===================================================================
     // FINALIZAR VISITA (Guardar y Resetear)
     // ===================================================================
     function finalizarVisita() {
@@ -2109,6 +2149,14 @@
         countComparativas.textContent = '0';
         galleryGrid.innerHTML = '';
         gallerySection.classList.add('hidden');
+
+        // Reset situación selector in Ficha
+        const sitSel = $('#situacion-selector');
+        if (sitSel) {
+            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+            const firstBtn = sitSel.querySelector('[data-sit="0"]');
+            if (firstBtn) firstBtn.classList.add('active');
+        }
 
         updateButtonState();
     }
