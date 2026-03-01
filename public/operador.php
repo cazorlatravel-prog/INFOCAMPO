@@ -344,6 +344,11 @@ if ($initials === '') $initials = 'OP';
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
+            <div id="annotation-size-wrap" class="annotation-size-wrap hidden">
+                <i class="bi bi-circle annotation-size-icon"></i>
+                <input type="range" id="annotation-size" min="1" max="10" value="4" step="1" class="annotation-size-slider">
+                <i class="bi bi-circle annotation-size-icon annotation-size-icon--lg"></i>
+            </div>
         </div>
         <div class="preview-bar">
             <button type="button" id="btn-retake" class="preview-btn preview-btn--secondary">

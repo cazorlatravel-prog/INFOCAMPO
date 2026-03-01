@@ -33,7 +33,7 @@
         prevPhotos: [], // fotos comparativas de visita anterior
         situacionIdx: 0, // 0=antes, 1=durante, 2=despues
         // Annotation
-        annotation: null,          // { x, y, text } — canvas pixel coords
+        annotation: null,          // { x, y, text, radius } — canvas pixel coords
         annotationMode: false,
         pendingFilename: null,
         baseImageData: null,       // ImageData snapshot without annotation
@@ -1338,6 +1338,10 @@
         const annotationText = $('#annotation-text');
         if (annotationText) annotationText.addEventListener('input', updateAnnotationText);
 
+        // Annotation size slider
+        const annotationSize = $('#annotation-size');
+        if (annotationSize) annotationSize.addEventListener('input', updateAnnotationSize);
+
         // Clear annotation
         const btnAnnotationClear = $('#btn-annotation-clear');
         if (btnAnnotationClear) btnAnnotationClear.addEventListener('click', clearAnnotation);
@@ -1999,13 +2003,17 @@
     function resetAnnotationUI() {
         const toolbar = $('#annotation-toolbar');
         const inputWrap = $('#annotation-input-wrap');
+        const sizeWrap = $('#annotation-size-wrap');
         const hint = $('#annotation-hint');
         const textInput = $('#annotation-text');
+        const sizeSlider = $('#annotation-size');
 
         if (toolbar) toolbar.classList.add('hidden');
         if (inputWrap) inputWrap.classList.add('hidden');
+        if (sizeWrap) sizeWrap.classList.add('hidden');
         if (hint) hint.classList.remove('hidden');
         if (textInput) textInput.value = '';
+        if (sizeSlider) sizeSlider.value = 4;
         if (btnAnnotate) btnAnnotate.classList.remove('active');
         previewCanvas.classList.remove('annotation-active');
     }
@@ -2073,17 +2081,23 @@
         const coords = getCanvasCoords(previewCanvas, e.clientX, e.clientY);
         if (!coords) return;
 
+        const sizeSlider = $('#annotation-size');
+        const sizeVal = sizeSlider ? parseInt(sizeSlider.value, 10) : 4;
+
         if (!state.annotation) {
-            state.annotation = { x: coords.x, y: coords.y, text: '' };
+            state.annotation = { x: coords.x, y: coords.y, text: '', radius: sizeVal };
         } else {
             state.annotation.x = coords.x;
             state.annotation.y = coords.y;
+            state.annotation.radius = sizeVal;
         }
 
-        // Show text input, hide hint
+        // Show controls, hide hint
         const inputWrap = $('#annotation-input-wrap');
+        const sizeWrap = $('#annotation-size-wrap');
         const hint = $('#annotation-hint');
         if (inputWrap) inputWrap.classList.remove('hidden');
+        if (sizeWrap) sizeWrap.classList.remove('hidden');
         if (hint) hint.classList.add('hidden');
 
         redrawPreviewWithAnnotation();
@@ -2100,6 +2114,16 @@
     }
 
     /**
+     * Update annotation circle radius from size slider.
+     */
+    function updateAnnotationSize() {
+        const slider = $('#annotation-size');
+        if (!slider || !state.annotation) return;
+        state.annotation.radius = parseInt(slider.value, 10);
+        redrawPreviewWithAnnotation();
+    }
+
+    /**
      * Clear annotation and restore base image.
      */
     function clearAnnotation() {
@@ -2108,9 +2132,14 @@
         const input = $('#annotation-text');
         if (input) input.value = '';
 
+        const sizeSlider = $('#annotation-size');
+        if (sizeSlider) sizeSlider.value = 4;
+
         const inputWrap = $('#annotation-input-wrap');
+        const sizeWrap = $('#annotation-size-wrap');
         const hint = $('#annotation-hint');
         if (inputWrap) inputWrap.classList.add('hidden');
+        if (sizeWrap) sizeWrap.classList.add('hidden');
         if (hint) hint.classList.remove('hidden');
 
         // Restore base image without annotation
@@ -2139,8 +2168,10 @@
 
         const { x, y, text } = state.annotation;
 
-        // --- Red circle ---
-        const radius = Math.max(20, Math.round(Math.min(w, h) * 0.04));
+        // --- Red circle (size 1-10 maps to small-large radius) ---
+        const sizeVal = state.annotation.radius || 4;
+        const baseUnit = Math.min(w, h) * 0.01;
+        const radius = Math.max(15, Math.round(baseUnit * (sizeVal + 1)));
         const lineW = Math.max(3, Math.round(h * 0.004));
 
         // Outer glow
