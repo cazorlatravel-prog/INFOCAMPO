@@ -6,7 +6,7 @@
  * - Estadísticas generales (infraestructuras, fotos, operadores, incidencias)
  * - Gráfico de actividad reciente
  * - Últimas inspecciones
- * - Incidencias críticas pendientes
+ * - Registros en progreso (durante)
  */
 
 declare(strict_types=1);
@@ -43,12 +43,12 @@ $stats = [
     'infraestructuras' => 0,
     'registros' => 0,
     'operadores' => 0,
-    'criticas_24h' => 0,
+    'durante_24h' => 0,
     'registros_7d' => 0,
     'registros_30d' => 0,
 ];
 $ultimosRegistros = [];
-$incidenciasCriticas = [];
+$registrosDurante = [];
 $actividadDiaria = [];
 $empresaNombre = '';
 
@@ -85,7 +85,7 @@ if ($empresaId > 0) {
            AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
     );
     $stmt->execute([':id' => $empresaId]);
-    $stats['criticas_24h'] = (int) $stmt->fetchColumn();
+    $stats['durante_24h'] = (int) $stmt->fetchColumn();
 
     // Registros últimos 7 días
     $stmt = $pdo->prepare(
@@ -108,7 +108,7 @@ if ($empresaId > 0) {
     // Actividad diaria últimos 14 días
     $stmt = $pdo->prepare(
         "SELECT DATE(r.fecha) AS dia, COUNT(*) AS total,
-                SUM(r.estado_incidencia = 'durante') AS criticas
+                SUM(r.estado_incidencia = 'durante') AS durante
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 14 DAY)
@@ -142,7 +142,7 @@ if ($empresaId > 0) {
          LIMIT 5"
     );
     $stmt->execute([':id' => $empresaId]);
-    $incidenciasCriticas = $stmt->fetchAll();
+    $registrosDurante = $stmt->fetchAll();
 
     // Subidas fallidas pendientes
     $subidasFallidas = [];
@@ -176,7 +176,7 @@ if ($empresaId > 0) {
 // Preparar datos para gráfico
 $chartLabels = [];
 $chartData = [];
-$chartCriticas = [];
+$chartDurante = [];
 for ($i = 13; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-{$i} days"));
     $chartLabels[] = date('d/m', strtotime($date));
@@ -184,14 +184,14 @@ for ($i = 13; $i >= 0; $i--) {
     foreach ($actividadDiaria as $act) {
         if ($act['dia'] === $date) {
             $chartData[] = (int) $act['total'];
-            $chartCriticas[] = (int) $act['criticas'];
+            $chartDurante[] = (int) $act['durante'];
             $found = true;
             break;
         }
     }
     if (!$found) {
         $chartData[] = 0;
-        $chartCriticas[] = 0;
+        $chartDurante[] = 0;
     }
 }
 ?>
@@ -248,7 +248,7 @@ for ($i = 13; $i >= 0; $i--) {
         .activity-dot.durante { background: #f59e0b; }
         .activity-dot.despues { background: #22c55e; }
         .badge-inc { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .critica-card {
+        .durante-card {
             background: linear-gradient(135deg, #eff6ff, #f0f7ff);
             border-left: 4px solid #3b82f6;
             border-radius: 10px;
@@ -321,14 +321,14 @@ for ($i = 13; $i >= 0; $i--) {
                 </div>
             </div>
             <div class="col-xl-3 col-md-6">
-                <div class="stat-card" <?= $stats['criticas_24h'] > 0 ? 'style="border:2px solid #93c5fd;"' : '' ?>>
+                <div class="stat-card" <?= $stats['durante_24h'] > 0 ? 'style="border:2px solid #93c5fd;"' : '' ?>>
                     <div class="d-flex align-items-center gap-3 mb-2">
                         <div class="stat-icon" style="background:#dbeafe;color:#2563eb;">
                             <i class="bi bi-clock-history"></i>
                         </div>
                         <div>
-                            <div class="stat-value"><?= $stats['criticas_24h'] ?></div>
-                            <div class="stat-label">En Progreso (24h)</div>
+                            <div class="stat-value"><?= $stats['durante_24h'] ?></div>
+                            <div class="stat-label">Durante (24h)</div>
                         </div>
                     </div>
                 </div>
@@ -436,22 +436,22 @@ for ($i = 13; $i >= 0; $i--) {
                 </div>
             </div>
 
-            <!-- Columna derecha: Alertas críticas + Accesos rápidos -->
+            <!-- Columna derecha: Registros en progreso + Accesos rápidos -->
             <div class="col-lg-4">
-                <!-- Alertas críticas -->
+                <!-- Registros en fase "Durante" -->
                 <div class="card mb-4">
                     <div class="card-body">
                         <h6 class="card-title mb-3">
-                            <i class="bi bi-clock-history text-primary me-2"></i>En Progreso (Durante)
+                            <i class="bi bi-clock-history text-primary me-2"></i>Registros Durante (recientes)
                         </h6>
-                        <?php if (empty($incidenciasCriticas)): ?>
+                        <?php if (empty($registrosDurante)): ?>
                             <div class="text-center py-3">
                                 <i class="bi bi-check-circle text-success" style="font-size:2rem;"></i>
-                                <p class="text-muted small mt-2 mb-0">Sin registros en progreso recientes</p>
+                                <p class="text-muted small mt-2 mb-0">Sin registros en fase "durante" recientes</p>
                             </div>
                         <?php else: ?>
-                            <?php foreach ($incidenciasCriticas as $crit): ?>
-                                <div class="critica-card">
+                            <?php foreach ($registrosDurante as $crit): ?>
+                                <div class="durante-card">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <strong class="small"><?= htmlspecialchars($crit['infra_nombre']) ?></strong>
                                         <span class="small text-muted"><?= date('d/m H:i', strtotime($crit['fecha'])) ?></span>
@@ -511,9 +511,9 @@ for ($i = 13; $i >= 0; $i--) {
                     borderRadius: 6,
                     borderSkipped: false,
                 }, {
-                    label: 'Críticas',
-                    data: <?= json_encode($chartCriticas) ?>,
-                    backgroundColor: 'rgba(239,68,68,0.7)',
+                    label: 'Durante',
+                    data: <?= json_encode($chartDurante) ?>,
+                    backgroundColor: 'rgba(59,130,246,0.5)',
                     borderRadius: 6,
                     borderSkipped: false,
                 }]

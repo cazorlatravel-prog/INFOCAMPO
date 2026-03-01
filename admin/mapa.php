@@ -135,7 +135,7 @@ foreach ($registros as $r) {
 // Stats
 $totalFotos = count($registros);
 $totalComp = count(array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') === 'comparativo'));
-$totalCriticas = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'durante'));
+$totalDurante = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'durante'));
 $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 ?>
 <!DOCTYPE html>
@@ -392,7 +392,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div class="stat-pill"><strong id="stat-fotos"><?= $totalFotos ?></strong> fotos</div>
         <div class="stat-pill"><strong id="stat-infras"><?= $totalInfras ?></strong> infraestructuras</div>
         <div class="stat-pill" style="color:#7c3aed;"><strong id="stat-comp"><?= $totalComp ?></strong> comparativas</div>
-        <div class="stat-pill" style="color:#f59e0b;"><strong id="stat-criticas"><?= $totalCriticas ?></strong> durante</div>
+        <div class="stat-pill" style="color:#f59e0b;"><strong id="stat-durante"><?= $totalDurante ?></strong> durante</div>
     </div>
 
     <!-- Map -->
@@ -547,7 +547,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             document.getElementById('stat-fotos').textContent = data.length;
             document.getElementById('stat-infras').textContent = Object.keys(infras).length;
             document.getElementById('stat-comp').textContent = data.filter(function(r) { return r.tipo === 'comparativo'; }).length;
-            document.getElementById('stat-criticas').textContent = data.filter(function(r) { return r.estado === 'durante'; }).length;
+            document.getElementById('stat-durante').textContent = data.filter(function(r) { return r.estado === 'durante'; }).length;
         }
 
         function applyFilters() {
