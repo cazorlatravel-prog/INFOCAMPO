@@ -38,13 +38,13 @@ if (isLoggedIn()) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $identifier = trim($_POST['identifier'] ?? '');
+    $password   = $_POST['password'] ?? '';
 
-    if ($email === '' || $password === '') {
-        $error = 'Introduce tu email y contraseña.';
+    if ($identifier === '' || $password === '') {
+        $error = 'Introduce tu email o teléfono y contraseña.';
     } else {
-        $result = login($email, $password);
+        $result = login($identifier, $password);
         if ($result === false) {
             $error = 'Credenciales incorrectas o cuenta desactivada.';
         } else {
@@ -176,10 +176,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <form method="post" autocomplete="on">
                 <div class="form-floating">
-                    <input type="email" name="email" id="email" class="form-control"
-                           placeholder="tu@empresa.com" required autofocus
-                           value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
-                    <label for="email"><i class="bi bi-envelope me-1"></i> Email</label>
+                    <input type="text" name="identifier" id="identifier" class="form-control"
+                           placeholder="Email o teléfono" required autofocus
+                           inputmode="text" autocomplete="username"
+                           value="<?= htmlspecialchars($_POST['identifier'] ?? '') ?>">
+                    <label for="identifier"><i class="bi bi-person me-1"></i> Email o Teléfono</label>
                 </div>
                 <div class="form-floating">
                     <input type="password" name="password" id="password" class="form-control"

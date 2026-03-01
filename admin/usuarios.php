@@ -29,11 +29,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     if ($action === 'create_user') {
         $nombre   = trim($_POST['nombre'] ?? '');
         $email    = trim($_POST['email'] ?? '');
+        $telefono = trim($_POST['telefono'] ?? '');
         $password = $_POST['password'] ?? '';
         $rol      = $_POST['rol'] ?? 'operador';
 
-        if ($nombre === '' || $email === '' || $password === '') {
-            $msg = 'Todos los campos son obligatorios.';
+        // Limpiar teléfono: solo dígitos y +
+        if ($telefono !== '') {
+            $telefono = preg_replace('/[^0-9+]/', '', $telefono);
+        }
+
+        // Email vacío se guarda como NULL
+        if ($email === '') $email = null;
+        if ($telefono === '') $telefono = null;
+
+        if ($nombre === '' || $password === '') {
+            $msg = 'El nombre y la contraseña son obligatorios.';
+            $msgType = 'danger';
+        } elseif ($email === null && $telefono === null) {
+            $msg = 'Debes introducir al menos un email o un teléfono.';
             $msgType = 'danger';
         } elseif (strlen($password) < 6) {
             $msg = 'La contraseña debe tener al menos 6 caracteres.';
@@ -45,13 +58,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msg = 'No se ha podido identificar la empresa.';
             $msgType = 'danger';
         } else {
-            // Verificar email único
-            $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email");
-            $check->execute([':email' => $email]);
-            if ($check->fetch()) {
-                $msg = 'Ya existe un usuario con ese email.';
-                $msgType = 'danger';
-            } else {
+            // Verificar email único (si se proporcionó)
+            $duplicado = false;
+            if ($email !== null) {
+                $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email");
+                $check->execute([':email' => $email]);
+                if ($check->fetch()) {
+                    $msg = 'Ya existe un usuario con ese email.';
+                    $msgType = 'danger';
+                    $duplicado = true;
+                }
+            }
+            // Verificar teléfono único (si se proporcionó)
+            if (!$duplicado && $telefono !== null) {
+                $check = $pdo->prepare("SELECT id FROM usuarios WHERE telefono = :tel");
+                $check->execute([':tel' => $telefono]);
+                if ($check->fetch()) {
+                    $msg = 'Ya existe un usuario con ese teléfono.';
+                    $msgType = 'danger';
+                    $duplicado = true;
+                }
+            }
+
+            if (!$duplicado) {
                 // Verificar límite de usuarios de la empresa
                 $empStmt = $pdo->prepare("SELECT max_usuarios FROM empresas WHERE id = :id");
                 $empStmt->execute([':id' => $empresaId]);
@@ -67,15 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                 } else {
                     $hash = hashPassword($password);
                     $stmt = $pdo->prepare(
-                        "INSERT INTO usuarios (empresa_id, nombre, email, password, rol, activo)
-                         VALUES (:emp_id, :nombre, :email, :password, :rol, 1)"
+                        "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
+                         VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
                     );
                     $stmt->execute([
-                        ':emp_id'   => $empresaId,
-                        ':nombre'   => $nombre,
-                        ':email'    => $email,
-                        ':password' => $hash,
-                        ':rol'      => $rol,
+                        ':emp_id'    => $empresaId,
+                        ':nombre'    => $nombre,
+                        ':email'     => $email,
+                        ':telefono'  => $telefono,
+                        ':password'  => $hash,
+                        ':rol'       => $rol,
                     ]);
                     $newUserId = (int) $pdo->lastInsertId();
                     $msg = 'Usuario creado correctamente.';
@@ -297,9 +327,13 @@ foreach ($usuarios as $u) {
                                 <label class="form-label fw-semibold small">Nombre completo *</label>
                                 <input type="text" name="nombre" class="form-control" required placeholder="Juan García">
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-semibold small">Email *</label>
-                                <input type="email" name="email" class="form-control" required placeholder="juan@empresa.com">
+                            <div class="col-md-2">
+                                <label class="form-label fw-semibold small">Email</label>
+                                <input type="email" name="email" class="form-control" placeholder="juan@empresa.com">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-semibold small">Teléfono</label>
+                                <input type="tel" name="telefono" class="form-control" placeholder="600123456">
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold small">Rol *</label>
@@ -313,12 +347,13 @@ foreach ($usuarios as $u) {
                                 <label class="form-label fw-semibold small">Contraseña *</label>
                                 <input type="password" name="password" class="form-control" required minlength="6" placeholder="Min. 6 caracteres">
                             </div>
-                            <div class="col-md-2 d-flex align-items-end">
+                            <div class="col-md-1 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary w-100">
-                                    <i class="bi bi-person-plus"></i> Crear
+                                    <i class="bi bi-person-plus"></i>
                                 </button>
                             </div>
                         </div>
+                        <div class="form-text mt-2"><i class="bi bi-info-circle me-1"></i>Email o teléfono: al menos uno es obligatorio. Los operadores sin email pueden acceder con su teléfono.</div>
                     </form>
                 </div>
             </div>
@@ -352,7 +387,12 @@ foreach ($usuarios as $u) {
                                     <tr class="<?= $u['activo'] ? '' : 'opacity-50' ?>">
                                         <td>
                                             <strong><?= htmlspecialchars($u['nombre']) ?></strong>
-                                            <br><small class="text-muted"><?= htmlspecialchars($u['email']) ?></small>
+                                            <?php if (!empty($u['email'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-envelope"></i> <?= htmlspecialchars($u['email']) ?></small>
+                                            <?php endif; ?>
+                                            <?php if (!empty($u['telefono'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-phone"></i> <?= htmlspecialchars($u['telefono']) ?></small>
+                                            <?php endif; ?>
                                         </td>
                                         <td><span class="badge <?= $rolBadge ?> badge-rol"><?= $u['rol'] ?></span></td>
                                         <td>

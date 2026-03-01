@@ -13,20 +13,39 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
- * Intentar login con email y password.
+ * Intentar login con email/teléfono y password.
+ * Acepta un email o un número de teléfono como identificador.
  * Devuelve los datos del usuario o false.
  */
-function login(string $email, string $password): array|false
+function login(string $identifier, string $password): array|false
 {
     $pdo = getDB();
-    $stmt = $pdo->prepare(
-        "SELECT u.*, e.nombre AS empresa_nombre, e.activa AS empresa_activa
-         FROM usuarios u
-         INNER JOIN empresas e ON u.empresa_id = e.id
-         WHERE u.email = :email AND u.activo = 1
-         LIMIT 1"
-    );
-    $stmt->execute([':email' => $email]);
+
+    // Determinar si es email o teléfono: si contiene @ es email, si no es teléfono
+    $isEmail = str_contains($identifier, '@');
+
+    if ($isEmail) {
+        $stmt = $pdo->prepare(
+            "SELECT u.*, e.nombre AS empresa_nombre, e.activa AS empresa_activa
+             FROM usuarios u
+             INNER JOIN empresas e ON u.empresa_id = e.id
+             WHERE u.email = :identifier AND u.activo = 1
+             LIMIT 1"
+        );
+    } else {
+        // Limpiar teléfono: solo dígitos y +
+        $phone = preg_replace('/[^0-9+]/', '', $identifier);
+        $stmt = $pdo->prepare(
+            "SELECT u.*, e.nombre AS empresa_nombre, e.activa AS empresa_activa
+             FROM usuarios u
+             INNER JOIN empresas e ON u.empresa_id = e.id
+             WHERE u.telefono = :identifier AND u.activo = 1
+             LIMIT 1"
+        );
+        $identifier = $phone;
+    }
+
+    $stmt->execute([':identifier' => $identifier]);
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($password, $user['password'])) {
