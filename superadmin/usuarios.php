@@ -51,33 +51,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         }
     }
 
-    // --- Editar nombre y email de usuario ---
+    // --- Editar nombre, email y teléfono de usuario ---
     if ($action === 'edit_user') {
-        $targetId  = (int) ($_POST['user_id'] ?? 0);
-        $newNombre = trim($_POST['edit_nombre'] ?? '');
-        $newEmail  = trim($_POST['edit_email'] ?? '');
+        $targetId     = (int) ($_POST['user_id'] ?? 0);
+        $newNombre    = trim($_POST['edit_nombre'] ?? '');
+        $newEmail     = trim($_POST['edit_email'] ?? '');
+        $newTelefono  = trim($_POST['edit_telefono'] ?? '');
+
+        // Limpiar teléfono
+        if ($newTelefono !== '') {
+            $newTelefono = preg_replace('/[^0-9+]/', '', $newTelefono);
+        }
+        if ($newEmail === '') $newEmail = null;
+        if ($newTelefono === '') $newTelefono = null;
 
         if ($targetId <= 0) {
             $msg = 'Usuario no válido.';
             $msgType = 'danger';
-        } elseif ($newNombre === '' || $newEmail === '') {
-            $msg = 'El nombre y el email son obligatorios.';
+        } elseif ($newNombre === '') {
+            $msg = 'El nombre es obligatorio.';
             $msgType = 'danger';
-        } elseif (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+        } elseif ($newEmail === null && $newTelefono === null) {
+            $msg = 'Debes introducir al menos un email o un teléfono.';
+            $msgType = 'danger';
+        } elseif ($newEmail !== null && !filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
             $msg = 'El email no es válido.';
             $msgType = 'danger';
         } else {
+            $duplicado = false;
             // Verificar que el email no esté en uso por otro usuario
-            $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :id");
-            $check->execute([':email' => $newEmail, ':id' => $targetId]);
-            if ($check->fetch()) {
-                $msg = 'Ya existe otro usuario con ese email.';
-                $msgType = 'danger';
-            } else {
+            if ($newEmail !== null) {
+                $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :id");
+                $check->execute([':email' => $newEmail, ':id' => $targetId]);
+                if ($check->fetch()) {
+                    $msg = 'Ya existe otro usuario con ese email.';
+                    $msgType = 'danger';
+                    $duplicado = true;
+                }
+            }
+            // Verificar teléfono único
+            if (!$duplicado && $newTelefono !== null) {
+                $check = $pdo->prepare("SELECT id FROM usuarios WHERE telefono = :tel AND id != :id");
+                $check->execute([':tel' => $newTelefono, ':id' => $targetId]);
+                if ($check->fetch()) {
+                    $msg = 'Ya existe otro usuario con ese teléfono.';
+                    $msgType = 'danger';
+                    $duplicado = true;
+                }
+            }
+
+            if (!$duplicado) {
                 $stmt = $pdo->prepare(
-                    "UPDATE usuarios SET nombre = :nombre, email = :email WHERE id = :id AND rol != 'superadmin'"
+                    "UPDATE usuarios SET nombre = :nombre, email = :email, telefono = :telefono WHERE id = :id AND rol != 'superadmin'"
                 );
-                $stmt->execute([':nombre' => $newNombre, ':email' => $newEmail, ':id' => $targetId]);
+                $stmt->execute([':nombre' => $newNombre, ':email' => $newEmail, ':telefono' => $newTelefono, ':id' => $targetId]);
                 if ($stmt->rowCount() > 0) {
                     $msg = 'Usuario actualizado correctamente.';
                     $msgType = 'success';
@@ -93,12 +120,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     if ($action === 'create_user') {
         $nombre    = trim($_POST['nombre'] ?? '');
         $email     = trim($_POST['email'] ?? '');
+        $telefono  = trim($_POST['telefono'] ?? '');
         $password  = $_POST['password'] ?? '';
         $rol       = $_POST['rol'] ?? 'operador';
         $empId     = (int) ($_POST['empresa_id'] ?? 0);
 
-        if ($nombre === '' || $email === '' || $password === '' || $empId <= 0) {
-            $msg = 'Todos los campos son obligatorios.';
+        // Limpiar teléfono
+        if ($telefono !== '') {
+            $telefono = preg_replace('/[^0-9+]/', '', $telefono);
+        }
+        if ($email === '') $email = null;
+        if ($telefono === '') $telefono = null;
+
+        if ($nombre === '' || $password === '' || $empId <= 0) {
+            $msg = 'El nombre, contraseña y empresa son obligatorios.';
+            $msgType = 'danger';
+        } elseif ($email === null && $telefono === null) {
+            $msg = 'Debes introducir al menos un email o un teléfono.';
             $msgType = 'danger';
         } elseif (strlen($password) < 6) {
             $msg = 'La contraseña debe tener al menos 6 caracteres.';
@@ -107,13 +145,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msg = 'Rol no válido.';
             $msgType = 'danger';
         } else {
+            $duplicado = false;
             // Verificar email único
-            $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email");
-            $check->execute([':email' => $email]);
-            if ($check->fetch()) {
-                $msg = 'Ya existe un usuario con ese email.';
-                $msgType = 'danger';
-            } else {
+            if ($email !== null) {
+                $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email");
+                $check->execute([':email' => $email]);
+                if ($check->fetch()) {
+                    $msg = 'Ya existe un usuario con ese email.';
+                    $msgType = 'danger';
+                    $duplicado = true;
+                }
+            }
+            // Verificar teléfono único
+            if (!$duplicado && $telefono !== null) {
+                $check = $pdo->prepare("SELECT id FROM usuarios WHERE telefono = :tel");
+                $check->execute([':tel' => $telefono]);
+                if ($check->fetch()) {
+                    $msg = 'Ya existe un usuario con ese teléfono.';
+                    $msgType = 'danger';
+                    $duplicado = true;
+                }
+            }
+
+            if (!$duplicado) {
                 // Verificar límite de usuarios de la empresa
                 $empStmt = $pdo->prepare("SELECT max_usuarios FROM empresas WHERE id = :id");
                 $empStmt->execute([':id' => $empId]);
@@ -129,15 +183,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                 } else {
                     $hash = hashPassword($password);
                     $stmt = $pdo->prepare(
-                        "INSERT INTO usuarios (empresa_id, nombre, email, password, rol, activo)
-                         VALUES (:emp_id, :nombre, :email, :password, :rol, 1)"
+                        "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
+                         VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
                     );
                     $stmt->execute([
-                        ':emp_id'   => $empId,
-                        ':nombre'   => $nombre,
-                        ':email'    => $email,
-                        ':password' => $hash,
-                        ':rol'      => $rol,
+                        ':emp_id'    => $empId,
+                        ':nombre'    => $nombre,
+                        ':email'     => $email,
+                        ':telefono'  => $telefono,
+                        ':password'  => $hash,
+                        ':rol'       => $rol,
                     ]);
                     $msg = 'Usuario creado correctamente.';
                     $msgType = 'success';
@@ -341,15 +396,19 @@ if ($empresaId > 0) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label fw-semibold small">Nombre completo *</label>
                             <input type="text" name="nombre" class="form-control" required placeholder="Juan García">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold small">Email *</label>
-                            <input type="email" name="email" class="form-control" required placeholder="juan@empresa.com">
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold small">Email</label>
+                            <input type="email" name="email" class="form-control" placeholder="juan@empresa.com">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold small">Teléfono</label>
+                            <input type="tel" name="telefono" class="form-control" placeholder="600123456">
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label fw-semibold small">Rol *</label>
                             <select name="rol" class="form-select">
                                 <option value="admin">Administrador</option>
@@ -357,16 +416,17 @@ if ($empresaId > 0) {
                                 <option value="operador" selected>Operador</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label fw-semibold small">Contraseña *</label>
                             <input type="password" name="password" class="form-control" required minlength="6" placeholder="Min. 6 caracteres">
                         </div>
-                        <div class="col-md-3 d-flex align-items-end">
+                        <div class="col-md-2 d-flex align-items-end">
                             <button type="submit" class="btn btn-primary w-100">
                                 <i class="bi bi-person-plus"></i> Crear usuario
                             </button>
                         </div>
                     </div>
+                    <div class="form-text mt-2"><i class="bi bi-info-circle me-1"></i>Email o teléfono: al menos uno es obligatorio.</div>
                 </form>
             </div>
         </div>
@@ -399,7 +459,12 @@ if ($empresaId > 0) {
                                 <tr>
                                     <td>
                                         <strong><?= htmlspecialchars($u['nombre']) ?></strong>
-                                        <br><small class="text-muted"><?= htmlspecialchars($u['email']) ?></small>
+                                        <?php if (!empty($u['email'])): ?>
+                                            <br><small class="text-muted"><i class="bi bi-envelope"></i> <?= htmlspecialchars($u['email']) ?></small>
+                                        <?php endif; ?>
+                                        <?php if (!empty($u['telefono'])): ?>
+                                            <br><small class="text-muted"><i class="bi bi-phone"></i> <?= htmlspecialchars($u['telefono']) ?></small>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="small"><?= htmlspecialchars($u['empresa_nombre']) ?></td>
                                     <td><span class="badge <?= $rolBadge ?> badge-rol"><?= $u['rol'] ?></span></td>
@@ -417,10 +482,10 @@ if ($empresaId > 0) {
                                         <div class="d-flex gap-1 justify-content-end">
                                             <!-- Editar usuario -->
                                             <button type="button" class="btn btn-sm btn-outline-primary"
-                                                    title="Editar nombre / email"
+                                                    title="Editar usuario"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#modalEditUser"
-                                                    onclick="setEditUser(<?= $u['id'] ?>, '<?= htmlspecialchars($u['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['email'], ENT_QUOTES) ?>')">
+                                                    onclick="setEditUser(<?= $u['id'] ?>, '<?= htmlspecialchars($u['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['email'] ?? '', ENT_QUOTES) ?>', '<?= htmlspecialchars($u['telefono'] ?? '', ENT_QUOTES) ?>')">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
 
@@ -542,13 +607,18 @@ if ($empresaId > 0) {
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Nombre</label>
+                            <label class="form-label fw-semibold">Nombre *</label>
                             <input type="text" name="edit_nombre" id="editUserNombre" class="form-control" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Email</label>
-                            <input type="email" name="edit_email" id="editUserEmail" class="form-control" required>
+                            <input type="email" name="edit_email" id="editUserEmail" class="form-control" placeholder="Opcional si tiene teléfono">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Teléfono</label>
+                            <input type="tel" name="edit_telefono" id="editUserTelefono" class="form-control" placeholder="Opcional si tiene email">
+                        </div>
+                        <div class="form-text"><i class="bi bi-info-circle me-1"></i>Al menos email o teléfono es obligatorio.</div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -567,10 +637,11 @@ if ($empresaId > 0) {
         document.getElementById('passUserId').value = id;
         document.getElementById('passUserName').textContent = name;
     }
-    function setEditUser(id, name, email) {
+    function setEditUser(id, name, email, telefono) {
         document.getElementById('editUserId').value = id;
         document.getElementById('editUserNombre').value = name;
         document.getElementById('editUserEmail').value = email;
+        document.getElementById('editUserTelefono').value = telefono || '';
     }
     </script>
 </body>

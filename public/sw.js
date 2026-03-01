@@ -7,7 +7,7 @@
  *   - Fallback page when completely offline
  */
 
-const CACHE_NAME = 'infocampo-v10';
+const CACHE_NAME = 'infocampo-v12';
 const STATIC_ASSETS = [
     'css/operador.css',
     'js/operador.js',
@@ -76,6 +76,22 @@ self.addEventListener('fetch', (event) => {
                     }
                     return response;
                 }).catch(() => new Response('', { status: 503 }));
+            })
+        );
+        return;
+    }
+
+    // PHP pages (dynamic content): network-only, never cache
+    if (url.pathname.endsWith('.php')) {
+        event.respondWith(
+            fetch(event.request).catch(() => {
+                return new Response(
+                    '<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:40px">' +
+                    '<h2>Sin conexión</h2><p>Necesitas conexión a internet para acceder. Inténtalo de nuevo.</p>' +
+                    '<button onclick="location.reload()" style="padding:10px 24px;font-size:1rem;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer">Reintentar</button>' +
+                    '</body></html>',
+                    { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+                );
             })
         );
         return;

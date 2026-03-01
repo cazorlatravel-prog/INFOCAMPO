@@ -16,13 +16,13 @@ if (isLoggedIn() && ($_SESSION['user_rol'] ?? '') === 'superadmin') {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email    = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $identifier = trim($_POST['identifier'] ?? '');
+    $password   = $_POST['password'] ?? '';
 
-    if ($email === '' || $password === '') {
-        $error = 'Introduce email y contraseña.';
+    if ($identifier === '' || $password === '') {
+        $error = 'Introduce email o teléfono y contraseña.';
     } else {
-        $user = login($email, $password);
+        $user = login($identifier, $password);
         if ($user && $user['rol'] === 'superadmin') {
             header('Location: index.php');
             exit;
@@ -116,10 +116,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="post" autocomplete="off">
             <div class="mb-3">
-                <label for="email" class="form-label fw-semibold small text-muted">Email</label>
-                <input type="email" name="email" id="email" class="form-control"
+                <label for="identifier" class="form-label fw-semibold small text-muted">Email o Teléfono</label>
+                <input type="text" name="identifier" id="identifier" class="form-control"
                        placeholder="superadmin@infocampo.app"
-                       value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                       autocomplete="username"
+                       value="<?= htmlspecialchars($_POST['identifier'] ?? '') ?>"
                        required autofocus>
             </div>
 
