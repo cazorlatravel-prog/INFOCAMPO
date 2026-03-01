@@ -105,10 +105,12 @@ if ($empresaId > 0) {
     $stmt->execute([':id' => $empresaId]);
     $stats['registros_30d'] = (int) $stmt->fetchColumn();
 
-    // Actividad diaria últimos 14 días
+    // Actividad diaria últimos 14 días (desglosada por fase)
     $stmt = $pdo->prepare(
-        "SELECT DATE(r.fecha) AS dia, COUNT(*) AS total,
-                SUM(r.estado_incidencia = 'durante') AS durante
+        "SELECT DATE(r.fecha) AS dia,
+                SUM(r.estado_incidencia = 'antes') AS fot_antes,
+                SUM(r.estado_incidencia = 'durante') AS fot_durante,
+                SUM(r.estado_incidencia = 'despues') AS fot_despues
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 14 DAY)
@@ -173,25 +175,28 @@ if ($empresaId > 0) {
     } catch (\Exception $e) {}
 }
 
-// Preparar datos para gráfico
+// Preparar datos para gráfico (3 series: Antes, Durante, Después)
 $chartLabels = [];
-$chartData = [];
+$chartAntes = [];
 $chartDurante = [];
+$chartDespues = [];
 for ($i = 13; $i >= 0; $i--) {
     $date = date('Y-m-d', strtotime("-{$i} days"));
     $chartLabels[] = date('d/m', strtotime($date));
     $found = false;
     foreach ($actividadDiaria as $act) {
         if ($act['dia'] === $date) {
-            $chartData[] = (int) $act['total'];
-            $chartDurante[] = (int) $act['durante'];
+            $chartAntes[] = (int) $act['fot_antes'];
+            $chartDurante[] = (int) $act['fot_durante'];
+            $chartDespues[] = (int) $act['fot_despues'];
             $found = true;
             break;
         }
     }
     if (!$found) {
-        $chartData[] = 0;
+        $chartAntes[] = 0;
         $chartDurante[] = 0;
+        $chartDespues[] = 0;
     }
 }
 ?>
@@ -505,15 +510,21 @@ for ($i = 13; $i >= 0; $i--) {
             data: {
                 labels: <?= json_encode($chartLabels) ?>,
                 datasets: [{
-                    label: 'Inspecciones',
-                    data: <?= json_encode($chartData) ?>,
-                    backgroundColor: 'rgba(45,106,159,0.6)',
+                    label: 'Fot. Antes',
+                    data: <?= json_encode($chartAntes) ?>,
+                    backgroundColor: 'rgba(59,130,246,0.7)',
                     borderRadius: 6,
                     borderSkipped: false,
                 }, {
-                    label: 'Durante',
+                    label: 'Fot. Durante',
                     data: <?= json_encode($chartDurante) ?>,
-                    backgroundColor: 'rgba(59,130,246,0.5)',
+                    backgroundColor: 'rgba(245,158,11,0.7)',
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }, {
+                    label: 'Fot. Después',
+                    data: <?= json_encode($chartDespues) ?>,
+                    backgroundColor: 'rgba(34,197,94,0.7)',
                     borderRadius: 6,
                     borderSkipped: false,
                 }]
