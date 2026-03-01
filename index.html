@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FotoGPS.app - Tu APP de recogida de datos en Campo</title>
-    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark GPS, navegación con alertas de proximidad, capas WMS (Ortofoto, Topográfico), ghosting comparativo, capas KML, informes PDF, exportación CSV y modo offline.">
+    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark GPS, anotaciones en foto con círculo ajustable, navegación con alertas de proximidad, capas WMS (Ortofoto, Topográfico), ghosting comparativo, capas KML, informes PDF, exportación CSV y modo offline.">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -881,13 +881,25 @@
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--rose"><i class="bi bi-exclamation-triangle-fill"></i></div>
                     <h3>Alertas de Subida</h3>
-                    <p>Si falla la subida a Cloudinary, el operador recibe alerta visual. El administrador es notificado automáticamente para resolver el problema.</p>
+                    <p>Si falla la subida a la NUBE, el operador recibe alerta visual. El administrador es notificado automáticamente para resolver el problema.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--indigo"><i class="bi bi-toggles"></i></div>
                     <h3>Estados de Inspección</h3>
                     <p>Clasifica cada foto como Antes, Durante o Después con un solo toque. El estado se refleja automáticamente en el watermark y en los informes.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--red"><i class="bi bi-bullseye"></i></div>
+                    <h3>Anotaciones en Foto</h3>
+                    <p>Señala puntos de interés directamente en la foto con un círculo rojo de tamaño ajustable. Añade una descripción y se muestra como advertencia en la imagen final.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--orange"><i class="bi bi-eye-fill"></i></div>
+                    <h3>Vista Previa antes de Enviar</h3>
+                    <p>Revisa cada foto antes de subirla con opciones para anotar, repetir o aceptar. Control total sobre la calidad y el contenido de cada captura.</p>
                 </div>
             </div>
         </div>
@@ -1047,12 +1059,12 @@
                 <div class="step-card reveal">
                     <div class="step-number">2</div>
                     <h4>Captura Fotos</h4>
-                    <p>Toma fotos aleatorias o comparativas con ghosting. El watermark GPS con coordenadas ETRS89 se aplica automáticamente.</p>
+                    <p>Toma fotos con ghosting comparativo, anota puntos de interés con círculo ajustable y revisa antes de enviar. Watermark GPS automático.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">3</div>
                     <h4>Sincronización</h4>
-                    <p>Las fotos se suben a Cloudinary automáticamente. Sin red, se guardan en IndexedDB y se sincronizan al recuperar conexión.</p>
+                    <p>Las fotos se suben a la NUBE automáticamente. Sin red, se guardan en IndexedDB y se sincronizan al recuperar conexión.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">4</div>
@@ -1116,6 +1128,8 @@
                         <li><i class="bi bi-check-circle-fill"></i> Modo offline con auto-sincronización</li>
                         <li><i class="bi bi-check-circle-fill"></i> App instalable (PWA)</li>
                         <li><i class="bi bi-check-circle-fill"></i> Estados: Antes / Durante / Después</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Anotaciones en foto con círculo ajustable</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Vista previa antes de enviar</li>
                     </ul>
                     <a href="/public/login.php" class="access-btn">
                         <i class="bi bi-camera"></i> Acceder como Operador
