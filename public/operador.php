@@ -20,6 +20,12 @@ if (session_status() === PHP_SESSION_NONE) {
 $usuarioId = isset($_GET['user']) ? (int) $_GET['user'] : (int) ($_SESSION['user_id'] ?? 0);
 $empresaId = isset($_GET['empresa']) ? (int) $_GET['empresa'] : (int) ($_SESSION['empresa_id'] ?? 0);
 
+// Si no hay usuario/empresa válidos, redirigir al login
+if ($usuarioId <= 0 || $empresaId <= 0) {
+    header('Location: login.php');
+    exit;
+}
+
 $pdo = getDB();
 
 // Obtener nombre del usuario y empresa
