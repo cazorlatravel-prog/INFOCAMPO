@@ -820,7 +820,7 @@
 
         camVideo.pause();
 
-        // Generate filename: NombreInfra_ALE_ANT_001 or NombreInfra_COMP_DUR_002
+        // Generate filename: NombreInfra_ALE_ANT_20260301_001
         const sitCodes = { antes: 'ANT', durante: 'DUR', despues: 'DES' };
         const sitCode = sitCodes[SITUACIONES[state.situacionIdx]] || 'ANT';
         const modeCode = state.currentMode === 'comparativo' ? 'COMP' : 'ALE';
@@ -833,8 +833,11 @@
             state.countAleatorias++;
         }
 
+        // Date stamp (YYYYMMDD Madrid timezone) to avoid filename collisions across visits
+        const nowMadrid = new Date().toLocaleString('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/-/g, '');
+
         const seqNum = String(state.countTotal).padStart(3, '0');
-        const filename = `${sanitizeFilename(state.infraName)}_${modeCode}_${sitCode}_${seqNum}`;
+        const filename = `${sanitizeFilename(state.infraName)}_${modeCode}_${sitCode}_${nowMadrid}_${seqNum}`;
 
         // Apply watermark directly on previewCanvas (used for blob generation)
         await applyWatermark(camCapture, previewCanvas, {
