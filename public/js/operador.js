@@ -332,6 +332,18 @@
         return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
     }
 
+    // Persistent per-infrastructure photo counter (localStorage)
+    function loadInfraSeq(infraId) {
+        try {
+            const val = localStorage.getItem('infocampo_seq_' + infraId);
+            return val ? parseInt(val, 10) : 0;
+        } catch { return 0; }
+    }
+
+    function saveInfraSeq(infraId, seq) {
+        try { localStorage.setItem('infocampo_seq_' + infraId, String(seq)); } catch {}
+    }
+
     function formatDateMadrid(date) {
         if (!date) date = new Date();
         return date.toLocaleString('es-ES', {
@@ -512,10 +524,10 @@
         state.infraId = id;
         state.infraName = name;
         state.infraCode = code || name;
-        // Reiniciar contadores al cambiar de infraestructura
+        // Load persistent counter for this infrastructure
         state.countAleatorias = 0;
         state.countComparativas = 0;
-        state.countTotal = 0;
+        state.countTotal = loadInfraSeq(id);
         state.seqComparativa = 0;
         state.photos = [];
         infraIdInput.value = id;
@@ -832,6 +844,9 @@
         } else {
             state.countAleatorias++;
         }
+
+        // Persist counter for this infrastructure
+        if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
 
         // Date stamp (YYYYMMDD Madrid timezone) to avoid filename collisions across visits
         const nowMadrid = new Date().toLocaleString('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/-/g, '');
@@ -2250,6 +2265,9 @@
             state.countAleatorias--;
         }
 
+        // Persist decremented counter
+        if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
+
         state.annotation = null;
         state.annotationMode = false;
         state.pendingFilename = null;
@@ -2574,8 +2592,8 @@
         state.photos = [];
         state.countAleatorias = 0;
         state.countComparativas = 0;
-        state.countTotal = 0;
         state.seqComparativa = 0;
+        let visitPhotoCount = 0;
 
         if (visita.fotos && visita.fotos.length > 0) {
             // Reverse to show oldest first (chronological order in gallery)
@@ -2594,11 +2612,14 @@
                 } else {
                     state.countAleatorias++;
                 }
-                state.countTotal++;
+                visitPhotoCount++;
 
                 addToGallery(url, tipo, nombre, seq);
             });
         }
+
+        // Use persistent counter (already loaded by selectInfra), ensure it's at least visit photo count
+        state.countTotal = Math.max(state.countTotal, visitPhotoCount);
 
         // 6. Update counters in UI
         countAleatorias.textContent = state.countAleatorias;
