@@ -182,6 +182,22 @@ if ($initials === '') $initials = 'OP';
                 <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="input-field input-textarea"></textarea>
             </div>
 
+            <!-- Card: Situación de la obra -->
+            <div class="card">
+                <div class="card-label"><i class="bi bi-flag-fill"></i> Situación de la obra</div>
+                <div class="situacion-selector" id="situacion-selector">
+                    <button type="button" class="situacion-option active" data-sit="0">
+                        <i class="bi bi-clock"></i> Antes
+                    </button>
+                    <button type="button" class="situacion-option" data-sit="1">
+                        <i class="bi bi-exclamation-triangle"></i> Durante
+                    </button>
+                    <button type="button" class="situacion-option" data-sit="2">
+                        <i class="bi bi-check-circle"></i> Después
+                    </button>
+                </div>
+            </div>
+
             <!-- Hint -->
             <div id="hint-select-infra" class="hint-box">
                 <i class="bi bi-info-circle"></i>
@@ -235,13 +251,6 @@ if ($initials === '') $initials = 'OP';
                 </button>
             </div>
 
-            <!-- Botón Guardar Visita (visible solo cuando hay infra seleccionada y fotos) -->
-            <div id="guardar-visita-section" class="hidden">
-                <button type="button" id="btn-guardar-visita" class="btn-guardar-visita">
-                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
-                </button>
-            </div>
-
             <!-- Sync bar -->
             <div id="sync-bar" class="sync-bar hidden">
                 <div class="sync-bar-info">
@@ -264,6 +273,13 @@ if ($initials === '') $initials = 'OP';
                 <h3 class="gallery-title"><i class="bi bi-images"></i> Fotos de esta visita</h3>
                 <div id="gallery-grid" class="gallery-grid"></div>
             </div>
+        </div>
+
+        <!-- Botón Finalizar Visita (fijo abajo, rojo, fuera del scroll) -->
+        <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
+            <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita">
+                <i class="bi bi-check-circle-fill"></i> Finalizar visita
+            </button>
         </div>
     </div>
 
@@ -295,12 +311,6 @@ if ($initials === '') $initials = 'OP';
             <span id="cam-seq-label">W1</span>
         </div>
 
-        <div class="cam-situacion">
-            <button type="button" id="btn-situacion" class="cam-situacion-btn" title="Cambiar situación">
-                <i class="bi bi-flag"></i> <span id="situacion-label">ANTES</span>
-            </button>
-        </div>
-
         <div class="cam-controls">
             <div class="cam-controls-left">
                 <button type="button" id="btn-ghost-toggle" class="cam-ctrl hidden" title="Toggle Ghost">
@@ -319,17 +329,34 @@ if ($initials === '') $initials = 'OP';
     </div>
 
     <!-- ========================================================
-         PANTALLA 3: PREVIEW
+         PANTALLA 3: PREVIEW + ANOTACIÓN
          ======================================================== -->
     <div id="screen-preview" class="screen">
         <canvas id="preview-canvas"></canvas>
+        <div id="annotation-toolbar" class="annotation-toolbar hidden">
+            <div id="annotation-hint" class="annotation-hint">
+                <i class="bi bi-hand-index"></i> Toca la foto para señalar un punto
+            </div>
+            <div id="annotation-input-wrap" class="annotation-input-wrap hidden">
+                <i class="bi bi-exclamation-triangle-fill annotation-warning-icon"></i>
+                <input type="text" id="annotation-text" placeholder="¿Qué quieres señalar?" maxlength="80" class="annotation-input">
+                <button type="button" id="btn-annotation-clear" class="annotation-clear-btn" title="Borrar anotación">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div id="annotation-size-wrap" class="annotation-size-wrap hidden">
+                <i class="bi bi-circle annotation-size-icon"></i>
+                <input type="range" id="annotation-size" min="1" max="10" value="4" step="1" class="annotation-size-slider">
+                <i class="bi bi-circle annotation-size-icon annotation-size-icon--lg"></i>
+            </div>
+        </div>
         <div class="preview-bar">
             <button type="button" id="btn-retake" class="preview-btn preview-btn--secondary">
                 <i class="bi bi-arrow-repeat"></i> Repetir
             </button>
-            <div class="preview-info">
-                <span id="preview-filename"></span>
-            </div>
+            <button type="button" id="btn-annotate" class="preview-btn preview-btn--annotate">
+                <i class="bi bi-circle"></i> Anotar
+            </button>
             <button type="button" id="btn-accept" class="preview-btn preview-btn--primary">
                 <i class="bi bi-check-lg"></i> Aceptar
             </button>
@@ -415,6 +442,11 @@ if ($initials === '') $initials = 'OP';
                 <div class="spinner"></div>
                 <span>Cargando visitas...</span>
             </div>
+        </div>
+        <div class="visitas-footer">
+            <button type="button" id="btn-visitas-volver" class="btn-volver-rojo">
+                <i class="bi bi-arrow-left-circle-fill"></i> Volver
+            </button>
         </div>
     </div>
 

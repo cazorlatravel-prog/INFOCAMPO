@@ -32,6 +32,11 @@
         countTotal: 0, // contador global por infraestructura
         prevPhotos: [], // fotos comparativas de visita anterior
         situacionIdx: 0, // 0=antes, 1=durante, 2=despues
+        // Annotation
+        annotation: null,          // { x, y, text, radius } — canvas pixel coords
+        annotationMode: false,
+        pendingFilename: null,
+        baseImageData: null,       // ImageData snapshot without annotation
     };
 
     const SITUACIONES = ['antes', 'durante', 'despues'];
@@ -84,15 +89,13 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
-    const btnSituacion   = $('#btn-situacion');
-    const situacionLabel = $('#situacion-label');
 
     // Preview
     const previewCanvas  = $('#preview-canvas');
     const previewFilename = $('#preview-filename');
-    // Preview buttons (kept for backwards compat but no longer primary flow)
     const btnRetake      = $('#btn-retake');
     const btnAccept      = $('#btn-accept');
+    const btnAnnotate    = $('#btn-annotate');
 
     // Map
     const mapaDetailPanel = $('#mapa-detail-panel');
@@ -561,6 +564,7 @@
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;
+        state.situacionIdx = 0;
         infraIdInput.value = '';
         infraSearch.value = '';
         infraSearch.classList.remove('hidden');
@@ -569,6 +573,13 @@
         countComparativas.textContent = '0';
         galleryGrid.innerHTML = '';
         gallerySection.classList.add('hidden');
+        // Reset situación selector in Ficha
+        const sitSel = $('#situacion-selector');
+        if (sitSel) {
+            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+            const firstBtn = sitSel.querySelector('[data-sit="0"]');
+            if (firstBtn) firstBtn.classList.add('active');
+        }
         const obsField = $('#observaciones-general');
         if (obsField) obsField.value = '';
         updateButtonState();
@@ -838,8 +849,17 @@
             seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
         });
 
-        // Auto-accept: upload + save to gallery + go back to ficha
-        await processAndUploadPhoto(filename);
+        // Save base image for annotation overlay (before any annotation)
+        const prevCtx = previewCanvas.getContext('2d');
+        state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+        state.pendingFilename = filename;
+        state.annotation = null;
+        state.annotationMode = false;
+
+        // Show preview screen for optional annotation before uploading
+        showScreen('preview');
+        if (previewFilename) previewFilename.textContent = filename;
+        resetAnnotationUI();
     }
 
     // ===================================================================
@@ -1291,15 +1311,6 @@
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
 
-        // Situación toggle
-        if (btnSituacion) {
-            btnSituacion.addEventListener('click', () => {
-                state.situacionIdx = (state.situacionIdx + 1) % SITUACIONES.length;
-                situacionLabel.textContent = SITUACIONES_UI[state.situacionIdx];
-                btnSituacion.className = 'cam-situacion-btn sit-' + SITUACIONES[state.situacionIdx];
-            });
-        }
-
         // Ghost toggle
         btnGhostToggle.addEventListener('click', () => {
             if (!state.ghostUrl) return;
@@ -1315,9 +1326,25 @@
         btnClosePrev.addEventListener('click', () => modalPrevPhotos.classList.add('hidden'));
         btnSkipPrev.addEventListener('click', () => modalPrevPhotos.classList.add('hidden'));
 
-        // Preview (legacy — photo now auto-accepts and returns to ficha)
-        if (btnRetake) btnRetake.addEventListener('click', () => showScreen('ficha'));
-        if (btnAccept) btnAccept.addEventListener('click', () => showScreen('ficha'));
+        // Preview — annotation + accept/retake
+        if (btnRetake) btnRetake.addEventListener('click', retakePhoto);
+        if (btnAccept) btnAccept.addEventListener('click', acceptPhoto);
+        if (btnAnnotate) btnAnnotate.addEventListener('click', toggleAnnotationMode);
+
+        // Canvas click for annotation placement
+        previewCanvas.addEventListener('click', handlePreviewCanvasClick);
+
+        // Annotation text input
+        const annotationText = $('#annotation-text');
+        if (annotationText) annotationText.addEventListener('input', updateAnnotationText);
+
+        // Annotation size slider
+        const annotationSize = $('#annotation-size');
+        if (annotationSize) annotationSize.addEventListener('input', updateAnnotationSize);
+
+        // Clear annotation
+        const btnAnnotationClear = $('#btn-annotation-clear');
+        if (btnAnnotationClear) btnAnnotationClear.addEventListener('click', clearAnnotation);
 
         // Offline: precache button
         const btnPrecache = $('#btn-precache');
@@ -1344,9 +1371,24 @@
         // Guardar visita (finalizar y resetear)
         if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
 
+        // Selector de situación en Ficha
+        const situacionSelector = $('#situacion-selector');
+        if (situacionSelector) {
+            situacionSelector.querySelectorAll('.situacion-option').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const sitIdx = parseInt(btn.dataset.sit);
+                    state.situacionIdx = sitIdx;
+                    situacionSelector.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                });
+            });
+        }
+
         // Mis Visitas
         if (btnMisVisitas) btnMisVisitas.addEventListener('click', openVisitasScreen);
         if (btnVisitasBack) btnVisitasBack.addEventListener('click', () => showScreen('ficha'));
+        const btnVisitasVolver = $('#btn-visitas-volver');
+        if (btnVisitasVolver) btnVisitasVolver.addEventListener('click', () => showScreen('ficha'));
 
         // Editar visita
         if (btnEditarBack) btnEditarBack.addEventListener('click', () => {
@@ -1952,6 +1994,292 @@
     }
 
     // ===================================================================
+    // ANNOTATION
+    // ===================================================================
+
+    /**
+     * Reset annotation UI elements to initial state.
+     */
+    function resetAnnotationUI() {
+        const toolbar = $('#annotation-toolbar');
+        const inputWrap = $('#annotation-input-wrap');
+        const sizeWrap = $('#annotation-size-wrap');
+        const hint = $('#annotation-hint');
+        const textInput = $('#annotation-text');
+        const sizeSlider = $('#annotation-size');
+
+        if (toolbar) toolbar.classList.add('hidden');
+        if (inputWrap) inputWrap.classList.add('hidden');
+        if (sizeWrap) sizeWrap.classList.add('hidden');
+        if (hint) hint.classList.remove('hidden');
+        if (textInput) textInput.value = '';
+        if (sizeSlider) sizeSlider.value = 4;
+        if (btnAnnotate) btnAnnotate.classList.remove('active');
+        previewCanvas.classList.remove('annotation-active');
+    }
+
+    /**
+     * Toggle annotation mode on/off.
+     */
+    function toggleAnnotationMode() {
+        state.annotationMode = !state.annotationMode;
+        const toolbar = $('#annotation-toolbar');
+
+        if (state.annotationMode) {
+            if (btnAnnotate) btnAnnotate.classList.add('active');
+            if (toolbar) toolbar.classList.remove('hidden');
+            previewCanvas.classList.add('annotation-active');
+        } else {
+            if (btnAnnotate) btnAnnotate.classList.remove('active');
+            if (toolbar) toolbar.classList.add('hidden');
+            previewCanvas.classList.remove('annotation-active');
+        }
+    }
+
+    /**
+     * Convert screen click/touch coordinates to canvas pixel coordinates,
+     * accounting for object-fit: contain letterboxing.
+     */
+    function getCanvasCoords(canvas, clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const canvasRatio = canvas.width / canvas.height;
+        const displayRatio = rect.width / rect.height;
+
+        let drawWidth, drawHeight, offsetX, offsetY;
+
+        if (canvasRatio > displayRatio) {
+            drawWidth = rect.width;
+            drawHeight = rect.width / canvasRatio;
+            offsetX = 0;
+            offsetY = (rect.height - drawHeight) / 2;
+        } else {
+            drawHeight = rect.height;
+            drawWidth = rect.height * canvasRatio;
+            offsetX = (rect.width - drawWidth) / 2;
+            offsetY = 0;
+        }
+
+        const x = clientX - rect.left - offsetX;
+        const y = clientY - rect.top - offsetY;
+
+        if (x < 0 || x > drawWidth || y < 0 || y > drawHeight) {
+            return null;
+        }
+
+        return {
+            x: (x / drawWidth) * canvas.width,
+            y: (y / drawHeight) * canvas.height,
+        };
+    }
+
+    /**
+     * Handle click on preview canvas to place annotation circle.
+     */
+    function handlePreviewCanvasClick(e) {
+        if (!state.annotationMode) return;
+
+        const coords = getCanvasCoords(previewCanvas, e.clientX, e.clientY);
+        if (!coords) return;
+
+        const sizeSlider = $('#annotation-size');
+        const sizeVal = sizeSlider ? parseInt(sizeSlider.value, 10) : 4;
+
+        if (!state.annotation) {
+            state.annotation = { x: coords.x, y: coords.y, text: '', radius: sizeVal };
+        } else {
+            state.annotation.x = coords.x;
+            state.annotation.y = coords.y;
+            state.annotation.radius = sizeVal;
+        }
+
+        // Show controls, hide hint
+        const inputWrap = $('#annotation-input-wrap');
+        const sizeWrap = $('#annotation-size-wrap');
+        const hint = $('#annotation-hint');
+        if (inputWrap) inputWrap.classList.remove('hidden');
+        if (sizeWrap) sizeWrap.classList.remove('hidden');
+        if (hint) hint.classList.add('hidden');
+
+        redrawPreviewWithAnnotation();
+    }
+
+    /**
+     * Update annotation text from input field.
+     */
+    function updateAnnotationText() {
+        const input = $('#annotation-text');
+        if (!input || !state.annotation) return;
+        state.annotation.text = input.value;
+        redrawPreviewWithAnnotation();
+    }
+
+    /**
+     * Update annotation circle radius from size slider.
+     */
+    function updateAnnotationSize() {
+        const slider = $('#annotation-size');
+        if (!slider || !state.annotation) return;
+        state.annotation.radius = parseInt(slider.value, 10);
+        redrawPreviewWithAnnotation();
+    }
+
+    /**
+     * Clear annotation and restore base image.
+     */
+    function clearAnnotation() {
+        state.annotation = null;
+
+        const input = $('#annotation-text');
+        if (input) input.value = '';
+
+        const sizeSlider = $('#annotation-size');
+        if (sizeSlider) sizeSlider.value = 4;
+
+        const inputWrap = $('#annotation-input-wrap');
+        const sizeWrap = $('#annotation-size-wrap');
+        const hint = $('#annotation-hint');
+        if (inputWrap) inputWrap.classList.add('hidden');
+        if (sizeWrap) sizeWrap.classList.add('hidden');
+        if (hint) hint.classList.remove('hidden');
+
+        // Restore base image without annotation
+        if (state.baseImageData) {
+            const ctx = previewCanvas.getContext('2d');
+            ctx.putImageData(state.baseImageData, 0, 0);
+        }
+    }
+
+    /**
+     * Redraw the preview canvas with annotation overlay:
+     * - Red circle at the marked point
+     * - Warning badge at bottom-left with annotation text
+     */
+    function redrawPreviewWithAnnotation() {
+        if (!state.baseImageData) return;
+
+        const ctx = previewCanvas.getContext('2d');
+        const w = previewCanvas.width;
+        const h = previewCanvas.height;
+
+        // Restore base image
+        ctx.putImageData(state.baseImageData, 0, 0);
+
+        if (!state.annotation) return;
+
+        const { x, y, text } = state.annotation;
+
+        // --- Red circle (size 1-10 maps to small-large radius) ---
+        const sizeVal = state.annotation.radius || 4;
+        const baseUnit = Math.min(w, h) * 0.01;
+        const radius = Math.max(15, Math.round(baseUnit * (sizeVal + 1)));
+        const lineW = Math.max(3, Math.round(h * 0.004));
+
+        // Outer glow
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+        ctx.lineWidth = lineW + 4;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + lineW, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Main circle
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = lineW;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // --- Warning badge at bottom-left (only if text exists) ---
+        if (text && text.trim()) {
+            const fontSize = Math.max(14, Math.round(h * 0.02));
+            const padding = 14;
+            const iconText = '\u26A0'; // ⚠
+
+            ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+            const iconWidth = ctx.measureText(iconText).width;
+            const textWidth = ctx.measureText(text).width;
+            const gap = 8;
+
+            const badgeWidth = Math.min(w * 0.6, padding + iconWidth + gap + textWidth + padding);
+            const badgeHeight = fontSize * 1.5 + padding * 2;
+
+            const bx = 12;
+            const by = h - badgeHeight - 12;
+
+            // Background
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+            roundRect(ctx, bx, by, badgeWidth, badgeHeight, 8);
+            ctx.fill();
+
+            // Warning icon
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${Math.round(fontSize * 1.2)}px -apple-system, sans-serif`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            ctx.fillText(iconText, bx + padding, by + badgeHeight / 2);
+
+            // Text (truncate if needed)
+            ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
+            const maxTextW = badgeWidth - padding - iconWidth - gap - padding;
+            let displayText = text;
+            while (ctx.measureText(displayText).width > maxTextW && displayText.length > 0) {
+                displayText = displayText.slice(0, -1);
+            }
+            if (displayText.length < text.length) displayText += '\u2026';
+
+            ctx.fillText(displayText, bx + padding + iconWidth + gap, by + badgeHeight / 2);
+
+            // Reset
+            ctx.textAlign = 'start';
+            ctx.textBaseline = 'alphabetic';
+        }
+    }
+
+    /**
+     * Retake photo: undo counters, resume camera.
+     */
+    function retakePhoto() {
+        // Undo the counters incremented in captureFrame
+        state.countTotal--;
+        if (state.currentMode === 'comparativo') {
+            state.seqComparativa--;
+            state.countComparativas--;
+        } else {
+            state.countAleatorias--;
+        }
+
+        state.annotation = null;
+        state.annotationMode = false;
+        state.pendingFilename = null;
+        state.baseImageData = null;
+
+        // Resume camera
+        camVideo.play();
+        showScreen('camera');
+    }
+
+    /**
+     * Accept photo: apply annotation if present, then upload.
+     */
+    async function acceptPhoto() {
+        if (!state.pendingFilename) return;
+
+        // Ensure annotation is drawn on canvas
+        if (state.annotation) {
+            redrawPreviewWithAnnotation();
+        }
+
+        const filename = state.pendingFilename;
+
+        // Clean up annotation state
+        state.annotation = null;
+        state.annotationMode = false;
+        state.pendingFilename = null;
+        state.baseImageData = null;
+
+        await processAndUploadPhoto(filename);
+    }
+
+    // ===================================================================
     // UTILITIES
     // ===================================================================
     function escHtml(str) {
@@ -2110,6 +2438,14 @@
         galleryGrid.innerHTML = '';
         gallerySection.classList.add('hidden');
 
+        // Reset situación selector in Ficha
+        const sitSel = $('#situacion-selector');
+        if (sitSel) {
+            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+            const firstBtn = sitSel.querySelector('[data-sit="0"]');
+            if (firstBtn) firstBtn.classList.add('active');
+        }
+
         updateButtonState();
     }
 
@@ -2140,7 +2476,7 @@
             }
 
             let html = '';
-            data.visitas.forEach(visita => {
+            data.visitas.forEach((visita, idx) => {
                 const fechaFmt = formatFechaVisita(visita.fecha);
                 html += `<div class="visita-group">
                     <div class="visita-group-header">
@@ -2163,13 +2499,111 @@
                     </div>`;
                 });
 
-                html += `</div></div>`;
+                html += `</div>
+                    <button type="button" class="btn-continuar-visita" data-visita-idx="${idx}">
+                        <i class="bi bi-pencil-square"></i> Continuar visita
+                    </button>
+                </div>`;
             });
 
+            // Store visitas data for continuarVisita
+            window._visitasData = data.visitas;
+
             visitasBody.innerHTML = html;
+
+            // Bind "Continuar visita" buttons
+            visitasBody.querySelectorAll('.btn-continuar-visita').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const idx = parseInt(btn.dataset.visitaIdx);
+                    if (window._visitasData && window._visitasData[idx]) {
+                        continuarVisita(window._visitasData[idx]);
+                    }
+                });
+            });
         } catch (err) {
             visitasBody.innerHTML = '<div class="visita-empty"><i class="bi bi-wifi-off"></i><p>Error de conexión</p></div>';
         }
+    }
+
+    // ===================================================================
+    // CONTINUAR VISITA - Load full visit into Ficha
+    // ===================================================================
+    function continuarVisita(visita) {
+        // 1. Select the infrastructure
+        selectInfra(visita.infra_id, visita.infra_nombre, visita.infra_codigo);
+
+        // 2. Determine situación from the most recent photo
+        if (visita.fotos && visita.fotos.length > 0) {
+            const lastFoto = visita.fotos[0]; // fotos are ordered by most recent first
+            const sitMap = { antes: 0, durante: 1, despues: 2 };
+            const sitIdx = sitMap[lastFoto.estado] !== undefined ? sitMap[lastFoto.estado] : 0;
+            state.situacionIdx = sitIdx;
+
+            // Update situación selector UI
+            const sitSel = $('#situacion-selector');
+            if (sitSel) {
+                sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
+                const activeBtn = sitSel.querySelector(`[data-sit="${sitIdx}"]`);
+                if (activeBtn) activeBtn.classList.add('active');
+            }
+        }
+
+        // 3. Set observations from the most recent photo
+        const obsField = $('#observaciones-general');
+        if (obsField && visita.fotos && visita.fotos.length > 0) {
+            // Use the last photo's observations as a starting point
+            const lastObs = visita.fotos[0].observaciones || '';
+            obsField.value = lastObs;
+        }
+
+        // 4. Set work unit from the most recent photo that has one
+        if (visita.fotos && visita.fotos.length > 0) {
+            const fotoConUO = visita.fotos.find(f => f.unidad_obra_id);
+            if (fotoConUO && fotoConUO.unidad_obra_id) {
+                unidadObra.value = fotoConUO.unidad_obra_id;
+                state.unidadObraId = fotoConUO.unidad_obra_id;
+            }
+        }
+
+        // 5. Load all visit photos into gallery and set counters
+        galleryGrid.innerHTML = '';
+        state.photos = [];
+        state.countAleatorias = 0;
+        state.countComparativas = 0;
+        state.countTotal = 0;
+        state.seqComparativa = 0;
+
+        if (visita.fotos && visita.fotos.length > 0) {
+            // Reverse to show oldest first (chronological order in gallery)
+            const fotosOrdenadas = [...visita.fotos].reverse();
+            fotosOrdenadas.forEach(foto => {
+                const tipo = foto.tipo || 'aleatorio';
+                const seq = foto.seq || null;
+                const nombre = foto.nombre || '';
+                const url = foto.url || '';
+
+                if (tipo === 'comparativo') {
+                    state.countComparativas++;
+                    if (seq && seq > state.seqComparativa) {
+                        state.seqComparativa = seq;
+                    }
+                } else {
+                    state.countAleatorias++;
+                }
+                state.countTotal++;
+
+                addToGallery(url, tipo, nombre, seq);
+            });
+        }
+
+        // 6. Update counters in UI
+        countAleatorias.textContent = state.countAleatorias;
+        countComparativas.textContent = state.countComparativas;
+
+        // 7. Show Ficha screen
+        showScreen('ficha');
+        showNotification(`Visita a "${visita.infra_nombre}" cargada. Puedes editar datos y seguir tomando fotos.`);
     }
 
     // Global handler for clicking on a visit photo
