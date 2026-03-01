@@ -329,17 +329,29 @@ if ($initials === '') $initials = 'OP';
     </div>
 
     <!-- ========================================================
-         PANTALLA 3: PREVIEW
+         PANTALLA 3: PREVIEW + ANOTACIÓN
          ======================================================== -->
     <div id="screen-preview" class="screen">
         <canvas id="preview-canvas"></canvas>
+        <div id="annotation-toolbar" class="annotation-toolbar hidden">
+            <div id="annotation-hint" class="annotation-hint">
+                <i class="bi bi-hand-index"></i> Toca la foto para señalar un punto
+            </div>
+            <div id="annotation-input-wrap" class="annotation-input-wrap hidden">
+                <i class="bi bi-exclamation-triangle-fill annotation-warning-icon"></i>
+                <input type="text" id="annotation-text" placeholder="¿Qué quieres señalar?" maxlength="80" class="annotation-input">
+                <button type="button" id="btn-annotation-clear" class="annotation-clear-btn" title="Borrar anotación">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
         <div class="preview-bar">
             <button type="button" id="btn-retake" class="preview-btn preview-btn--secondary">
                 <i class="bi bi-arrow-repeat"></i> Repetir
             </button>
-            <div class="preview-info">
-                <span id="preview-filename"></span>
-            </div>
+            <button type="button" id="btn-annotate" class="preview-btn preview-btn--annotate">
+                <i class="bi bi-circle"></i> Anotar
+            </button>
             <button type="button" id="btn-accept" class="preview-btn preview-btn--primary">
                 <i class="bi bi-check-lg"></i> Aceptar
             </button>
