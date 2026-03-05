@@ -107,6 +107,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         }
     }
 
+    if ($action === 'create_defaults') {
+        $targetEmpId = (int) ($_POST['empresa_id'] ?? 0);
+        if ($targetEmpId > 0) {
+            $defaults = [
+                ['COD Infraestructura', 'cod_infraestructura', 'texto', null, 0, 0],
+                ['Nombre Infraestructura', 'nombre_infraestructura', 'texto', null, 0, 1],
+                ['Monte', 'monte', 'texto', null, 0, 2],
+                ['Municipio', 'municipio', 'texto', null, 0, 3],
+                ['Unidad de obra', 'unidad_de_obra', 'texto', null, 0, 4],
+                ['Observaciones', 'observaciones_campo', 'textarea', null, 0, 5],
+            ];
+            $inserted = 0;
+            $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM campos_formulario WHERE empresa_id = :emp AND slug = :slug AND activo = 1");
+            $stmtInsert = $pdo->prepare("INSERT INTO campos_formulario (empresa_id, nombre, slug, tipo, opciones, obligatorio, orden) VALUES (:emp, :nombre, :slug, :tipo, :opciones, :obligatorio, :orden)");
+            foreach ($defaults as $d) {
+                $stmtCheck->execute([':emp' => $targetEmpId, ':slug' => $d[1]]);
+                if ((int) $stmtCheck->fetchColumn() === 0) {
+                    $stmtInsert->execute([':emp' => $targetEmpId, ':nombre' => $d[0], ':slug' => $d[1], ':tipo' => $d[2], ':opciones' => $d[3], ':obligatorio' => $d[4], ':orden' => $d[5]]);
+                    $inserted++;
+                }
+            }
+            $msg = "$inserted campos por defecto creados.";
+            $msgType = 'success';
+            $empresaId = $targetEmpId;
+        }
+    }
+
+    if ($action === 'import_csv') {
+        $targetEmpId = (int) ($_POST['empresa_id'] ?? 0);
+        if ($targetEmpId > 0 && isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] === UPLOAD_ERR_OK) {
+            $content = file_get_contents($_FILES['csv_file']['tmp_name']);
+            $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
+            $lines = preg_split('/\r?\n/', $content);
+            $header = null;
+            $imported = 0;
+            $validTypes = ['texto', 'numero', 'select', 'checkbox', 'textarea', 'fecha'];
+            $stmtImp = $pdo->prepare("INSERT INTO campos_formulario (empresa_id, nombre, slug, tipo, opciones, obligatorio, orden) VALUES (:emp, :nombre, :slug, :tipo, :opciones, :obligatorio, :orden)");
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') continue;
+                $cols = str_getcsv($line, ';');
+                if (count($cols) < 2) $cols = str_getcsv($line, ',');
+                if ($header === null) { $header = array_map(fn($h) => strtolower(trim($h)), $cols); continue; }
+                $row = [];
+                foreach ($header as $idx => $col) $row[$col] = $cols[$idx] ?? '';
+                $nombre = trim($row['nombre'] ?? '');
+                if ($nombre === '') continue;
+                $slug = trim($row['slug'] ?? '');
+                if ($slug === '') { $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', iconv('UTF-8', 'ASCII//TRANSLIT', $nombre) ?: $nombre)); $slug = trim($slug, '_'); }
+                $tipo = trim($row['tipo'] ?? 'texto');
+                if (!in_array($tipo, $validTypes)) $tipo = 'texto';
+                $opciones = trim($row['opciones'] ?? '');
+                $opcionesJson = null;
+                if ($tipo === 'select' && $opciones !== '') {
+                    $optsArray = array_filter(array_map('trim', explode('|', $opciones)), fn($v) => $v !== '');
+                    if (!empty($optsArray)) $opcionesJson = json_encode(array_values($optsArray), JSON_UNESCAPED_UNICODE);
+                }
+                $obligatorio = in_array(strtoupper(trim($row['obligatorio'] ?? '')), ['SI', 'SÍ', '1', 'TRUE', 'YES']) ? 1 : 0;
+                $orden = (int) ($row['orden'] ?? $imported);
+                try { $stmtImp->execute([':emp' => $targetEmpId, ':nombre' => $nombre, ':slug' => $slug, ':tipo' => $tipo, ':opciones' => $opcionesJson, ':obligatorio' => $obligatorio, ':orden' => $orden]); $imported++; } catch (\PDOException $e) {}
+            }
+            $msg = "$imported campos importados desde CSV.";
+            $msgType = 'success';
+            $empresaId = $targetEmpId;
+        }
+    }
+
     if ($action === 'reorder') {
         $order = $_POST['order'] ?? '';
         if ($order) {
@@ -284,9 +352,46 @@ $tiposCampo = [
                         <h5 class="mb-0">
                             Campos de <strong><?= htmlspecialchars($empresaSeleccionada['nombre']) ?></strong>
                         </h5>
-                        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formCampo">
-                            <i class="bi bi-plus-lg"></i> Nuevo campo
-                        </button>
+                        <div class="d-flex gap-2">
+                            <form method="post" class="d-inline">
+                                <?= csrfField() ?>
+                                <input type="hidden" name="action" value="create_defaults">
+                                <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-primary" title="Crear campos por defecto" onclick="return confirm('¿Crear los 6 campos por defecto?')">
+                                    <i class="bi bi-magic"></i> Por defecto
+                                </button>
+                            </form>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formCampo">
+                                <i class="bi bi-plus-lg"></i> Nuevo campo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Import/Export -->
+                    <div class="d-flex gap-2 align-items-center mb-3 flex-wrap" style="background:#f8f9fa;border-radius:8px;padding:10px 14px;">
+                        <span class="small fw-semibold text-muted"><i class="bi bi-arrow-left-right"></i></span>
+                        <?php
+                        // Export CSV inline
+                        $csvContent = "nombre;slug;tipo;opciones;obligatorio;orden\n";
+                        foreach ($campos as $c) {
+                            $opcStr = '';
+                            if ($c['opciones']) { $opts = json_decode($c['opciones'], true); if (is_array($opts)) $opcStr = implode('|', $opts); }
+                            $csvContent .= implode(';', [$c['nombre'], $c['slug'], $c['tipo'], $opcStr, $c['obligatorio'] ? 'SI' : 'NO', $c['orden']]) . "\n";
+                        }
+                        $csvDataUri = 'data:text/csv;charset=utf-8,' . rawurlencode("\xEF\xBB\xBF" . $csvContent);
+                        ?>
+                        <a href="<?= $csvDataUri ?>" download="campos_<?= $empresaId ?>.csv" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+                        </a>
+                        <form method="post" enctype="multipart/form-data" class="d-flex gap-1 align-items-center">
+                            <?= csrfField() ?>
+                            <input type="hidden" name="action" value="import_csv">
+                            <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+                            <input type="file" name="csv_file" accept=".csv" class="form-control form-control-sm" style="width:180px;font-size:0.8rem;">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-upload"></i> Importar
+                            </button>
+                        </form>
                     </div>
 
                     <!-- Form crear/editar campo -->
