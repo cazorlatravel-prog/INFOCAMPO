@@ -196,6 +196,9 @@ if ($_navEmpresaId > 0) {
             <i class="bi bi-people"></i> Usuarios
         </a></li>
         <?php endif; ?>
+        <li><a href="/admin/fotos.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'fotos' ? 'active' : '' ?>">
+            <i class="bi bi-images"></i> Fotos
+        </a></li>
         <li><a href="/admin/mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'mapa' ? 'active' : '' ?>">
             <i class="bi bi-map"></i> Mapa
         </a></li>
