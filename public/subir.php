@@ -112,15 +112,6 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 // ---------------------------------------------------------------
 $cloudinaryUrl = '';
 
-// Debug log para diagnosticar problemas de subida
-$debugLog = __DIR__ . '/upload_debug.log';
-$debugInfo = date('Y-m-d H:i:s') . " | ImageKit configured: " . (ImageKitHelper::isConfigured() ? 'YES' : 'NO')
-    . " | Cloudinary configured: " . (CloudinaryHelper::isConfigured() ? 'YES' : 'NO')
-    . " | File size: " . ($_FILES['imagen']['size'] ?? 0)
-    . " | IMAGEKIT_URL_ENDPOINT defined: " . (defined('IMAGEKIT_URL_ENDPOINT') ? IMAGEKIT_URL_ENDPOINT : 'NO')
-    . "\n";
-file_put_contents($debugLog, $debugInfo, FILE_APPEND);
-
 try {
     if (ImageKitHelper::isConfigured()) {
         // ImageKit configurado — subir
@@ -133,10 +124,8 @@ try {
             $folder,
             $nombreArchivo ?: null
         );
-        file_put_contents($debugLog, date('Y-m-d H:i:s') . " | ImageKit OK: {$cloudinaryUrl}\n", FILE_APPEND);
     } elseif (CloudinaryHelper::isConfigured()) {
         // Cloudinary (legacy fallback)
-        file_put_contents($debugLog, date('Y-m-d H:i:s') . " | Using Cloudinary (legacy fallback)\n", FILE_APPEND);
         $folder = $tipoFoto === 'comparativo'
             ? 'infocampo/comparativas'
             : 'infocampo/aleatorias';
@@ -149,7 +138,6 @@ try {
         );
     } else {
         // Ningún servicio de imágenes configurado — guardar en uploads/ local
-        file_put_contents($debugLog, date('Y-m-d H:i:s') . " | Using LOCAL storage (no cloud configured)\n", FILE_APPEND);
         $uploadsDir = __DIR__ . '/uploads';
         if (!is_dir($uploadsDir)) {
             mkdir($uploadsDir, 0755, true);
@@ -176,7 +164,6 @@ try {
         $cloudinaryUrl = APP_URL . '/uploads/' . $subDir . '/' . $localFile;
     }
 } catch (\Exception $e) {
-    file_put_contents($debugLog, date('Y-m-d H:i:s') . " | UPLOAD ERROR: " . $e->getMessage() . "\n", FILE_APPEND);
     // Registrar la subida fallida para notificar al admin
     try {
         $pdo = getDB();
