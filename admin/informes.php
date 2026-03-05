@@ -13,7 +13,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/auth.php';
-requireAuth('/admin/login.php');
+requireRole(['admin', 'supervisor', 'superadmin']);
 
 $pdo = getDB();
 $currentPage = 'informes';

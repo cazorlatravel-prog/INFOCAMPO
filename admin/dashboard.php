@@ -16,9 +16,12 @@ require_once __DIR__ . '/../includes/auth.php';
 // Manejar logout
 if (isset($_GET['logout'])) {
     logout();
-    header('Location: login.php');
+    header('Location: /login.php');
     exit;
 }
+
+// Exigir rol de panel
+requireRole(['admin', 'supervisor', 'superadmin']);
 
 $pdo = getDB();
 $currentPage = 'dashboard';

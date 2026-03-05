@@ -111,7 +111,7 @@ function currentUser(): ?array
 /**
  * Exigir autenticación. Redirige al login si no hay sesión.
  */
-function requireAuth(string $loginUrl = '/superadmin/login.php'): array
+function requireAuth(string $loginUrl = '/login.php'): array
 {
     if (!isLoggedIn()) {
         header('Location: ' . $loginUrl);
@@ -123,7 +123,7 @@ function requireAuth(string $loginUrl = '/superadmin/login.php'): array
 /**
  * Exigir un rol específico. Redirige si no cumple.
  */
-function requireRole(string|array $roles, string $loginUrl = '/superadmin/login.php'): array
+function requireRole(string|array $roles, string $loginUrl = '/login.php'): array
 {
     $user = requireAuth($loginUrl);
     if (is_string($roles)) $roles = [$roles];

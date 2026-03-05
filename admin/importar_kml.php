@@ -19,7 +19,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 
 // Solo admin y superadmin pueden importar
-requireRole(['admin', 'superadmin'], '/admin/login.php');
+requireRole(['admin', 'superadmin']);
 
 $pdo = getDB();
 

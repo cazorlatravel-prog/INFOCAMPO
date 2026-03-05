@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/auth.php';
 
-requireRole(['admin', 'superadmin'], '/admin/login.php');
+requireRole(['admin', 'superadmin']);
 
 header('Content-Type: application/json; charset=utf-8');
 
