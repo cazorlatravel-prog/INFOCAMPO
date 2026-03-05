@@ -238,45 +238,33 @@ $tiposCampo = [
     <title>FotoGPS.app - Campos Formulario</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/admin/css/admin.css" rel="stylesheet">
     <style>
-        body { background: #f0f2f5; }
-        .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
-        .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
-        .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
-        .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
-        .sa-main { padding: 24px 32px; min-height: 100vh; }
+        .sa-main { padding: 24px 32px; min-height: 100vh; max-width: 1400px; margin: 0 auto; }
         .sa-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
-        .sa-topbar h1 { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin: 0; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .form-section { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 24px; }
-
-        /* Campo card */
+        .sa-topbar h1 { font-size: 1.5rem; font-weight: 700; color: var(--text); margin: 0; }
         .campo-card {
-            background: #fff;
-            border-radius: 10px;
-            padding: 16px 20px;
-            margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            cursor: grab;
-            transition: box-shadow 0.15s;
-            border-left: 4px solid #dee2e6;
+            background: var(--bg-card); border-radius: var(--radius-sm);
+            padding: 16px 20px; margin-bottom: 10px;
+            box-shadow: var(--shadow-sm); display: flex; align-items: center;
+            gap: 16px; cursor: grab; transition: box-shadow var(--transition);
+            border-left: 4px solid var(--border);
         }
-        .campo-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
-        .campo-card.obligatorio { border-left-color: #dc3545; }
-        .campo-card .campo-drag { color: #adb5bd; font-size: 1.2rem; cursor: grab; }
-        .campo-card .campo-info { flex: 1; }
+        .campo-card:hover { box-shadow: var(--shadow-md); }
+        .campo-card.obligatorio { border-left-color: var(--danger); }
+        .campo-card .campo-drag { color: var(--text-light); font-size: 1.2rem; cursor: grab; }
+        .campo-card .campo-info { flex: 1; min-width: 0; }
         .campo-card .campo-nombre { font-weight: 600; font-size: 0.95rem; }
-        .campo-card .campo-meta { font-size: 0.78rem; color: #6b7280; }
+        .campo-card .campo-meta { font-size: 0.78rem; color: var(--text-muted); }
         .campo-card .campo-actions { display: flex; gap: 6px; }
-        .campo-card.dragging { opacity: 0.5; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
-
-        /* Preview */
-        .preview-form { background: #f8f9fa; border-radius: 10px; padding: 20px; border: 2px dashed #dee2e6; }
-        .preview-form h6 { color: #6b7280; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
-
+        .campo-card.dragging { opacity: 0.5; box-shadow: var(--shadow-lg); }
+        .preview-form { background: var(--bg); border-radius: var(--radius-sm); padding: 20px; border: 2px dashed var(--border); }
+        .preview-form h6 { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        @media (max-width: 768px) {
+            .sa-main { padding: 14px; }
+            .sa-topbar h1 { font-size: 1.2rem; }
+            .campo-card { padding: 12px 14px; gap: 10px; }
+        }
     </style>
 </head>
 <body>

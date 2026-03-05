@@ -89,8 +89,17 @@ if ($initials === '') $initials = 'OP';
                     <div id="offline-dot" class="offline-dot online"></div>
                     <span id="offline-text">En linea</span>
                 </div>
-                <div class="user-avatar" title="<?= htmlspecialchars($userName) ?>">
+                <button type="button" class="user-avatar" id="btn-user-menu" title="<?= htmlspecialchars($userName) ?>" aria-label="Menu de usuario">
                     <?= $initials ?>
+                </button>
+                <div id="user-menu-dropdown" class="user-menu-dropdown hidden">
+                    <div class="user-menu-header">
+                        <strong><?= htmlspecialchars($userName) ?></strong>
+                        <small><?= htmlspecialchars($empresaName) ?></small>
+                    </div>
+                    <a href="/login.php?logout=1" class="user-menu-item user-menu-logout">
+                        <i class="bi bi-box-arrow-left"></i> Cerrar sesion
+                    </a>
                 </div>
             </div>
         </div>
@@ -601,6 +610,23 @@ if ($initials === '') $initials = 'OP';
                 campos: 'api/campos.php',
             }
         };
+    </script>
+    <script>
+    // User menu toggle
+    (function() {
+        const btn = document.getElementById('btn-user-menu');
+        const menu = document.getElementById('user-menu-dropdown');
+        if (!btn || !menu) return;
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            menu.classList.toggle('hidden');
+        });
+        document.addEventListener('click', function(e) {
+            if (!menu.contains(e.target) && e.target !== btn) {
+                menu.classList.add('hidden');
+            }
+        });
+    })();
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="js/offline.js"></script>

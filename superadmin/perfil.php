@@ -102,16 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     <title>FotoGPS.app - Mi Perfil</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/admin/css/admin.css" rel="stylesheet">
     <style>
-        body { background: #f0f2f5; }
-        .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
-        .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
-        .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
-        .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
-        .sa-main { padding: 24px 32px; min-height: 100vh; }
+        .sa-main { padding: 24px 32px; min-height: 100vh; max-width: 1400px; margin: 0 auto; }
         .sa-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
-        .sa-topbar h1 { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin: 0; }
-        .form-section { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 24px; }
+        .sa-topbar h1 { font-size: 1.5rem; font-weight: 700; color: var(--text); margin: 0; }
+        @media (max-width: 768px) {
+            .sa-main { padding: 14px; }
+            .sa-topbar h1 { font-size: 1.2rem; }
+        }
     </style>
 </head>
 <body>
