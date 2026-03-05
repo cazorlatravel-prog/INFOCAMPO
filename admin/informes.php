@@ -156,16 +156,11 @@ foreach ($registros as $r) {
 <title>FotoGPS.app - Informes</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="/admin/css/admin.css" rel="stylesheet">
 <?php if ($infra): ?>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <?php endif; ?>
 <style>
-    body { background: #f4f6f9; margin: 0; }
-    .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
-    .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
-    .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
-    .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
-
     .page-content { max-width: 1000px; margin: 0 auto; padding: 24px; }
 
     /* Selector */

@@ -233,23 +233,10 @@ foreach ($usuarios as $u) {
     <title>FotoGPS.app - Gestión de Usuarios</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/admin/css/admin.css" rel="stylesheet">
     <style>
-        body { background: #f4f6f9; }
-        .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
-        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-radius: 12px; }
-        .form-section { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 20px; }
-        .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
-        .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
-        .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
-        .badge-rol { font-size: 0.7rem; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .link-box { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; word-break: break-all; display: flex; align-items: center; gap: 8px; }
-        .link-box code { flex: 1; color: #1e3a5f; font-size: 0.78rem; }
-        .btn-copy { border: none; background: #1e3a5f; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
-        .btn-copy:hover { background: #2d6a9f; }
-        .btn-copy.copied { background: #22c55e; }
-        .stat-card { background: #fff; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
-        .stat-card .stat-number { font-size: 1.8rem; font-weight: 800; color: #1e3a5f; }
-        .stat-card .stat-label { font-size: 0.8rem; color: #6b7280; }
+        .stat-card { text-align: center; }
+        .stat-card .stat-label { font-size: 0.8rem; }
     </style>
 </head>
 <body>
