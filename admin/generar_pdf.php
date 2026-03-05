@@ -542,7 +542,7 @@ $totalAlea       = count($aleatorias);
                 $operador  = htmlspecialchars($reg['usuario_nombre']);
                 $gps       = $reg['lat_real'] . ', ' . $reg['lon_real'];
                 $estado    = $reg['estado_incidencia'];
-                $tipo      = ($reg['tipo_foto'] ?? 'aleatorio') === 'comparativo' ? 'COMP' : 'ALEA';
+                $tipo      = ($reg['tipo_foto'] ?? 'aleatorio') === 'comparativo' ? 'Fotos Comparativas' : 'Fotos Aleatorias';
                 $tipoClass = ($reg['tipo_foto'] ?? 'aleatorio') === 'comparativo' ? 'badge-comp' : 'badge-alea';
                 $obs       = htmlspecialchars(mb_substr($reg['observaciones'] ?? '-', 0, 60));
                 $uo        = htmlspecialchars($reg['unidad_obra_nombre'] ?? '-');
@@ -662,7 +662,7 @@ $totalAlea       = count($aleatorias);
 
     <!-- Footer -->
     <div class="report-footer">
-        FotoGPS.app &mdash; Informe generado automáticamente &mdash; <?= $fechaGeneracion ?>
+        <?= $empresaNombre ?> &mdash; Informe generado automáticamente &mdash; <?= $fechaGeneracion ?>
     </div>
 
 </div><!-- /page-container -->
