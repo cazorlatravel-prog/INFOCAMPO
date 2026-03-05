@@ -646,7 +646,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
                 var marker = L.marker([r.lat, r.lon], { icon: icon });
 
-                var downloadUrl = r.url.replace('/upload/', '/upload/fl_attachment/');
+                var downloadUrl = r.url;
                 var popupHtml =
                     '<div class="popup-photo">' +
                     '<img src="' + r.url + '" alt="" loading="lazy">' +
