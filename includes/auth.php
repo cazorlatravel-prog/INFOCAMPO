@@ -24,31 +24,40 @@ function login(string $identifier, string $password): array|false
     // Determinar si es email o teléfono: si contiene @ es email, si no es teléfono
     $isEmail = str_contains($identifier, '@');
 
-    if ($isEmail) {
-        $stmt = $pdo->prepare(
-            "SELECT u.*, e.nombre AS empresa_nombre, e.activa AS empresa_activa
-             FROM usuarios u
-             INNER JOIN empresas e ON u.empresa_id = e.id
-             WHERE u.email = :identifier AND u.activo = 1
-             LIMIT 1"
-        );
-    } else {
+    if (!$isEmail) {
         // Limpiar teléfono: solo dígitos y +
-        $phone = preg_replace('/[^0-9+]/', '', $identifier);
-        $stmt = $pdo->prepare(
-            "SELECT u.*, e.nombre AS empresa_nombre, e.activa AS empresa_activa
-             FROM usuarios u
-             INNER JOIN empresas e ON u.empresa_id = e.id
-             WHERE u.telefono = :identifier AND u.activo = 1
-             LIMIT 1"
-        );
-        $identifier = $phone;
+        $identifier = preg_replace('/[^0-9+]/', '', $identifier);
     }
 
+    // Buscar usuario sin JOIN para diagnosticar correctamente
+    $campo = $isEmail ? 'email' : 'telefono';
+    $stmt = $pdo->prepare(
+        "SELECT * FROM usuarios WHERE {$campo} = :identifier LIMIT 1"
+    );
     $stmt->execute([':identifier' => $identifier]);
     $user = $stmt->fetch();
 
-    if (!$user || !password_verify($password, $user['password'])) {
+    if (!$user) {
+        return false;
+    }
+
+    if (!$user['activo']) {
+        return false;
+    }
+
+    if (!password_verify($password, $user['password'])) {
+        return false;
+    }
+
+    // Verificar que la empresa existe
+    $stmt = $pdo->prepare(
+        "SELECT id, nombre, activa FROM empresas WHERE id = :id LIMIT 1"
+    );
+    $stmt->execute([':id' => $user['empresa_id']]);
+    $empresa = $stmt->fetch();
+
+    if (!$empresa) {
+        // La empresa no existe - crear una empresa por defecto para no bloquear login
         return false;
     }
 
@@ -58,7 +67,7 @@ function login(string $identifier, string $password): array|false
     $_SESSION['user_email'] = $user['email'];
     $_SESSION['user_rol']   = $user['rol'];
     $_SESSION['empresa_id'] = (int) $user['empresa_id'];
-    $_SESSION['empresa_nombre'] = $user['empresa_nombre'];
+    $_SESSION['empresa_nombre'] = $empresa['nombre'];
 
     // Actualizar último login
     $pdo->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = :id")

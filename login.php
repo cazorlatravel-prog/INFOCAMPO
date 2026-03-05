@@ -44,7 +44,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = login($identifier, $password);
             if ($result === false) {
-                $error = 'Credenciales incorrectas o cuenta desactivada.';
+                // Diagnóstico más específico
+                $pdo = getDB();
+                $isEmail = str_contains($identifier, '@');
+                $campo = $isEmail ? 'email' : 'telefono';
+                $cleanId = $isEmail ? $identifier : preg_replace('/[^0-9+]/', '', $identifier);
+                $checkStmt = $pdo->prepare("SELECT id, activo, empresa_id, rol FROM usuarios WHERE {$campo} = :id LIMIT 1");
+                $checkStmt->execute([':id' => $cleanId]);
+                $checkUser = $checkStmt->fetch();
+
+                if (!$checkUser) {
+                    $error = 'No existe ningún usuario con ese ' . ($isEmail ? 'email' : 'teléfono') . '.';
+                } elseif (!$checkUser['activo']) {
+                    $error = 'Esta cuenta está desactivada. Contacta con tu administrador.';
+                } else {
+                    // Verificar si la empresa existe
+                    $empStmt = $pdo->prepare("SELECT id FROM empresas WHERE id = :id");
+                    $empStmt->execute([':id' => $checkUser['empresa_id']]);
+                    if (!$empStmt->fetch()) {
+                        $error = 'Error de configuración: la empresa asociada a este usuario no existe (ID: ' . $checkUser['empresa_id'] . '). Contacta con el superadministrador.';
+                    } else {
+                        $error = 'Contraseña incorrecta.';
+                    }
+                }
             } else {
                 $rol = $result['rol'];
                 if ($rol === 'operador') {
