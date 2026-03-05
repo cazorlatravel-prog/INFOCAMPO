@@ -46,7 +46,14 @@ define('DB_PASS', $dbPass);
 define('DB_CHARSET', 'utf8mb4');
 
 // -----------------------------------------------------------
-// Cloudinary
+// ImageKit.io
+// -----------------------------------------------------------
+define('IMAGEKIT_URL_ENDPOINT', env('IMAGEKIT_URL_ENDPOINT'));
+define('IMAGEKIT_PUBLIC_KEY',   env('IMAGEKIT_PUBLIC_KEY'));
+define('IMAGEKIT_PRIVATE_KEY',  env('IMAGEKIT_PRIVATE_KEY'));
+
+// -----------------------------------------------------------
+// Cloudinary (legacy — mantenido por compatibilidad)
 // -----------------------------------------------------------
 define('CLOUDINARY_CLOUD_NAME', env('CLOUDINARY_CLOUD_NAME'));
 define('CLOUDINARY_API_KEY',    env('CLOUDINARY_API_KEY'));

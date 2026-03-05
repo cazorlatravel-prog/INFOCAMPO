@@ -351,9 +351,9 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                                     <?php endif; ?>
                                                 </div>
                                                 <?php
-                                                $downloadUrl = preg_replace('#/upload/#', '/upload/fl_attachment/', $reg['url_cloudinary'], 1);
+                                                $downloadUrl = $reg['url_cloudinary'];
                                                 ?>
-                                                <a href="<?= htmlspecialchars($downloadUrl) ?>" class="btn btn-sm btn-outline-secondary" title="Descargar">
+                                                <a href="<?= htmlspecialchars($downloadUrl) ?>" download class="btn btn-sm btn-outline-secondary" title="Descargar">
                                                     <i class="bi bi-download"></i>
                                                 </a>
                                             </div>
@@ -440,7 +440,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
             'obs' => $r['observaciones'] ?? '',
             'lat' => $r['lat_real'],
             'lon' => $r['lon_real'],
-            'download' => preg_replace('#/upload/#', '/upload/fl_attachment/', $r['url_cloudinary'], 1),
+            'download' => $r['url_cloudinary'],
         ];
     }, $registros), JSON_UNESCAPED_UNICODE) ?>;
 

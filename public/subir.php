@@ -24,6 +24,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/imagekit_helper.php';
 require_once __DIR__ . '/../includes/cloudinary_helper.php';
 
 // ---------------------------------------------------------------
@@ -111,8 +112,19 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 // ---------------------------------------------------------------
 $cloudinaryUrl = '';
 try {
-    if (CloudinaryHelper::isConfigured()) {
-        // Cloudinary configurado — subir
+    if (ImageKitHelper::isConfigured()) {
+        // ImageKit configurado — subir
+        $folder = $tipoFoto === 'comparativo'
+            ? '/infocampo/comparativas'
+            : '/infocampo/aleatorias';
+
+        $cloudinaryUrl = ImageKitHelper::upload(
+            $_FILES['imagen']['tmp_name'],
+            $folder,
+            $nombreArchivo ?: null
+        );
+    } elseif (CloudinaryHelper::isConfigured()) {
+        // Cloudinary (legacy fallback)
         $folder = $tipoFoto === 'comparativo'
             ? 'infocampo/comparativas'
             : 'infocampo/aleatorias';
