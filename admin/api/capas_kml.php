@@ -27,7 +27,7 @@ if ($empresaId <= 0) {
 // ---------- GET: Listar capas ----------
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt = $pdo->prepare(
-        "SELECT id, nombre, contenido_kml, color, activa, created_at
+        "SELECT id, nombre, contenido_kml, color, grosor, opacidad, activa, created_at
          FROM capas_kml
          WHERE empresa_id = :emp AND activa = 1
          ORDER BY created_at DESC"
@@ -67,6 +67,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // --- Actualizar estilo (grosor/opacidad) ---
+    if ($action === 'actualizar_estilo') {
+        $capaId = (int) ($_POST['capa_id'] ?? 0);
+        if ($capaId <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'capa_id requerido'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $grosor = isset($_POST['grosor']) ? max(1, min(10, (int) $_POST['grosor'])) : null;
+        $opacidad = isset($_POST['opacidad']) ? max(0.0, min(1.0, (float) $_POST['opacidad'])) : null;
+        $color = isset($_POST['color']) && preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['color']) ? $_POST['color'] : null;
+
+        $updates = [];
+        $params = [':id' => $capaId, ':emp' => $empresaId];
+
+        if ($grosor !== null) {
+            $updates[] = 'grosor = :grosor';
+            $params[':grosor'] = $grosor;
+        }
+        if ($opacidad !== null) {
+            $updates[] = 'opacidad = :opacidad';
+            $params[':opacidad'] = $opacidad;
+        }
+        if ($color !== null) {
+            $updates[] = 'color = :color';
+            $params[':color'] = $color;
+        }
+
+        if (empty($updates)) {
+            echo json_encode(['ok' => false, 'error' => 'No hay campos para actualizar'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $stmt = $pdo->prepare(
+            "UPDATE capas_kml SET " . implode(', ', $updates) . " WHERE id = :id AND empresa_id = :emp"
+        );
+        $stmt->execute($params);
+
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // --- Guardar nueva capa ---
     $nombre = trim($_POST['nombre'] ?? '');
     $contenidoKml = trim($_POST['contenido_kml'] ?? '');
@@ -92,15 +135,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $color = '#8b5cf6';
     }
 
+    $grosor = isset($_POST['grosor']) ? max(1, min(10, (int) $_POST['grosor'])) : 3;
+    $opacidad = isset($_POST['opacidad']) ? max(0.0, min(1.0, (float) $_POST['opacidad'])) : 0.80;
+
     $stmt = $pdo->prepare(
-        "INSERT INTO capas_kml (empresa_id, nombre, contenido_kml, color)
-         VALUES (:emp, :nombre, :kml, :color)"
+        "INSERT INTO capas_kml (empresa_id, nombre, contenido_kml, color, grosor, opacidad)
+         VALUES (:emp, :nombre, :kml, :color, :grosor, :opacidad)"
     );
     $stmt->execute([
         ':emp' => $empresaId,
         ':nombre' => $nombre,
         ':kml' => $contenidoKml,
         ':color' => $color,
+        ':grosor' => $grosor,
+        ':opacidad' => $opacidad,
     ]);
 
     $newId = (int) $pdo->lastInsertId();
@@ -110,6 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'id' => $newId,
         'nombre' => $nombre,
         'color' => $color,
+        'grosor' => $grosor,
+        'opacidad' => $opacidad,
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }

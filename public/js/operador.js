@@ -1469,13 +1469,13 @@
             mapBaseLayers.osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OSM', maxZoom: 19,
             });
-            mapBaseLayers.ortofoto = L.tileLayer.wms('https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Ortofoto_2020?', {
-                layers: 'orto_RGBlr_2020_raster', format: 'image/png', transparent: false,
-                attribution: '&copy; Junta de Andalucía', maxZoom: 20,
+            mapBaseLayers.ortofoto = L.tileLayer.wms('https://www.ign.es/wms-inspire/pnoa-ma', {
+                layers: 'OI.OrthoimageCoverage', format: 'image/png', transparent: false,
+                attribution: '&copy; IGN España - PNOA', maxZoom: 20,
             });
-            mapBaseLayers.topografico = L.tileLayer.wms('https://www.ideandalucia.es/wms/mta10r_2001-2013?', {
-                layers: 'mta10r_2001-2013', format: 'image/png', transparent: false,
-                attribution: '&copy; IDEAndalucía', maxZoom: 20,
+            mapBaseLayers.topografico = L.tileLayer.wms('https://www.ign.es/wms-inspire/mapa-raster', {
+                layers: 'mtn_rasterizado', format: 'image/png', transparent: false,
+                attribution: '&copy; IGN España - MTN', maxZoom: 20,
             });
 
             mapActiveBaseLayer = mapBaseLayers.osm;
@@ -1719,14 +1719,16 @@
             data.capas.forEach(capa => {
                 const group = L.layerGroup().addTo(leafletMap);
                 mapKmlLayers.push(group);
-                renderKmlToLayer(capa.contenido_kml, group, capa.color || '#8b5cf6');
+                renderKmlToLayer(capa.contenido_kml, group, capa.color || '#8b5cf6', parseInt(capa.grosor) || 3, parseFloat(capa.opacidad) || 0.8);
             });
         } catch (err) {
             console.warn('Error loading KML layers:', err);
         }
     }
 
-    function renderKmlToLayer(kmlText, layerGroup, color) {
+    function renderKmlToLayer(kmlText, layerGroup, color, weight, opacity) {
+        weight = weight || 3;
+        opacity = opacity || 0.8;
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(kmlText, 'text/xml');
         const placemarks = xmlDoc.querySelectorAll('Placemark');
@@ -1769,7 +1771,7 @@
             if (lineEl) {
                 const lineCoords = parseKmlCoords(lineEl.textContent);
                 if (lineCoords.length > 0) {
-                    L.polyline(lineCoords, { color, weight: 3, opacity: 0.8 })
+                    L.polyline(lineCoords, { color, weight, opacity })
                         .bindPopup(popupContent)
                         .addTo(layerGroup);
                 }
@@ -1780,7 +1782,7 @@
             if (polyEl) {
                 const polyCoords = parseKmlCoords(polyEl.textContent);
                 if (polyCoords.length > 0) {
-                    L.polygon(polyCoords, { color, fillColor: color, fillOpacity: 0.15, weight: 2 })
+                    L.polygon(polyCoords, { color, fillColor: color, fillOpacity: opacity * 0.2, weight, opacity })
                         .bindPopup(popupContent)
                         .addTo(layerGroup);
                 }

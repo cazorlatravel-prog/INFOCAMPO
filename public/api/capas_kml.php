@@ -22,7 +22,7 @@ if ($empresaId <= 0) {
 $pdo = getDB();
 
 $stmt = $pdo->prepare(
-    "SELECT id, nombre, contenido_kml, color
+    "SELECT id, nombre, contenido_kml, color, grosor, opacidad
      FROM capas_kml
      WHERE empresa_id = :emp AND activa = 1
      ORDER BY created_at DESC"
