@@ -14,7 +14,7 @@ require_once __DIR__ . '/../includes/auth.php';
 // ---------------------------------------------------------------
 if (isset($_GET['stop'])) {
     stopImpersonation();
-    header('Location: /superadmin/empresas.php');
+    header('Location: /admin/dashboard.php');
     exit;
 }
 

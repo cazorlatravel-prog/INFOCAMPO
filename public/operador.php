@@ -22,7 +22,7 @@ $empresaId = isset($_GET['empresa']) ? (int) $_GET['empresa'] : (int) ($_SESSION
 
 // Si no hay usuario/empresa válidos, redirigir al login
 if ($usuarioId <= 0 || $empresaId <= 0) {
-    header('Location: login.php');
+    header('Location: /login.php');
     exit;
 }
 

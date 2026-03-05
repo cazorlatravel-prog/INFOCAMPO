@@ -15,7 +15,7 @@ require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 // Verificar autenticación (consistente con el resto de páginas admin)
-requireAuth('/admin/login.php');
+requireRole(['admin', 'supervisor', 'superadmin']);
 
 // ---------------------------------------------------------------
 // Validar parámetro

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../includes/auth.php';
 $user = requireRole('superadmin');
 
 $pdo = getDB();
+$currentPage = 'usuarios_global';
 
 // ---------------------------------------------------------------
 // Procesar acciones POST
@@ -283,25 +284,12 @@ if ($empresaId > 0) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        :root { --sa-primary: #1e3a5f; --sa-secondary: #2d6a9f; --sa-bg: #f0f2f5; }
-        body { background: var(--sa-bg); }
-        .sa-sidebar {
-            position: fixed; top: 0; left: 0; bottom: 0; width: 260px;
-            background: linear-gradient(180deg, var(--sa-primary), #162d4a);
-            color: #fff; z-index: 1000; overflow-y: auto;
-        }
-        .sa-sidebar .brand { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .sa-sidebar .brand h2 { font-size: 1.2rem; font-weight: 800; margin: 0; }
-        .sa-sidebar .brand small { opacity: 0.6; font-size: 0.75rem; }
-        .sa-sidebar .nav-link {
-            color: rgba(255,255,255,0.7); padding: 12px 20px; font-size: 0.9rem;
-            display: flex; align-items: center; gap: 10px; transition: all 0.2s;
-            border-left: 3px solid transparent;
-        }
-        .sa-sidebar .nav-link:hover, .sa-sidebar .nav-link.active {
-            color: #fff; background: rgba(255,255,255,0.08); border-left-color: #4da6ff;
-        }
-        .sa-main { margin-left: 260px; padding: 24px 32px; min-height: 100vh; }
+        body { background: #f0f2f5; }
+        .brand-bar { background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: #fff; padding: 14px 24px; }
+        .nav-admin { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px; }
+        .nav-admin .nav-link { color: #6b7280; padding: 12px 16px; font-size: 0.9rem; border-bottom: 2px solid transparent; }
+        .nav-admin .nav-link:hover, .nav-admin .nav-link.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
+        .sa-main { padding: 24px 32px; min-height: 100vh; }
         .sa-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
         .sa-topbar h1 { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin: 0; }
         .card { border: none; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
@@ -310,41 +298,10 @@ if ($empresaId > 0) {
             font-size: 0.7rem; padding: 4px 10px; border-radius: 6px;
             text-transform: uppercase; letter-spacing: 0.5px;
         }
-        @media (max-width: 767px) {
-            .sa-sidebar { position: relative; width: 100%; }
-            .sa-main { margin-left: 0; padding: 16px; }
-        }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
-    <nav class="sa-sidebar">
-        <div class="brand">
-            <h2>FotoGPS.app</h2>
-            <small>Super Administración</small>
-        </div>
-        <ul class="nav flex-column mt-2">
-            <li><a href="index.php" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-            <li><a href="empresas.php" class="nav-link"><i class="bi bi-building"></i> Empresas</a></li>
-            <li><a href="usuarios.php" class="nav-link active"><i class="bi bi-people"></i> Usuarios</a></li>
-            <li><a href="campos.php" class="nav-link"><i class="bi bi-ui-checks-grid"></i> Campos Formulario</a></li>
-        </ul>
-        <div style="position:absolute;bottom:0;width:100%;border-top:1px solid rgba(255,255,255,0.1);padding:16px 20px;">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <i class="bi bi-person-circle" style="font-size:1.4rem;opacity:0.7;"></i>
-                <div>
-                    <div class="small fw-semibold"><?= htmlspecialchars($user['nombre']) ?></div>
-                    <div class="small" style="opacity:0.5;font-size:0.7rem;"><?= htmlspecialchars($user['email']) ?></div>
-                </div>
-            </div>
-            <a href="perfil.php" class="btn btn-sm btn-outline-light w-100 mb-2" style="font-size:0.8rem;">
-                <i class="bi bi-person-gear"></i> Mi Perfil
-            </a>
-            <a href="logout.php" class="btn btn-sm btn-outline-light w-100" style="opacity:0.6;font-size:0.8rem;">
-                <i class="bi bi-box-arrow-left"></i> Cerrar sesión
-            </a>
-        </div>
-    </nav>
+    <?php $empresaId = $empresaId ?? 0; require_once __DIR__ . '/../admin/includes/header.php'; ?>
 
     <div class="sa-main">
         <div class="sa-topbar">

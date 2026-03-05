@@ -10,7 +10,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
+requireRole(['admin', 'supervisor', 'superadmin']);
 
 $infraId = isset($_GET['infra_id']) ? (int) $_GET['infra_id'] : 0;
 

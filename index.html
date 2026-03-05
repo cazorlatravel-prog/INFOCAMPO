@@ -1109,69 +1109,18 @@
     <section class="section" id="acceso">
         <div class="container">
             <div class="section-label reveal"><i class="bi bi-person-check"></i> Acceso</div>
-            <h2 class="section-title reveal">Elige tu perfil de acceso</h2>
+            <h2 class="section-title reveal">Accede a la plataforma</h2>
             <p class="section-desc reveal">
-                Tres niveles de acceso adaptados a cada rol dentro de la organización.
+                Un único acceso para todos los roles. El sistema te redirigirá automáticamente a tu panel correspondiente.
             </p>
 
-            <div class="access-grid">
-                <!-- Operador -->
-                <div class="access-card access-card--operator reveal">
-                    <div class="access-icon"><i class="bi bi-phone-fill"></i></div>
-                    <h3>Operador de Campo</h3>
-                    <p>Interfaz móvil optimizada para captura de fotos geolocalizadas en campo.</p>
-                    <ul class="access-features">
-                        <li><i class="bi bi-check-circle-fill"></i> Fotos con watermark GPS (ETRS89)</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Ghosting comparativo entre visitas</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Navegación con alertas de proximidad</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Mapa con Ortofoto y Topográfico WMS</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Modo offline con auto-sincronización</li>
-                        <li><i class="bi bi-check-circle-fill"></i> App instalable (PWA)</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Estados: Antes / Durante / Después</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Anotaciones en foto con círculo ajustable</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Vista previa antes de enviar</li>
-                    </ul>
-                    <a href="/public/login.php" class="access-btn">
-                        <i class="bi bi-camera"></i> Acceder como Operador
-                    </a>
-                </div>
-
-                <!-- Admin -->
-                <div class="access-card access-card--admin reveal">
-                    <div class="access-icon"><i class="bi bi-speedometer2"></i></div>
-                    <h3>Administrador de Empresa</h3>
-                    <p>Panel completo de gestión, análisis visual y generación de informes.</p>
-                    <ul class="access-features">
-                        <li><i class="bi bi-check-circle-fill"></i> Dashboard con métricas y gráficos</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Timeline y galería de inspecciones</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Mapa con capas KML, Ortofoto y Topográfico</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Comparador de fotos side-by-side</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Informes PDF y exportación CSV</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Descarga masiva de fotos en ZIP</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Reubicar infraestructuras con drag & drop</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Búsqueda global con Ctrl+K</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Gestión de infraestructuras y usuarios</li>
-                    </ul>
-                    <a href="/admin/login.php" class="access-btn">
-                        <i class="bi bi-box-arrow-in-right"></i> Panel de Administración
-                    </a>
-                </div>
-
-                <!-- Superadmin -->
-                <div class="access-card access-card--super reveal">
-                    <div class="access-icon"><i class="bi bi-shield-lock-fill"></i></div>
-                    <h3>Super Administrador</h3>
-                    <p>Gestión global de la plataforma, empresas y configuración.</p>
-                    <ul class="access-features">
-                        <li><i class="bi bi-check-circle-fill"></i> Gestión de empresas y licencias</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Administración global de usuarios</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Constructor de formularios dinámicos</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Impersonación de usuarios (soporte)</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Métricas globales de la plataforma</li>
-                        <li><i class="bi bi-check-circle-fill"></i> Control de planes y vigencia</li>
-                    </ul>
-                    <a href="/superadmin/" class="access-btn">
-                        <i class="bi bi-gear"></i> Panel Super Admin
+            <div style="display:flex;justify-content:center;margin-top:2.5rem;">
+                <div class="access-card access-card--admin reveal" style="max-width:480px;text-align:center;">
+                    <div class="access-icon"><i class="bi bi-box-arrow-in-right"></i></div>
+                    <h3>Iniciar Sesión</h3>
+                    <p>Accede con tu email o teléfono y contraseña. Serás redirigido a tu panel según tu rol: operador, administrador o superadministrador.</p>
+                    <a href="/login.php" class="access-btn" style="display:inline-flex;align-items:center;gap:8px;font-size:1.1rem;padding:14px 40px;">
+                        <i class="bi bi-box-arrow-in-right"></i> Acceder
                     </a>
                 </div>
             </div>
