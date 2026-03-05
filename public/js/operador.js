@@ -537,6 +537,7 @@
         infraSelectedName.textContent = `${name} (${code || 'sin código'})`;
         updateButtonState();
         updatePrecacheIndicator();
+        loadDynamicFields();
     }
 
     async function createNewInfra(name) {
@@ -594,7 +595,93 @@
         }
         const obsField = $('#observaciones-general');
         if (obsField) obsField.value = '';
+        clearDynamicFields();
         updateButtonState();
+    }
+
+    // ===================================================================
+    // CAMPOS DINÁMICOS DEL FORMULARIO
+    // ===================================================================
+    async function loadDynamicFields() {
+        const container = document.getElementById('dynamic-fields');
+        const card = document.getElementById('dynamic-fields-card');
+        if (!container || !card) return;
+
+        try {
+            const res = await fetch(`${CFG.endpoints.campos}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+
+            if (!data.ok || !data.campos || data.campos.length === 0) {
+                card.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            data.campos.forEach(campo => {
+                const req = campo.obligatorio ? 'required' : '';
+                const reqMark = campo.obligatorio ? '<span style="color:#ef4444;">*</span>' : '';
+                html += '<div class="dyn-field" style="margin-bottom:10px;">';
+                html += `<label class="card-label" style="font-size:0.78rem;margin-bottom:4px;">${campo.nombre}${reqMark}</label>`;
+
+                switch (campo.tipo) {
+                    case 'texto':
+                        html += `<input type="text" name="campos[${campo.id}]" placeholder="${campo.nombre}" class="input-field" ${req}>`;
+                        break;
+                    case 'numero':
+                        html += `<input type="number" name="campos[${campo.id}]" placeholder="0" step="any" class="input-field" ${req}>`;
+                        break;
+                    case 'select':
+                        html += `<select name="campos[${campo.id}]" class="input-field" ${req}>`;
+                        html += '<option value="">-- Seleccionar --</option>';
+                        if (campo.opciones) {
+                            campo.opciones.forEach(opt => {
+                                html += `<option value="${opt}">${opt}</option>`;
+                            });
+                        }
+                        html += '</select>';
+                        break;
+                    case 'checkbox':
+                        html += `<label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;"><input type="checkbox" name="campos[${campo.id}]" value="1"> ${campo.nombre}</label>`;
+                        break;
+                    case 'textarea':
+                        html += `<textarea name="campos[${campo.id}]" placeholder="${campo.nombre}" rows="2" class="input-field input-textarea" ${req}></textarea>`;
+                        break;
+                    case 'fecha':
+                        html += `<input type="date" name="campos[${campo.id}]" class="input-field" ${req}>`;
+                        break;
+                }
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+            card.style.display = '';
+        } catch (err) {
+            console.warn('Error loading dynamic fields:', err);
+        }
+    }
+
+    function clearDynamicFields() {
+        const container = document.getElementById('dynamic-fields');
+        const card = document.getElementById('dynamic-fields-card');
+        if (container) container.innerHTML = '';
+        if (card) card.style.display = 'none';
+    }
+
+    function collectDynamicFields() {
+        const fields = {};
+        const container = document.getElementById('dynamic-fields');
+        if (!container) return fields;
+        container.querySelectorAll('[name^="campos["]').forEach(el => {
+            const match = el.name.match(/campos\[(\d+)\]/);
+            if (!match) return;
+            if (el.type === 'checkbox') {
+                fields[match[1]] = el.checked ? '1' : '0';
+            } else {
+                fields[match[1]] = el.value;
+            }
+        });
+        return fields;
     }
 
     // ===================================================================
@@ -943,6 +1030,7 @@
                 mode: state.currentMode,
             }),
             uploadUrl: CFG.endpoints.upload,
+            campos: collectDynamicFields(),
         };
 
         // Stop camera stream since we return to ficha
@@ -989,6 +1077,12 @@
             formData.append('unidad_obra_id', unidadObra.value);
         }
         formData.append('datos_tecnicos', uploadData.datos_tecnicos);
+
+        // Campos dinámicos
+        const dynFields = collectDynamicFields();
+        for (const [campoId, valor] of Object.entries(dynFields)) {
+            formData.append(`campos[${campoId}]`, valor);
+        }
 
         try {
             const res = await fetch(CFG.endpoints.upload, { method: 'POST', body: formData });

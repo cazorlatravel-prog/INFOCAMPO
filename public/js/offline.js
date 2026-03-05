@@ -295,6 +295,12 @@
                     : JSON.stringify(fd.datos_tecnicos)
             );
         }
+        // Campos dinámicos
+        if (fd.campos && typeof fd.campos === 'object') {
+            for (const [campoId, valor] of Object.entries(fd.campos)) {
+                formData.append(`campos[${campoId}]`, valor);
+            }
+        }
 
         const response = await fetch(fd.uploadUrl || 'subir.php', {
             method: 'POST',

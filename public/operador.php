@@ -188,6 +188,12 @@ if ($initials === '') $initials = 'OP';
                 <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="input-field input-textarea"></textarea>
             </div>
 
+            <!-- Card: Campos dinámicos del formulario -->
+            <div class="card" id="dynamic-fields-card" style="display:none;">
+                <div class="card-label"><i class="bi bi-ui-checks-grid"></i> Datos adicionales</div>
+                <div id="dynamic-fields"></div>
+            </div>
+
             <!-- Card: Situación de la obra -->
             <div class="card">
                 <div class="card-label"><i class="bi bi-flag-fill"></i> Situación de la obra</div>
@@ -592,6 +598,7 @@ if ($initials === '') $initials = 'OP';
                 registrosMapa: 'api/registros_mapa.php',
                 capasKml: 'api/capas_kml.php',
                 visitas: 'api/visitas.php',
+                campos: 'api/campos.php',
             }
         };
     </script>
