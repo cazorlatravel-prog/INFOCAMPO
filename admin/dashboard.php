@@ -211,51 +211,8 @@ for ($i = 13; $i >= 0; $i--) {
     <title>FotoGPS.app - Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/admin/css/admin.css" rel="stylesheet">
     <style>
-        body { background: #f4f6f9; }
-        .brand-bar {
-            background: linear-gradient(135deg, #1e3a5f, #2d6a9f);
-            color: #fff; padding: 14px 24px;
-        }
-        .card { border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-radius: 12px; }
-        .nav-admin {
-            background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px;
-        }
-        .nav-admin .nav-link {
-            color: #6b7280; padding: 12px 16px; font-size: 0.9rem;
-            border-bottom: 2px solid transparent;
-        }
-        .nav-admin .nav-link:hover, .nav-admin .nav-link.active {
-            color: #1e3a5f; border-bottom-color: #1e3a5f;
-        }
-        .stat-card {
-            background: #fff; border-radius: 14px; padding: 20px 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            transition: transform 0.15s;
-        }
-        .stat-card:hover { transform: translateY(-2px); }
-        .stat-card .stat-icon {
-            width: 52px; height: 52px; border-radius: 14px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.4rem;
-        }
-        .stat-card .stat-value { font-size: 2rem; font-weight: 800; color: #1f2937; line-height: 1; }
-        .stat-card .stat-label { font-size: 0.78rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat-card .stat-delta { font-size: 0.75rem; }
-        .chart-container { position: relative; height: 200px; }
-        .activity-item {
-            display: flex; gap: 12px; padding: 10px 0;
-            border-bottom: 1px solid #f3f4f6;
-        }
-        .activity-item:last-child { border-bottom: none; }
-        .activity-dot {
-            width: 10px; height: 10px; border-radius: 50%;
-            margin-top: 6px; flex-shrink: 0;
-        }
-        .activity-dot.antes { background: #3b82f6; }
-        .activity-dot.durante { background: #f59e0b; }
-        .activity-dot.despues { background: #22c55e; }
-        .badge-inc { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
         .durante-card {
             background: linear-gradient(135deg, #eff6ff, #f0f7ff);
             border-left: 4px solid #3b82f6;

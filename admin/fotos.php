@@ -108,35 +108,8 @@ foreach ($registros as $r) {
 <title>FotoGPS.app - Galeria de Fotos</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link href="/admin/css/admin.css" rel="stylesheet">
 <style>
-    :root {
-        --primary: #1e3a5f;
-        --primary-light: #2d6a9f;
-        --accent: #3b82f6;
-        --success: #22c55e;
-        --warning: #f59e0b;
-        --danger: #ef4444;
-        --bg: #f4f6f9;
-        --card-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    }
-
-    body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-
-    .brand-bar {
-        background: linear-gradient(135deg, var(--primary), var(--primary-light));
-        color: #fff; padding: 14px 24px;
-    }
-    .nav-admin {
-        background: #fff; border-bottom: 1px solid #e5e7eb; padding: 0 24px;
-    }
-    .nav-admin .nav-link {
-        color: #6b7280; padding: 12px 16px; font-size: 0.9rem;
-        border-bottom: 2px solid transparent;
-    }
-    .nav-admin .nav-link:hover, .nav-admin .nav-link.active {
-        color: var(--primary); border-bottom-color: var(--primary);
-    }
-
     /* Stats bar */
     .stats-bar {
         display: flex; gap: 16px; padding: 20px 0; flex-wrap: wrap;
