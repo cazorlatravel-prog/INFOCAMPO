@@ -198,5 +198,8 @@ if ($_navEmpresaId > 0) {
         <li><a href="campos.php" class="nav-link <?= $currentPage === 'campos' ? 'active' : '' ?>">
             <i class="bi bi-ui-checks-grid"></i> Campos
         </a></li>
+        <li><a href="informes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'informes' ? 'active' : '' ?>">
+            <i class="bi bi-file-earmark-text"></i> Informes
+        </a></li>
     </ul>
 </nav>
