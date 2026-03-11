@@ -49,14 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         } elseif ($email === null && $telefono === null) {
             $msg = 'Debes introducir al menos un email o un teléfono.';
             $msgType = 'danger';
-        } elseif (strlen($password) < 6) {
-            $msg = 'La contraseña debe tener al menos 6 caracteres.';
+        } elseif (strlen($password) < 12) {
+            $msg = 'La contraseña debe tener al menos 12 caracteres.';
             $msgType = 'danger';
         } elseif (!in_array($rol, ['admin', 'supervisor', 'operador'], true)) {
             $msg = 'Rol no válido.';
             $msgType = 'danger';
         } elseif ($empresaId <= 0) {
             $msg = 'No se ha podido identificar la empresa.';
+            $msgType = 'danger';
+        } elseif ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $msg = 'El email no es válido.';
             $msgType = 'danger';
         } else {
             // Verificar email único (si se proporcionó)
@@ -131,8 +134,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         if ($targetId <= 0) {
             $msg = 'Usuario no válido.';
             $msgType = 'danger';
-        } elseif (strlen($newPass) < 6) {
-            $msg = 'La contraseña debe tener al menos 6 caracteres.';
+        } elseif (strlen($newPass) < 12) {
+            $msg = 'La contraseña debe tener al menos 12 caracteres.';
             $msgType = 'danger';
         } elseif ($newPass !== $confirmPass) {
             $msg = 'Las contraseñas no coinciden.';
@@ -333,7 +336,7 @@ foreach ($usuarios as $u) {
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold small">Contraseña *</label>
-                                <input type="password" name="password" class="form-control" required minlength="6" placeholder="Min. 6 caracteres">
+                                <input type="password" name="password" class="form-control" required minlength="12" placeholder="Min. 12 caracteres">
                             </div>
                             <div class="col-md-1 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary w-100">
@@ -482,12 +485,12 @@ foreach ($usuarios as $u) {
                         </p>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Nueva contraseña</label>
-                            <input type="password" name="new_password" class="form-control" required minlength="6"
-                                   placeholder="Mínimo 6 caracteres">
+                            <input type="password" name="new_password" class="form-control" required minlength="12"
+                                   placeholder="Mínimo 12 caracteres">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Confirmar contraseña</label>
-                            <input type="password" name="confirm_password" class="form-control" required minlength="6"
+                            <input type="password" name="confirm_password" class="form-control" required minlength="12"
                                    placeholder="Repetir contraseña">
                         </div>
                     </div>

@@ -216,6 +216,10 @@ function startImpersonation(int $userId): bool
         'empresa_id'     => $_SESSION['empresa_id'],
         'empresa_nombre' => $_SESSION['empresa_nombre'],
     ];
+    $_SESSION['impersonation_start'] = time();
+
+    // Regenerar ID de sesión para prevenir session fixation
+    session_regenerate_id(true);
 
     // Cambiar a la sesión del usuario objetivo
     $_SESSION['user_id']        = (int) $target['id'];
@@ -238,6 +242,10 @@ function stopImpersonation(): bool
     }
 
     $original = $_SESSION['impersonating_from'];
+
+    // Regenerar ID de sesión al detener suplantación
+    session_regenerate_id(true);
+
     $_SESSION['user_id']        = $original['user_id'];
     $_SESSION['user_name']      = $original['user_name'];
     $_SESSION['user_email']     = $original['user_email'];
@@ -245,14 +253,27 @@ function stopImpersonation(): bool
     $_SESSION['empresa_id']     = $original['empresa_id'];
     $_SESSION['empresa_nombre'] = $original['empresa_nombre'];
 
-    unset($_SESSION['impersonating_from']);
+    unset($_SESSION['impersonating_from'], $_SESSION['impersonation_start']);
     return true;
 }
 
 /**
  * Verificar si estamos en modo suplantación.
+ * Auto-detiene si ha superado el tiempo máximo (1 hora).
  */
 function isImpersonating(): bool
 {
-    return isset($_SESSION['impersonating_from']);
+    if (!isset($_SESSION['impersonating_from'])) {
+        return false;
+    }
+
+    // Timeout: máximo 1 hora de suplantación
+    $maxDuration = 3600;
+    $start = $_SESSION['impersonation_start'] ?? 0;
+    if ($start > 0 && (time() - $start) > $maxDuration) {
+        stopImpersonation();
+        return false;
+    }
+
+    return true;
 }
