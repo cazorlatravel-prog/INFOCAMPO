@@ -128,13 +128,8 @@ const Watermark = (() => {
             lines.push(utm.str);
         }
 
-        // Date and time
+        // Date and time (top line)
         lines.push(formatDateGPS(meta.fecha || new Date()));
-
-        // Empresa / Infraestructura / Situación
-        if (meta.situacion) lines.push(`Situación: ${meta.situacion}`);
-        if (meta.infraName || meta.code) lines.push(meta.infraName || meta.code);
-        if (meta.empresaName) lines.push(meta.empresaName);
 
         // Draw lines from bottom to top, right-aligned
         ctx.textBaseline = 'bottom';
@@ -149,11 +144,7 @@ const Watermark = (() => {
         let textY = h - margin;
 
         for (let i = 0; i < lines.length; i++) {
-            if (i >= lines.length - 3) {
-                ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
-            } else {
-                ctx.font = `${fontSize}px Arial, Helvetica, sans-serif`;
-            }
+            ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
             ctx.fillText(lines[i], textX, textY);
             textY -= lineHeight;
         }

@@ -1457,13 +1457,8 @@
             lines.push(utm.str);
         }
 
-        // Line 5: Date and time
+        // Line 5 (top): Date and time
         lines.push(formatDateMadrid());
-
-        // Line 6 (top): Empresa — Infraestructura — Situación
-        if (meta.situacion) lines.push(`${meta.situacion}`);
-        if (meta.infraName) lines.push(meta.infraName);
-        if (meta.empresaName) lines.push(meta.empresaName);
 
         // Draw lines from bottom to top, right-aligned with text shadow
         ctx.textBaseline = 'bottom';
@@ -1481,15 +1476,8 @@
         ctx.fillStyle = '#ffffff';
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            // Use bold for empresa name (last line drawn = top line)
-            if (i >= lines.length - 3) {
-                // Empresa, InfraName, Situación — bold
-                ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
-            } else {
-                ctx.font = `${fontSize}px Arial, Helvetica, sans-serif`;
-            }
-            ctx.fillText(line, textX, textY);
+            ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+            ctx.fillText(lines[i], textX, textY);
             textY -= lineHeight;
         }
 
