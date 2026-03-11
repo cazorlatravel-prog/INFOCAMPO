@@ -23,10 +23,12 @@
         gpsWatchId: null,
         stream: null,
         capturedBlob: null,
+        capturedGps: { lat: null, lon: null }, // GPS frozen at capture moment
         ghostUrl: null,
         ghostActive: false,
         seqComparativa: 0,
         photos: [], // { url, type, seq, name }
+        waypoints: [], // { lat, lon, filename, timestamp } — waypoints for comparative photos
         countAleatorias: 0,
         countComparativas: 0,
         countTotal: 0, // contador global por infraestructura
@@ -139,6 +141,45 @@
         initGPS();
         initOffline();
         registerServiceWorker();
+        initExitConfirmation();
+    }
+
+    // ===================================================================
+    // EXIT CONFIRMATION — prevent accidental close with unsaved data
+    // ===================================================================
+    function initExitConfirmation() {
+        window.addEventListener('beforeunload', (e) => {
+            // Check for pending conditions: active session with photos, pending uploads, or active camera
+            const hasPhotos = state.photos.length > 0;
+            const hasInfra = !!state.infraId;
+            const hasPendingBlob = !!state.capturedBlob;
+            const hasOfflineQueue = window.InfocampoOffline && typeof window.InfocampoOffline.getPendingCount === 'function'
+                && window.InfocampoOffline.getPendingCount() > 0;
+
+            if (hasPhotos || hasPendingBlob || hasOfflineQueue || (hasInfra && state.countTotal > 0)) {
+                e.preventDefault();
+                // Modern browsers show a generic message; returnValue triggers the dialog
+                e.returnValue = 'Tienes datos sin guardar. ¿Seguro que quieres salir?';
+                return e.returnValue;
+            }
+        });
+
+        // Also intercept mobile back / navigation via popstate
+        if (history.pushState) {
+            history.pushState(null, '', location.href);
+            window.addEventListener('popstate', () => {
+                const hasPhotos = state.photos.length > 0;
+                const hasInfra = !!state.infraId;
+                if (hasPhotos || (hasInfra && state.countTotal > 0)) {
+                    if (!confirm('¿Seguro que quieres salir? Los datos de la sesión actual se perderán.')) {
+                        history.pushState(null, '', location.href);
+                        return;
+                    }
+                }
+                // Allow navigation
+                history.back();
+            });
+        }
     }
 
     // ===================================================================
@@ -919,6 +960,10 @@
 
         camVideo.pause();
 
+        // Freeze GPS coordinates at the exact moment of capture
+        state.capturedGps.lat = state.gps.lat;
+        state.capturedGps.lon = state.gps.lon;
+
         // Generate filename: NombreInfra_ALE_ANT_20260301_001
         const sitCodes = { antes: 'ANT', durante: 'DUR', despues: 'DES' };
         const sitCode = sitCodes[SITUACIONES[state.situacionIdx]] || 'ANT';
@@ -943,8 +988,8 @@
 
         // Apply watermark directly on previewCanvas (used for blob generation)
         await applyWatermark(camCapture, previewCanvas, {
-            lat: state.gps.lat,
-            lon: state.gps.lon,
+            lat: state.capturedGps.lat,
+            lon: state.capturedGps.lon,
             infraName: state.infraName,
             infraCode: state.infraCode,
             empresaName: CFG.empresaName,
@@ -1010,12 +1055,16 @@
             seq = state.seqComparativa;
         }
 
+        // Use GPS frozen at capture moment for accuracy
+        const captureLat = state.capturedGps.lat || state.gps.lat || 0;
+        const captureLon = state.capturedGps.lon || state.gps.lon || 0;
+
         // Build upload data
         const uploadData = {
             infra_id: state.infraId,
             usuario_id: CFG.usuarioId,
-            lat_real: state.gps.lat || 0,
-            lon_real: state.gps.lon || 0,
+            lat_real: captureLat,
+            lon_real: captureLon,
             estado_incidencia: SITUACIONES[state.situacionIdx],
             tipo_foto: state.currentMode,
             nombre_archivo: filename,
@@ -1024,14 +1073,25 @@
             unidad_obra_id: unidadObra.value || null,
             datos_tecnicos: JSON.stringify({
                 timestamp: new Date().toISOString(),
-                etrs89_lat: state.gps.lat,
-                etrs89_lon: state.gps.lon,
+                etrs89_lat: captureLat,
+                etrs89_lon: captureLon,
                 timezone: 'Europe/Madrid',
                 mode: state.currentMode,
             }),
             uploadUrl: CFG.endpoints.upload,
             campos: collectDynamicFields(),
         };
+
+        // Save waypoint for comparative photos
+        if (state.currentMode === 'comparativo' && captureLat && captureLon) {
+            state.waypoints.push({
+                lat: captureLat,
+                lon: captureLon,
+                filename: filename,
+                timestamp: new Date().toISOString(),
+                seq: seq,
+            });
+        }
 
         // Stop camera stream since we return to ficha
         stopCameraStream();
@@ -1517,6 +1577,8 @@
     let mapMarkers = [];
     let mapSelectedInfra = null; // { id, nombre, codigo, lat, lon, registros }
     let mapUserMarker = null;
+    let mapUserAccuracyCircle = null; // GPS accuracy radius
+    let mapGpsWatchId = null; // dedicated GPS watch for map auto-update
     let mapKmlLayers = []; // KML layer groups
     let mapActiveBaseLayer = null;
     const mapBaseLayers = {};
@@ -1605,8 +1667,9 @@
             }
         }
 
-        // Show user position on map
+        // Show user position on map and start auto-tracking
         updateUserPositionOnMap();
+        startMapGpsTracking();
 
         // Load data
         await loadMapData();
@@ -1614,18 +1677,23 @@
 
     function closeMapScreen() {
         if (navActive) stopNavigation();
+        stopMapGpsTracking();
         showScreen('ficha');
     }
 
-    function updateUserPositionOnMap() {
+    function updateUserPositionOnMap(accuracy) {
         if (!leafletMap || !state.gps.lat || !state.gps.lon) return;
 
         const userIcon = L.divIcon({
             className: 'user-location-marker',
-            html: `<div style="width:16px;height:16px;border-radius:50%;background:#4285f4;
-                    border:3px solid #fff;box-shadow:0 0 0 2px rgba(66,133,244,0.3),0 2px 6px rgba(0,0,0,0.3);"></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
+            html: `<div style="width:22px;height:22px;position:relative;">
+                    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(66,133,244,0.2);animation:userPulse 2s ease-out infinite;"></div>
+                    <div style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+                         background:#4285f4;border:3px solid #fff;
+                         box-shadow:0 0 0 2px rgba(66,133,244,0.4),0 2px 8px rgba(0,0,0,0.3);"></div>
+                   </div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
         });
 
         if (mapUserMarker) {
@@ -1634,7 +1702,46 @@
             mapUserMarker = L.marker([state.gps.lat, state.gps.lon], {
                 icon: userIcon, zIndexOffset: 1000,
             }).addTo(leafletMap);
-            mapUserMarker.bindTooltip('Tu ubicación', { direction: 'top', offset: [0, -10] });
+            mapUserMarker.bindTooltip('Tu ubicación', { direction: 'top', offset: [0, -14] });
+        }
+
+        // Show accuracy circle
+        if (accuracy && accuracy < 500) {
+            if (mapUserAccuracyCircle) {
+                mapUserAccuracyCircle.setLatLng([state.gps.lat, state.gps.lon]);
+                mapUserAccuracyCircle.setRadius(accuracy);
+            } else {
+                mapUserAccuracyCircle = L.circle([state.gps.lat, state.gps.lon], {
+                    radius: accuracy,
+                    color: '#4285f4',
+                    fillColor: '#4285f4',
+                    fillOpacity: 0.08,
+                    weight: 1,
+                    opacity: 0.3,
+                }).addTo(leafletMap);
+            }
+        }
+    }
+
+    function startMapGpsTracking() {
+        if (mapGpsWatchId !== null) return;
+        if (!('geolocation' in navigator)) return;
+
+        mapGpsWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                state.gps.lat = pos.coords.latitude;
+                state.gps.lon = pos.coords.longitude;
+                updateUserPositionOnMap(pos.coords.accuracy);
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 3000 }
+        );
+    }
+
+    function stopMapGpsTracking() {
+        if (mapGpsWatchId !== null) {
+            navigator.geolocation.clearWatch(mapGpsWatchId);
+            mapGpsWatchId = null;
         }
     }
 
@@ -2521,9 +2628,54 @@
     // ===================================================================
     // FINALIZAR VISITA (Guardar y Resetear)
     // ===================================================================
+    // ===================================================================
+    // WAYPOINTS — Export GPS waypoints for comparative photos
+    // ===================================================================
+    function exportWaypoints() {
+        if (!state.waypoints || state.waypoints.length === 0) return;
+
+        const infraName = sanitizeFilename(state.infraName || 'infraestructura');
+        const nowMadrid = new Date().toLocaleString('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/-/g, '');
+
+        // Build GPX file with waypoints named after their photo filenames
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+        gpx += `<gpx version="1.1" creator="INFOCAMPO" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+        gpx += `  <metadata>\n`;
+        gpx += `    <name>Waypoints comparativos - ${escHtml(state.infraName)}</name>\n`;
+        gpx += `    <time>${new Date().toISOString()}</time>\n`;
+        gpx += `  </metadata>\n`;
+
+        state.waypoints.forEach(wp => {
+            gpx += `  <wpt lat="${wp.lat}" lon="${wp.lon}">\n`;
+            gpx += `    <name>${escHtml(wp.filename)}</name>\n`;
+            gpx += `    <time>${wp.timestamp}</time>\n`;
+            gpx += `    <desc>Foto comparativa seq ${wp.seq || 0} - ${escHtml(state.infraName)}</desc>\n`;
+            gpx += `  </wpt>\n`;
+        });
+
+        gpx += `</gpx>\n`;
+
+        // Download the GPX file
+        const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${infraName}_WAYPOINTS_${nowMadrid}.gpx`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
     function finalizarVisita() {
         const numFotos = state.photos.length;
         const infraName = state.infraName;
+
+        // Export waypoints if comparative photos were taken
+        if (state.waypoints.length > 0) {
+            exportWaypoints();
+        }
 
         showNotification(`Visita a "${infraName}" finalizada (${numFotos} foto${numFotos !== 1 ? 's' : ''})`);
 
@@ -2536,6 +2688,7 @@
         state.countTotal = 0;
         state.seqComparativa = 0;
         state.photos = [];
+        state.waypoints = [];
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;
