@@ -169,7 +169,7 @@ try {
             ];
             $sqlState = $e->getCode();
             $errorCode = '';
-            if (preg_match('/(\d{4})/', $e->getMessage(), $ec)) {
+            if (preg_match('/:\s*(\d{4})\s/', $e->getMessage(), $ec)) {
                 $errorCode = $ec[1];
             }
             if (in_array($errorCode, $harmless)) {
