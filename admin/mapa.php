@@ -1065,12 +1065,57 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         var kmlLayerGroups = {};   // { id_or_temp: L.layerGroup }
         var pendingKmlText = null; // KML text pending to be saved
         var pendingKmlName = '';
+        var kmlStorageKey = 'infocampo_kml_temp_' + empresaId;
+
+        function saveKmlToLocalStorage(kmlText, nombre) {
+            try {
+                localStorage.setItem(kmlStorageKey, JSON.stringify({
+                    text: kmlText,
+                    nombre: nombre,
+                    timestamp: Date.now()
+                }));
+            } catch (e) {
+                console.warn('No se pudo guardar KML en localStorage:', e);
+            }
+        }
+
+        function clearKmlFromLocalStorage() {
+            localStorage.removeItem(kmlStorageKey);
+        }
+
+        function loadKmlFromLocalStorage() {
+            try {
+                var stored = localStorage.getItem(kmlStorageKey);
+                if (!stored) return;
+                var data = JSON.parse(stored);
+                if (!data.text) return;
+
+                pendingKmlText = data.text;
+                pendingKmlName = data.nombre || 'KML recuperado';
+                renderKmlOnMap(pendingKmlText, 'temp', '#8b5cf6', 3, 0.8);
+                document.getElementById('btn-save-kml').style.display = 'inline-block';
+                document.getElementById('btn-remove-kml').style.display = 'inline-block';
+                showDragToast('KML "' + pendingKmlName + '" restaurado automáticamente', 'success');
+            } catch (e) {
+                console.warn('Error restaurando KML de localStorage:', e);
+                localStorage.removeItem(kmlStorageKey);
+            }
+        }
+
+        function activateTempKml(kmlText, nombre) {
+            pendingKmlText = kmlText;
+            pendingKmlName = nombre;
+            renderKmlOnMap(pendingKmlText, 'temp', '#8b5cf6', 3, 0.8);
+            document.getElementById('btn-save-kml').style.display = 'inline-block';
+            document.getElementById('btn-remove-kml').style.display = 'inline-block';
+            saveKmlToLocalStorage(kmlText, nombre);
+        }
 
         document.getElementById('kml-overlay-input').addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (!file) return;
 
-            pendingKmlName = file.name.replace(/\.(kml|kmz)$/i, '');
+            var nombre = file.name.replace(/\.(kml|kmz)$/i, '');
             var isKmz = /\.kmz$/i.test(file.name);
 
             if (isKmz) {
@@ -1089,10 +1134,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                             return;
                         }
                         kmlFile.async('string').then(function(kmlText) {
-                            pendingKmlText = kmlText;
-                            renderKmlOnMap(pendingKmlText, 'temp', '#8b5cf6', 3, 0.8);
-                            document.getElementById('btn-save-kml').style.display = 'inline-block';
-                            document.getElementById('btn-remove-kml').style.display = 'inline-block';
+                            activateTempKml(kmlText, nombre);
                         });
                     }).catch(function(err) {
                         showDragToast('Error al descomprimir KMZ: ' + err.message, 'error');
@@ -1103,10 +1145,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 // KML: read as text
                 var reader = new FileReader();
                 reader.onload = function(ev) {
-                    pendingKmlText = ev.target.result;
-                    renderKmlOnMap(pendingKmlText, 'temp', '#8b5cf6', 3, 0.8);
-                    document.getElementById('btn-save-kml').style.display = 'inline-block';
-                    document.getElementById('btn-remove-kml').style.display = 'inline-block';
+                    activateTempKml(ev.target.result, nombre);
                 };
                 reader.readAsText(file);
             }
@@ -1605,6 +1644,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     document.getElementById('kml-overlay-input').value = '';
                     document.getElementById('btn-save-kml').style.display = 'none';
                     document.getElementById('btn-remove-kml').style.display = 'none';
+                    clearKmlFromLocalStorage();
 
                     showDragToast('Capa "' + nombre + '" guardada correctamente', 'success');
                     renderSavedKmlList();
@@ -1626,6 +1666,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             document.getElementById('kml-overlay-input').value = '';
             document.getElementById('btn-save-kml').style.display = 'none';
             document.getElementById('btn-remove-kml').style.display = 'none';
+            clearKmlFromLocalStorage();
             updateKmlStats();
         };
 
@@ -1805,6 +1846,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             renderKmlOnMap(capa.contenido_kml, 'kml-' + capa.id, capa.color, parseInt(capa.grosor) || 3, parseFloat(capa.opacidad) || 0.8);
         });
         updateKmlStats();
+
+        // Restaurar KML temporal desde localStorage si existe
+        loadKmlFromLocalStorage();
 
         // ---------------------------------------------------------------
         // Capas de Infraestructuras (SHP/KML/KMZ → GeoJSON)
