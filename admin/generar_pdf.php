@@ -269,30 +269,38 @@ $totalAlea       = count($aleatorias);
     .badge-comp    { color: #6d28d9; font-weight: bold; }
     .badge-alea    { color: #1d4ed8; font-weight: bold; }
 
-    /* Foto blocks */
-    .foto-block {
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 12px;
-        margin-bottom: 16px;
+    /* Fotos aleatorias — grid de 3 por fila */
+    .alea-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
         page-break-inside: avoid;
     }
 
-    .foto-block img {
-        max-width: 100%;
-        max-height: 320px;
+    .alea-col {
+        flex: 1;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 8px;
+        min-width: 0;
+    }
+
+    .alea-col img {
+        width: 100%;
+        max-height: 180px;
+        object-fit: contain;
         display: block;
-        margin: 10px auto;
+        margin: 6px auto;
         border-radius: 4px;
     }
 
-    .foto-meta {
-        font-size: 11px;
+    .alea-col .foto-meta {
+        font-size: 9px;
         color: #666;
-        line-height: 1.6;
+        line-height: 1.4;
     }
 
-    .foto-meta strong { color: #333; }
+    .alea-col .foto-meta strong { color: #333; }
 
     /* Comparativas lado a lado */
     .comp-pair {
@@ -395,7 +403,7 @@ $totalAlea       = count($aleatorias);
         /* Controlar saltos de página */
         .page-break { page-break-before: always; }
 
-        .foto-block,
+        .alea-row,
         .comp-pair {
             page-break-inside: avoid;
         }
@@ -409,7 +417,7 @@ $totalAlea       = count($aleatorias);
         .report-header { padding: 20px 24px; }
 
         /* Imágenes a tamaño razonable */
-        .foto-block img { max-height: 280px; }
+        .alea-col img { max-height: 160px; }
         .comp-col img { max-height: 220px; }
 
         /* Footer */
@@ -423,6 +431,7 @@ $totalAlea       = count($aleatorias);
         .report-header { padding: 20px 16px; }
         .report-header h1 { font-size: 17px; }
         .comp-pair { flex-direction: column; }
+        .alea-row { flex-direction: column; }
         .toolbar-title span { display: none; }
     }
 </style>
@@ -633,28 +642,44 @@ $totalAlea       = count($aleatorias);
 
         <?php
         $fotosAlea = array_values($aleatorias);
-        foreach ($fotosAlea as $idx => $reg):
-            if ($idx > 0 && $idx % 4 === 0):
+        $totalAleaFotos = count($fotosAlea);
+        // 3 fotos por fila, ~3 filas por página = 9 fotos por página
+        $filas = array_chunk($fotosAlea, 3);
+        $filaCount = 0;
+        foreach ($filas as $fila):
+            $filaCount++;
+            if ($filaCount > 1 && ($filaCount - 1) % 3 === 0):
         ?>
         </div>
         <div class="page-break"></div>
         <div class="section">
             <h2>Fotos Aleatorias (cont.)</h2>
-        <?php endif;
-            $fecha      = date('d/m/Y H:i', strtotime($reg['fecha']));
-            $operador   = htmlspecialchars($reg['usuario_nombre']);
-            $estado     = strtoupper($reg['estado_incidencia']);
-            $badgeClass = "badge-{$reg['estado_incidencia']}";
-            $url        = htmlspecialchars($reg['url_cloudinary']);
-            $uo         = !empty($reg['unidad_obra_nombre']) ? ' | U.Obra: ' . htmlspecialchars($reg['unidad_obra_nombre']) : '';
-        ?>
-            <div class="foto-block">
-                <div class="foto-meta">
-                    <strong><?= $fecha ?></strong> &mdash; Operador: <?= $operador ?>
-                    &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span>
-                    &mdash; GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?><?= $uo ?>
+        <?php endif; ?>
+            <div class="alea-row">
+                <?php foreach ($fila as $reg):
+                    $fecha      = date('d/m/Y H:i', strtotime($reg['fecha']));
+                    $operador   = htmlspecialchars($reg['usuario_nombre']);
+                    $estado     = strtoupper($reg['estado_incidencia']);
+                    $badgeClass = "badge-{$reg['estado_incidencia']}";
+                    $url        = htmlspecialchars($reg['url_cloudinary']);
+                    $uo         = !empty($reg['unidad_obra_nombre']) ? ' | ' . htmlspecialchars($reg['unidad_obra_nombre']) : '';
+                ?>
+                <div class="alea-col">
+                    <img src="<?= $url ?>" alt="Inspección">
+                    <div class="foto-meta">
+                        <strong><?= $fecha ?></strong><br>
+                        <?= $operador ?> &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span><?= $uo ?><br>
+                        <span style="font-size:8px;">GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?></span>
+                    </div>
                 </div>
-                <img src="<?= $url ?>" alt="Inspección">
+                <?php endforeach; ?>
+                <?php
+                // Rellenar celdas vacías si la fila tiene menos de 3
+                $vacias = 3 - count($fila);
+                for ($i = 0; $i < $vacias; $i++):
+                ?>
+                <div class="alea-col" style="border:none;"></div>
+                <?php endfor; ?>
             </div>
         <?php endforeach; ?>
     </div>
