@@ -165,6 +165,9 @@ if ($initials === '') $initials = 'OP';
                     <select id="filter-municipio" class="input-field" disabled>
                         <option value="">Todos los municipios</option>
                     </select>
+                    <select id="filter-monte" class="input-field" disabled>
+                        <option value="">Todos los montes</option>
+                    </select>
                 </div>
             </div>
 

@@ -145,6 +145,7 @@
         updateDate();
         setInterval(updateClock, 30000);
         loadProvincias();
+        loadMontes();
         loadTiposTrabajo();
         loadUnidadesObra();
         bindEvents();
@@ -598,6 +599,7 @@
     // ===================================================================
     const filterProvincia = $('#filter-provincia');
     const filterMunicipio = $('#filter-municipio');
+    const filterMonte     = $('#filter-monte');
 
     async function loadProvincias() {
         if (!CFG.empresaId) return;
@@ -642,12 +644,40 @@
         }
     }
 
+    async function loadMontes() {
+        if (!CFG.empresaId || !filterMonte) return;
+        const prov = filterProvincia ? filterProvincia.value : '';
+        const muni = filterMunicipio ? filterMunicipio.value : '';
+        try {
+            let url = `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&action=montes`;
+            if (prov) url += `&provincia=${encodeURIComponent(prov)}`;
+            if (muni) url += `&municipio=${encodeURIComponent(muni)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.ok && data.montes && data.montes.length > 0) {
+                let html = '<option value="">-- Todos los montes --</option>';
+                data.montes.forEach(m => {
+                    html += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
+                });
+                filterMonte.innerHTML = html;
+                filterMonte.disabled = false;
+            } else {
+                filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
+                filterMonte.disabled = true;
+            }
+        } catch (err) {
+            console.warn('Error loading montes:', err);
+        }
+    }
+
     function getFilterParams() {
         let params = '';
         const prov = filterProvincia ? filterProvincia.value : '';
         const muni = filterMunicipio ? filterMunicipio.value : '';
+        const monte = filterMonte ? filterMonte.value : '';
         if (prov) params += `&provincia=${encodeURIComponent(prov)}`;
         if (muni) params += `&municipio=${encodeURIComponent(muni)}`;
+        if (monte) params += `&monte=${encodeURIComponent(monte)}`;
         return params;
     }
 
@@ -682,7 +712,7 @@
                 }
 
                 data.infraestructuras.forEach(inf => {
-                    const loc = [inf.municipio, inf.provincia].filter(Boolean).join(', ');
+                    const loc = [inf.monte, inf.municipio, inf.provincia].filter(Boolean).join(', ');
                     html += `<div class="result-item" data-id="${inf.id}" data-name="${escHtml(inf.nombre)}" data-code="${escHtml(inf.codigo_unico)}">
                         ${escHtml(inf.nombre)} <span class="result-code">${escHtml(inf.codigo_unico)}</span>
                         ${loc ? `<span class="result-location">${escHtml(loc)}</span>` : ''}
@@ -1882,15 +1912,26 @@
     // EVENTS
     // ===================================================================
     function bindEvents() {
-        // Provincia / municipio filters
+        // Provincia / municipio / monte filters
         if (filterProvincia) {
             filterProvincia.addEventListener('change', () => {
                 loadMunicipios(filterProvincia.value);
+                if (filterMonte) {
+                    filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
+                    filterMonte.disabled = true;
+                }
+                loadMontes();
                 clearInfra();
             });
         }
         if (filterMunicipio) {
             filterMunicipio.addEventListener('change', () => {
+                loadMontes();
+                clearInfra();
+            });
+        }
+        if (filterMonte) {
+            filterMonte.addEventListener('change', () => {
                 clearInfra();
             });
         }

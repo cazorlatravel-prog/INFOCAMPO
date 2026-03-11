@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         $tipo      = trim($_POST['tipo'] ?? '');
         $provincia = trim($_POST['provincia'] ?? '');
         $municipio = trim($_POST['municipio'] ?? '');
+        $monte     = trim($_POST['monte'] ?? '');
         $desc      = trim($_POST['descripcion'] ?? '');
 
         if ($nombre === '') {
@@ -63,14 +64,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                     $msgType = 'warning';
                 } else {
                     $stmt = $pdo->prepare(
-                        "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, descripcion, activa)
-                         VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :desc, 1)"
+                        "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
+                         VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
                     );
                     $stmt->execute([
                         ':emp_id' => $empresaId, ':nombre' => $nombre, ':codigo' => $codigo,
                         ':lat' => $lat, ':lon' => $lon, ':tipo' => $tipo ?: null,
                         ':provincia' => $provincia ?: null, ':municipio' => $municipio ?: null,
-                        ':desc' => $desc ?: null,
+                        ':monte' => $monte ?: null, ':desc' => $desc ?: null,
                     ]);
                     $msg = 'Infraestructura creada correctamente.';
                     $msgType = 'success';
@@ -79,14 +80,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                 $stmt = $pdo->prepare(
                     "UPDATE infraestructuras SET nombre = :nombre, codigo_unico = :codigo,
                      lat_teorica = :lat, lon_teorica = :lon, tipo = :tipo,
-                     provincia = :provincia, municipio = :municipio, descripcion = :desc
+                     provincia = :provincia, municipio = :municipio, monte = :monte, descripcion = :desc
                      WHERE id = :id AND empresa_id = :emp_id"
                 );
                 $stmt->execute([
                     ':nombre' => $nombre, ':codigo' => $codigo,
                     ':lat' => $lat, ':lon' => $lon, ':tipo' => $tipo ?: null,
                     ':provincia' => $provincia ?: null, ':municipio' => $municipio ?: null,
-                    ':desc' => $desc ?: null, ':id' => $id, ':emp_id' => $empresaId,
+                    ':monte' => $monte ?: null, ':desc' => $desc ?: null,
+                    ':id' => $id, ':emp_id' => $empresaId,
                 ]);
                 $msg = 'Infraestructura actualizada.';
                 $msgType = 'success';
@@ -283,6 +285,12 @@ if (isset($_GET['edit'])) {
                                    placeholder="Nombre del municipio"
                                    value="<?= htmlspecialchars($editInfra['municipio'] ?? '') ?>">
                         </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold small">Monte</label>
+                            <input type="text" name="monte" class="form-control"
+                                   placeholder="Nombre del monte"
+                                   value="<?= htmlspecialchars($editInfra['monte'] ?? '') ?>">
+                        </div>
                         <div class="col-md-2">
                             <label class="form-label fw-semibold small">Latitud</label>
                             <input type="number" step="0.0000001" name="lat_teorica" id="lat_teorica" class="form-control"
@@ -357,10 +365,14 @@ if (isset($_GET['edit'])) {
                             <?php endif; ?>
                         </div>
                         <div class="d-flex gap-3 flex-wrap align-items-center">
-                            <?php if (!empty($inf['provincia']) || !empty($inf['municipio'])): ?>
+                            <?php if (!empty($inf['provincia']) || !empty($inf['municipio']) || !empty($inf['monte'])): ?>
                                 <span class="small text-muted">
                                     <i class="bi bi-pin-map"></i>
-                                    <?= htmlspecialchars(trim(($inf['municipio'] ?? '') . ', ' . ($inf['provincia'] ?? ''), ', ')) ?>
+                                    <?= htmlspecialchars(trim(implode(', ', array_filter([
+                                        $inf['monte'] ?? '',
+                                        $inf['municipio'] ?? '',
+                                        $inf['provincia'] ?? ''
+                                    ])), ', ')) ?>
                                 </span>
                             <?php endif; ?>
                             <span class="coord-text">
@@ -460,7 +472,7 @@ if (isset($_GET['edit'])) {
                         <strong>Columnas reconocidas:</strong>
                         <ul class="mb-0 mt-1">
                             <li><strong>nombre</strong> (obligatorio)</li>
-                            <li>codigo, tipo, provincia, municipio, descripción</li>
+                            <li>codigo, tipo, provincia, municipio, monte, descripción</li>
                             <li>lat, lon (opcionales)</li>
                         </ul>
                     </div>
@@ -534,7 +546,7 @@ if (isset($_GET['edit'])) {
                         Cada punto se importará como una infraestructura con sus coordenadas.
                         <br>
                         <strong>Campos reconocidos:</strong> nombre, descripción, coordenadas, y datos extendidos
-                        (tipo, provincia, municipio).
+                        (tipo, provincia, municipio, monte).
                     </div>
 
                     <form id="form-kml" enctype="multipart/form-data">
@@ -888,10 +900,10 @@ if (isset($_GET['edit'])) {
                     if (data.detalles && data.detalles.length > 0) {
                         html += '<div style="max-height: 200px; overflow-y: auto;">';
                         html += '<table class="table table-sm table-striped small">';
-                        html += '<thead><tr><th>Nombre</th><th>Código</th><th>Provincia</th><th>Municipio</th></tr></thead><tbody>';
+                        html += '<thead><tr><th>Nombre</th><th>Código</th><th>Provincia</th><th>Municipio</th><th>Monte</th></tr></thead><tbody>';
                         data.detalles.forEach(d => {
                             html += '<tr><td>' + (d.nombre || '') + '</td><td><code>' + (d.codigo || '') + '</code></td>' +
-                                    '<td>' + (d.provincia || '-') + '</td><td>' + (d.municipio || '-') + '</td></tr>';
+                                    '<td>' + (d.provincia || '-') + '</td><td>' + (d.municipio || '-') + '</td><td>' + (d.monte || '-') + '</td></tr>';
                         });
                         html += '</tbody></table></div>';
                     }

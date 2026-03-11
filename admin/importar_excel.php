@@ -7,7 +7,7 @@
  * la georreferenciación se realiza cuando el operador toma fotos en campo.
  *
  * Columnas reconocidas (flexible, case-insensitive):
- *   nombre (obligatorio), codigo, tipo, provincia, municipio, descripcion, lat, lon
+ *   nombre (obligatorio), codigo, tipo, provincia, municipio, monte, descripcion, lat, lon
  */
 
 declare(strict_types=1);
@@ -99,6 +99,7 @@ $aliases = [
     'tipo'        => ['tipo', 'type', 'categoria', 'categoría', 'category'],
     'provincia'   => ['provincia', 'province', 'state', 'comunidad'],
     'municipio'   => ['municipio', 'municipality', 'localidad', 'ciudad', 'city', 'termino_municipal', 'término_municipal', 'termino municipal', 'término municipal'],
+    'monte'       => ['monte', 'forest', 'bosque', 'zona_forestal', 'zona forestal', 'monte_publico', 'monte público', 'monte publico'],
     'descripcion' => ['descripcion', 'descripción', 'description', 'observaciones', 'notas', 'localizacion', 'localización', 'ubicacion', 'ubicación'],
     'lat'         => ['lat', 'latitud', 'latitude', 'lat_teorica'],
     'lon'         => ['lon', 'lng', 'longitud', 'longitude', 'lon_teorica'],
@@ -167,8 +168,8 @@ $opcionDuplicados = $_POST['duplicados'] ?? 'omitir';
 // Insertar filas
 // ---------------------------------------------------------------
 $insertStmt = $pdo->prepare(
-    "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, descripcion, activa)
-     VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :desc, 1)"
+    "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
+     VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
 );
 
 $importados = 0;
@@ -198,6 +199,7 @@ try {
         $tipo       = isset($colMap['tipo'])         ? trim((string) ($row[$colMap['tipo']] ?? ''))        : '';
         $provincia  = isset($colMap['provincia'])    ? trim((string) ($row[$colMap['provincia']] ?? ''))   : '';
         $municipio  = isset($colMap['municipio'])    ? trim((string) ($row[$colMap['municipio']] ?? ''))   : '';
+        $monte      = isset($colMap['monte'])        ? trim((string) ($row[$colMap['monte']] ?? ''))      : '';
         $descripcion = isset($colMap['descripcion']) ? trim((string) ($row[$colMap['descripcion']] ?? '')) : '';
         $lat        = isset($colMap['lat'])          ? (float) ($row[$colMap['lat']] ?? 0)                : 0.0;
         $lon        = isset($colMap['lon'])          ? (float) ($row[$colMap['lon']] ?? 0)                : 0.0;
@@ -244,6 +246,7 @@ try {
             ':tipo'      => $tipo !== '' ? mb_substr($tipo, 0, 100) : null,
             ':provincia' => $provincia !== '' ? mb_substr($provincia, 0, 100) : null,
             ':municipio' => $municipio !== '' ? mb_substr($municipio, 0, 150) : null,
+            ':monte'     => $monte !== '' ? mb_substr($monte, 0, 200) : null,
             ':desc'      => $descripcion !== '' ? mb_substr($descripcion, 0, 500) : null,
         ]);
 
@@ -253,6 +256,7 @@ try {
             'codigo'    => $codigo,
             'provincia' => $provincia,
             'municipio' => $municipio,
+            'monte'     => $monte,
         ];
 
         $existentes[] = [
