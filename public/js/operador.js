@@ -14,6 +14,7 @@
     // STATE
     // ===================================================================
     const state = {
+        screen: 'ficha', // current screen name
         infraId: null,
         infraName: '',
         infraCode: '',
@@ -161,34 +162,28 @@
     // ===================================================================
     function initExitConfirmation() {
         window.addEventListener('beforeunload', (e) => {
-            // Check for pending conditions: active session with photos, pending uploads, or active camera
-            const hasPhotos = state.photos.length > 0;
-            const hasInfra = !!state.infraId;
-            const hasPendingBlob = !!state.capturedBlob;
-            const hasOfflineQueue = window.InfocampoOffline && typeof window.InfocampoOffline.getPendingCount === 'function'
-                && window.InfocampoOffline.getPendingCount() > 0;
-
-            if (hasPhotos || hasPendingBlob || hasOfflineQueue || (hasInfra && state.countTotal > 0)) {
-                e.preventDefault();
-                // Modern browsers show a generic message; returnValue triggers the dialog
-                e.returnValue = 'Tienes datos sin guardar. ¿Seguro que quieres salir?';
-                return e.returnValue;
-            }
+            // Always ask before leaving the app
+            e.preventDefault();
+            e.returnValue = '¿Seguro que quieres salir de INFOCAMPO?';
+            return e.returnValue;
         });
 
-        // Also intercept mobile back / navigation via popstate
+        // Intercept mobile back button via popstate
         if (history.pushState) {
             history.pushState(null, '', location.href);
             window.addEventListener('popstate', () => {
-                const hasPhotos = state.photos.length > 0;
-                const hasInfra = !!state.infraId;
-                if (hasPhotos || (hasInfra && state.countTotal > 0)) {
-                    if (!confirm('¿Seguro que quieres salir? Los datos de la sesión actual se perderán.')) {
-                        history.pushState(null, '', location.href);
-                        return;
-                    }
+                // If on a sub-screen (camera, preview, map, etc.), go back to ficha instead of leaving
+                if (state.screen !== 'ficha') {
+                    history.pushState(null, '', location.href);
+                    showScreen('ficha');
+                    return;
                 }
-                // Allow navigation
+                // On ficha screen, ask before leaving the app
+                if (!confirm('¿Quieres salir de INFOCAMPO? Asegúrate de haber guardado tus datos antes de cerrar.')) {
+                    history.pushState(null, '', location.href);
+                    return;
+                }
+                // Allow navigation out
                 history.back();
             });
         }
@@ -983,6 +978,7 @@
     function showScreen(name) {
         Object.values(screens).forEach(s => s.classList.remove('active'));
         screens[name].classList.add('active');
+        state.screen = name;
     }
 
     // ===================================================================
