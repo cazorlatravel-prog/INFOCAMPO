@@ -2204,6 +2204,9 @@
             }
         }
 
+        // Invalidate map size after screen transition
+        setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 100);
+
         // Show user position on map and start auto-tracking
         updateUserPositionOnMap();
         startMapGpsTracking();
@@ -2211,6 +2214,13 @@
         // Load data
         await loadMapData();
     }
+
+    // Invalidate map size on device rotation / resize
+    window.addEventListener('resize', () => {
+        if (leafletMap && state.screen === 'mapa') {
+            leafletMap.invalidateSize();
+        }
+    });
 
     function closeMapScreen() {
         if (navActive) stopNavigation();
@@ -2251,7 +2261,7 @@
             mapUserMarker.bindTooltip('Tu ubicación', { direction: 'top', offset: [0, -14] });
         }
 
-        // Show accuracy circle
+        // Show accuracy circle (hide when accuracy degrades above 500m)
         if (accuracy && accuracy < 500) {
             if (mapUserAccuracyCircle) {
                 mapUserAccuracyCircle.setLatLng([state.gps.lat, state.gps.lon]);
@@ -2266,6 +2276,9 @@
                     opacity: 0.3,
                 }).addTo(leafletMap);
             }
+        } else if (mapUserAccuracyCircle) {
+            leafletMap.removeLayer(mapUserAccuracyCircle);
+            mapUserAccuracyCircle = null;
         }
     }
 

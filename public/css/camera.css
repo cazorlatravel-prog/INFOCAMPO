@@ -70,8 +70,8 @@ html, body {
    ---------------------------------------------------------- */
 #gps-indicator {
     position: absolute;
-    top: 60px;
-    right: 16px;
+    top: calc(60px + env(safe-area-inset-top, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
     z-index: 10;
     display: flex;
     align-items: center;
@@ -114,6 +114,9 @@ html, body {
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-left: calc(16px + env(safe-area-inset-left, 0px));
+    padding-right: calc(16px + env(safe-area-inset-right, 0px));
     background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
 }
 
@@ -144,6 +147,9 @@ html, body {
     justify-content: space-around;
     align-items: center;
     padding: 20px 16px 36px;
+    padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(16px + env(safe-area-inset-left, 0px));
+    padding-right: calc(16px + env(safe-area-inset-right, 0px));
     background: linear-gradient(0deg, rgba(0,0,0,0.65) 0%, transparent 100%);
 }
 
@@ -153,6 +159,8 @@ html, body {
     color: #fff;
     width: 56px;
     height: 56px;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -234,6 +242,7 @@ html, body {
     flex-wrap: wrap;
     gap: 10px;
     padding: 12px 16px 32px;
+    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
     background: rgba(0,0,0,0.85);
     align-items: center;
     justify-content: center;

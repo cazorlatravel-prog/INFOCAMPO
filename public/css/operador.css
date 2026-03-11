@@ -92,6 +92,7 @@ html, body {
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: #ffffff;
     border-bottom: 1px solid #e8ecf1;
     position: sticky;
@@ -998,6 +999,7 @@ select.input-field {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, transparent 100%);
 }
 
@@ -1005,8 +1007,8 @@ select.input-field {
     background: rgba(255,255,255,0.18);
     border: none;
     color: #fff;
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1050,8 +1052,8 @@ select.input-field {
 
 .cam-gps {
     position: absolute;
-    top: 64px;
-    right: 12px;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
     z-index: 10;
     display: flex;
     align-items: center;
@@ -1428,6 +1430,7 @@ select.input-field {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: rgba(255,255,255,0.92);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
@@ -2437,6 +2440,7 @@ select.input-field {
    ========================================================== */
 .guardar-visita-fixed {
     padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     background: #fff;
     border-top: 1px solid #e8ecf1;
     flex-shrink: 0;
@@ -2496,6 +2500,7 @@ select.input-field {
    ========================================================== */
 .visitas-footer {
     padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     background: #fff;
     border-top: 1px solid #e8ecf1;
 }
@@ -2529,6 +2534,7 @@ select.input-field {
     display: flex;
     align-items: center;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: #fff;
     border-bottom: 1px solid #e8ecf1;
     gap: 12px;
