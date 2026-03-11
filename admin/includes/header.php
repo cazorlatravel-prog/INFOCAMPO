@@ -159,12 +159,17 @@ if ($_navEmpresaId > 0) {
         }
     });
 
+    function escHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
     async function doSearch(q) {
         try {
             const resp = await fetch('api/buscar.php?empresa_id=' + empresaId + '&q=' + encodeURIComponent(q));
             const data = await resp.json();
             if (!data.ok || data.results.length === 0) {
-                searchResults.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:0.85rem;"><i class="bi bi-search me-1"></i>Sin resultados para "' + q + '"</div>';
+                searchResults.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:0.85rem;"><i class="bi bi-search me-1"></i>Sin resultados para "' + escHtml(q) + '"</div>';
                 searchResults.style.display = 'block';
                 return;
             }
@@ -172,18 +177,21 @@ if ($_navEmpresaId > 0) {
             let lastType = '';
             const typeLabels = { infraestructura: 'Infraestructuras', registro: 'Inspecciones', usuario: 'Usuarios' };
             const typeColors = { infraestructura: '#2563eb', registro: '#7c3aed', usuario: '#059669' };
+            const allowedIcons = ['bi-building', 'bi-geo-alt', 'bi-person', 'bi-camera', 'bi-image', 'bi-file-earmark'];
 
             data.results.forEach(function(r) {
                 if (r.type !== lastType) {
-                    html += '<div style="padding:6px 14px;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;color:#9ca3af;font-weight:700;background:#f9fafb;">' + (typeLabels[r.type] || r.type) + '</div>';
+                    html += '<div style="padding:6px 14px;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;color:#9ca3af;font-weight:700;background:#f9fafb;">' + escHtml(typeLabels[r.type] || r.type) + '</div>';
                     lastType = r.type;
                 }
-                html += '<a href="' + r.url + '" style="display:flex;align-items:start;gap:10px;padding:10px 14px;text-decoration:none;color:#1f2937;border-bottom:1px solid #f3f4f6;transition:background 0.1s;" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'transparent\'">';
-                html += '<i class="bi ' + r.icon + '" style="color:' + (typeColors[r.type] || '#6b7280') + ';font-size:1rem;margin-top:2px;"></i>';
+                var safeUrl = escHtml(r.url);
+                var safeIcon = allowedIcons.includes(r.icon) ? r.icon : 'bi-search';
+                html += '<a href="' + safeUrl + '" style="display:flex;align-items:start;gap:10px;padding:10px 14px;text-decoration:none;color:#1f2937;border-bottom:1px solid #f3f4f6;transition:background 0.1s;" onmouseover="this.style.background=\'#f0f4ff\'" onmouseout="this.style.background=\'transparent\'">';
+                html += '<i class="bi ' + safeIcon + '" style="color:' + (typeColors[r.type] || '#6b7280') + ';font-size:1rem;margin-top:2px;"></i>';
                 html += '<div style="min-width:0;flex:1;">';
-                html += '<div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.title + '</div>';
-                html += '<div style="font-size:0.72rem;color:#6b7280;">' + r.subtitle + '</div>';
-                if (r.extra) html += '<div style="font-size:0.68rem;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + r.extra + '</div>';
+                html += '<div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(r.title) + '</div>';
+                html += '<div style="font-size:0.72rem;color:#6b7280;">' + escHtml(r.subtitle) + '</div>';
+                if (r.extra) html += '<div style="font-size:0.68rem;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(r.extra) + '</div>';
                 html += '</div></a>';
             });
 

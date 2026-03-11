@@ -10,6 +10,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/auth.php';
+
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
 
 try {
     $pdo = getDB();
@@ -19,7 +26,7 @@ try {
     exit;
 }
 
-$empresaId = (int) ($_GET['empresa_id'] ?? 0);
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 if ($empresaId <= 0) {
     echo json_encode(['ok' => false, 'error' => 'empresa_id requerido']);
     exit;

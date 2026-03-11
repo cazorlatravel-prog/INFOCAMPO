@@ -16,6 +16,13 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/auth.php';
+
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
 
 try {
     $pdo = getDB();
@@ -41,7 +48,7 @@ try {
 // GET: buscar infraestructuras / listas de provincias/municipios
 // ---------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $empresaId = (int) ($_GET['empresa_id'] ?? 0);
+    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
     $action    = trim($_GET['action'] ?? '');
 
     if ($empresaId <= 0) {
@@ -174,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // POST: crear nueva infraestructura
 // ---------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $empresaId = (int) ($_POST['empresa_id'] ?? 0);
+    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
     $nombre    = trim($_POST['nombre'] ?? '');
     $lat       = (float) ($_POST['lat'] ?? 0);
     $lon       = (float) ($_POST['lon'] ?? 0);

@@ -464,6 +464,20 @@
     // ===================================================================
     // PUBLIC API
     // ===================================================================
+    /**
+     * Revoke an array of blob URLs to free memory.
+     * Call this when cached photos are no longer needed (e.g., modal closed).
+     */
+    function revokeBlobUrls(items) {
+        if (!Array.isArray(items)) return;
+        items.forEach(item => {
+            const url = item.blobUrl || item;
+            if (typeof url === 'string' && url.startsWith('blob:')) {
+                URL.revokeObjectURL(url);
+            }
+        });
+    }
+
     window.InfocampoOffline = {
         init,
         isOnline,
@@ -482,5 +496,6 @@
         getCachedInfraIds,
         clearCachedPhotos,
         clearAll,
+        revokeBlobUrls,
     };
 })();

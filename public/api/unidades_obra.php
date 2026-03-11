@@ -10,8 +10,15 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/auth.php';
 
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : 0;
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
+
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
 if ($empresaId <= 0) {
     echo json_encode(['ok' => false, 'error' => 'empresa_id requerido']);

@@ -46,9 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($result === false) {
                 $pdo = getDB();
                 $isEmail = str_contains($identifier, '@');
-                $campo = $isEmail ? 'email' : 'telefono';
                 $cleanId = $isEmail ? $identifier : preg_replace('/[^0-9+]/', '', $identifier);
-                $checkStmt = $pdo->prepare("SELECT id, activo, empresa_id, rol FROM usuarios WHERE {$campo} = :id LIMIT 1");
+                if ($isEmail) {
+                    $checkStmt = $pdo->prepare("SELECT id, activo, empresa_id, rol FROM usuarios WHERE email = :id LIMIT 1");
+                } else {
+                    $checkStmt = $pdo->prepare("SELECT id, activo, empresa_id, rol FROM usuarios WHERE telefono = :id LIMIT 1");
+                }
                 $checkStmt->execute([':id' => $cleanId]);
                 $checkUser = $checkStmt->fetch();
 

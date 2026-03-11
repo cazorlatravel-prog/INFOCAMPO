@@ -799,6 +799,10 @@
         state.countTotal = 0;
         state.seqComparativa = 0;
         state.photos = [];
+        // Revocar blob URLs de fotos previas cacheadas para liberar memoria
+        if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
+            window.InfocampoOffline.revokeBlobUrls(state.prevPhotos);
+        }
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;
@@ -1033,6 +1037,12 @@
             camVideo.srcObject = state.stream;
             await camVideo.play();
         } catch (err) {
+            // Limpiar stream si fue adquirido pero play() falló
+            if (state.stream) {
+                state.stream.getTracks().forEach(t => t.stop());
+                state.stream = null;
+            }
+            camVideo.srcObject = null;
             alert('No se pudo acceder a la cámara: ' + err.message);
             return;
         }
@@ -1042,6 +1052,11 @@
 
     function closeCamera() {
         stopCameraStream();
+        // Limpiar GPS watch para ahorrar batería
+        if (state.gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(state.gpsWatchId);
+            state.gpsWatchId = null;
+        }
         camGhost.classList.remove('active');
         camGhost.style.opacity = '';
         if (ghostOpacityBar) ghostOpacityBar.classList.add('hidden');
@@ -2200,6 +2215,15 @@
     function closeMapScreen() {
         if (navActive) stopNavigation();
         stopMapGpsTracking();
+        // Limpiar marcador y círculo de precisión del usuario para evitar memory leak
+        if (mapUserMarker) {
+            leafletMap.removeLayer(mapUserMarker);
+            mapUserMarker = null;
+        }
+        if (mapUserAccuracyCircle) {
+            leafletMap.removeLayer(mapUserAccuracyCircle);
+            mapUserAccuracyCircle = null;
+        }
         showScreen('ficha');
     }
 
@@ -2956,6 +2980,11 @@
         if (state.gps.lat && state.gps.lon) {
             bounds.push([state.gps.lat, state.gps.lon]);
         }
+        // fitBounds necesita al menos 2 puntos distintos; con 1 solo usar setView
+        if (bounds.length < 2) {
+            leafletMap.setView([navTarget.lat, navTarget.lon], 16);
+            return;
+        }
         leafletMap.fitBounds(bounds, { padding: [80, 80], maxZoom: 18 });
     }
 
@@ -3470,6 +3499,9 @@
         state.seqComparativa = 0;
         state.photos = [];
         state.waypoints = [];
+        if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
+            window.InfocampoOffline.revokeBlobUrls(state.prevPhotos);
+        }
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;

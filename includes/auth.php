@@ -30,10 +30,11 @@ function login(string $identifier, string $password): array|false
     }
 
     // Buscar usuario sin JOIN para diagnosticar correctamente
-    $campo = $isEmail ? 'email' : 'telefono';
-    $stmt = $pdo->prepare(
-        "SELECT * FROM usuarios WHERE {$campo} = :identifier LIMIT 1"
-    );
+    if ($isEmail) {
+        $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE email = :identifier LIMIT 1");
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE telefono = :identifier LIMIT 1");
+    }
     $stmt->execute([':identifier' => $identifier]);
     $user = $stmt->fetch();
 
