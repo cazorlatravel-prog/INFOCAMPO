@@ -17,6 +17,7 @@
         infraId: null,
         infraName: '',
         infraCode: '',
+        tipoTrabajoId: null,
         unidadObraId: null,
         currentMode: null, // 'aleatorio' | 'comparativo'
         gps: { lat: null, lon: null },
@@ -70,6 +71,7 @@
     const infraSelected    = $('#infra-selected');
     const infraSelectedName = $('#infra-selected-name');
     const infraClear       = $('#infra-clear');
+    const tipoTrabajo      = $('#tipo-trabajo');
     const unidadObra       = $('#unidad-obra');
     const fechaDisplay     = $('#fecha-display');
     const btnAleatorias    = $('#btn-fotos-aleatorias');
@@ -143,6 +145,7 @@
         updateDate();
         setInterval(updateClock, 30000);
         loadProvincias();
+        loadTiposTrabajo();
         loadUnidadesObra();
         bindEvents();
         initGPS();
@@ -876,6 +879,27 @@
     }
 
     // ===================================================================
+    // TIPOS DE TRABAJO
+    // ===================================================================
+    async function loadTiposTrabajo() {
+        if (!CFG.empresaId || !tipoTrabajo) return;
+        try {
+            const res = await fetch(`${CFG.endpoints.tiposTrabajo}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (data.ok && data.tipos) {
+                let html = '<option value="">-- Seleccionar tipo de trabajo --</option>';
+                data.tipos.forEach(t => {
+                    const label = t.codigo ? `${t.codigo} - ${t.nombre}` : t.nombre;
+                    html += `<option value="${t.id}">${escHtml(label)}</option>`;
+                });
+                tipoTrabajo.innerHTML = html;
+            }
+        } catch (err) {
+            console.warn('Error loading tipos de trabajo:', err);
+        }
+    }
+
+    // ===================================================================
     // UNIDADES DE OBRA
     // ===================================================================
     async function loadUnidadesObra() {
@@ -1243,6 +1267,7 @@
             nombre_archivo: filename,
             observaciones: $('#observaciones-general').value || '',
             secuencia_comparativa: seq,
+            tipo_trabajo_id: tipoTrabajo ? tipoTrabajo.value || null : null,
             unidad_obra_id: unidadObra.value || null,
             datos_tecnicos: JSON.stringify({
                 timestamp: new Date().toISOString(),
@@ -1305,6 +1330,9 @@
 
         if (seq !== null) {
             formData.append('secuencia_comparativa', seq);
+        }
+        if (tipoTrabajo && tipoTrabajo.value) {
+            formData.append('tipo_trabajo_id', tipoTrabajo.value);
         }
         if (unidadObra.value) {
             formData.append('unidad_obra_id', unidadObra.value);

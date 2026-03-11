@@ -174,6 +174,16 @@ if ($initials === '') $initials = 'OP';
                 </button>
             </div>
 
+            <!-- Card: Tipo de Trabajo -->
+            <div class="card">
+                <div class="card-label">
+                    <i class="bi bi-briefcase"></i> Tipo de Trabajo
+                </div>
+                <select id="tipo-trabajo" class="input-field">
+                    <option value="">Seleccionar tipo de trabajo</option>
+                </select>
+            </div>
+
             <!-- Card: Unidad de Obra -->
             <div class="card">
                 <div class="card-label">
@@ -618,6 +628,7 @@ if ($initials === '') $initials = 'OP';
                 upload: 'subir.php',
                 infraestructuras: 'api/infraestructuras.php',
                 unidadesObra: 'api/unidades_obra.php',
+                tiposTrabajo: 'api/tipos_trabajo.php',
                 fotosComparativas: 'api/fotos_comparativas.php',
                 registrosMapa: 'api/registros_mapa.php',
                 capasKml: 'api/capas_kml.php',

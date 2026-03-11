@@ -195,6 +195,9 @@ if ($_navEmpresaId > 0) {
             <i class="bi bi-geo-alt"></i> <span>Infraestructuras</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
+        <li role="none"><a href="/admin/tipos_trabajo.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'tipos_trabajo' ? 'active' : '' ?>" role="menuitem">
+            <i class="bi bi-briefcase"></i> <span>Trabajos</span>
+        </a></li>
         <li role="none"><a href="/admin/unidades_obra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'unidades_obra' ? 'active' : '' ?>" role="menuitem">
             <i class="bi bi-tools"></i> <span>Unidades</span>
         </a></li>
