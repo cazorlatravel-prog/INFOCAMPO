@@ -87,6 +87,20 @@ if ($initials === '') $initials = 'OP';
          PANTALLA 1: FICHA DE VISITA
          ======================================================== -->
     <div id="screen-ficha" class="screen active">
+        <!-- Banner: Instalar App (sticky top) -->
+        <div id="install-banner" class="install-banner hidden">
+            <div class="install-banner-inner">
+                <i class="bi bi-phone-fill install-banner-pulse"></i>
+                <span class="install-banner-label"><strong>Instala FotoGPS</strong> en tu movil</span>
+                <button type="button" id="btn-install-app" class="install-btn">
+                    <i class="bi bi-download"></i> Instalar
+                </button>
+                <button type="button" id="btn-install-dismiss" class="install-dismiss" aria-label="Cerrar">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+
         <!-- Header -->
         <div class="ficha-header">
             <div class="ficha-brand">
@@ -122,27 +136,6 @@ if ($initials === '') $initials = 'OP';
 
         <!-- Body -->
         <div class="ficha-body">
-
-            <!-- Banner: Instalar App -->
-            <div id="install-banner" class="install-banner hidden">
-                <div class="install-banner-content">
-                    <div class="install-banner-icon">
-                        <i class="bi bi-download"></i>
-                    </div>
-                    <div class="install-banner-text">
-                        <strong>Instalar FotoGPS</strong>
-                        <small>Acceso directo desde tu pantalla de inicio</small>
-                    </div>
-                </div>
-                <div class="install-banner-actions">
-                    <button type="button" id="btn-install-app" class="install-btn">
-                        <i class="bi bi-phone-fill"></i> Instalar App
-                    </button>
-                    <button type="button" id="btn-install-dismiss" class="install-dismiss">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-            </div>
 
             <!-- Card: Ubicacion -->
             <div class="card">

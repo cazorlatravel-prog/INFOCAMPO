@@ -36,6 +36,20 @@ if ($_navEmpresaId > 0) {
 <!-- Skip to content (accessibility) -->
 <a href="#main-content" class="skip-link">Ir al contenido</a>
 
+<!-- Banner: Instalar App (PWA) -->
+<div id="admin-install-banner" class="admin-install-banner" style="display:none;">
+    <div class="admin-install-banner-inner">
+        <i class="bi bi-phone-fill"></i>
+        <span><strong>Instala FotoGPS</strong> en tu dispositivo para acceso rapido</span>
+        <button type="button" id="btn-admin-install" class="admin-install-btn">
+            <i class="bi bi-download"></i> Instalar App
+        </button>
+        <button type="button" id="btn-admin-install-dismiss" class="admin-install-dismiss" aria-label="Cerrar">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+</div>
+
 <?php if ($impersonating): ?>
 <div class="impersonate-bar" style="background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-size:0.85rem;position:sticky;top:0;z-index:9999;">
     <div>
@@ -252,5 +266,150 @@ if ($_navEmpresaId > 0) {
         <?php endif; ?>
     </ul>
 </nav>
+
+<!-- PWA Install Banner Styles & Script -->
+<style>
+.admin-install-banner {
+    background: linear-gradient(90deg, #4f6ef7, #6366f1, #8b5cf6);
+    color: #fff;
+    padding: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10000;
+    animation: pwaSlideDown 0.4s ease-out;
+    box-shadow: 0 4px 20px rgba(79, 110, 247, 0.4);
+}
+@keyframes pwaSlideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.admin-install-banner-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+    font-size: 0.88rem;
+}
+.admin-install-banner-inner > i:first-child {
+    font-size: 1.2rem;
+    animation: pwaPulse 2s infinite;
+}
+@keyframes pwaPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+.admin-install-btn {
+    background: #fff;
+    color: #4f6ef7;
+    border: none;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.admin-install-btn:hover {
+    background: #eef2ff;
+    transform: scale(1.04);
+}
+.admin-install-dismiss {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.admin-install-dismiss:hover {
+    background: rgba(255,255,255,0.35);
+}
+@media (max-width: 576px) {
+    .admin-install-banner-inner {
+        font-size: 0.8rem;
+        padding: 8px 12px;
+        gap: 8px;
+    }
+    .admin-install-btn {
+        padding: 6px 14px;
+        font-size: 0.78rem;
+    }
+}
+</style>
+<script>
+(function() {
+    // Inject manifest link for PWA support
+    if (!document.querySelector('link[rel="manifest"]')) {
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = '/admin/manifest.json';
+        document.head.appendChild(link);
+    }
+
+    var banner = document.getElementById('admin-install-banner');
+    var btnInstall = document.getElementById('btn-admin-install');
+    var btnDismiss = document.getElementById('btn-admin-install-dismiss');
+    if (!banner || !btnInstall) return;
+
+    var deferredPrompt = null;
+
+    // Already installed? Don't show
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) return;
+
+    // Check if dismissed recently (7 days)
+    var dismissed = localStorage.getItem('admin-pwa-install-dismissed');
+    if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 7 * 24 * 60 * 60 * 1000) return;
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.style.display = 'block';
+    });
+
+    // iOS detection - show banner with manual instructions
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS && !window.navigator.standalone) {
+        banner.style.display = 'block';
+    }
+
+    btnInstall.addEventListener('click', async function() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            var result = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (result.outcome === 'accepted') {
+                banner.style.display = 'none';
+            }
+        } else {
+            // Fallback instructions
+            if (isIOS) {
+                alert('Para instalar FotoGPS en tu dispositivo:\n\n1. Pulsa el boton Compartir (cuadrado con flecha)\n2. Pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
+            } else {
+                alert('Para instalar FotoGPS:\n\n1. Abre el menu del navegador (tres puntos)\n2. Pulsa "Instalar aplicacion" o "Añadir a pantalla de inicio"');
+            }
+        }
+    });
+
+    if (btnDismiss) {
+        btnDismiss.addEventListener('click', function() {
+            banner.style.display = 'none';
+            localStorage.setItem('admin-pwa-install-dismissed', String(Date.now()));
+        });
+    }
+})();
+</script>
 
 <div id="main-content">
