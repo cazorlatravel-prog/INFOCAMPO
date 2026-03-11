@@ -1296,11 +1296,15 @@
             campos: collectDynamicFields(),
         };
 
-        // Save waypoint for comparative photos
-        if (state.currentMode === 'comparativo' && captureLat && captureLon) {
+        // Save waypoint for comparative photos in "antes" situation
+        // GPX waypoints only for comparativas+antes, named CODIGO_W1, CODIGO_W2...
+        if (state.currentMode === 'comparativo' && SITUACIONES[state.situacionIdx] === 'antes' && captureLat && captureLon) {
+            const wpNum = state.waypoints.length + 1;
+            const wpName = (state.infraCode || 'INF') + ' W' + wpNum;
             state.waypoints.push({
                 lat: captureLat,
                 lon: captureLon,
+                name: wpName,
                 filename: filename,
                 timestamp: new Date().toISOString(),
                 seq: seq,
@@ -1871,6 +1875,7 @@
     let mapUserAccuracyCircle = null; // GPS accuracy radius
     let mapGpsWatchId = null; // dedicated GPS watch for map auto-update
     let mapKmlLayers = []; // KML layer groups
+    let mapWaypointLayer = null; // GPX waypoints layer
     let mapActiveBaseLayer = null;
     const mapBaseLayers = {};
 
@@ -2191,6 +2196,8 @@
             loadMapKmlLayers();
             // Load infrastructure GeoJSON layers
             loadMapInfraLayers();
+            // Load waypoints GPX layer (comparative photos, "antes" state)
+            loadMapWaypoints();
 
         } catch (err) {
             console.warn('Error loading map data:', err);
@@ -2356,6 +2363,65 @@
             });
         } catch (err) {
             console.warn('Error loading infra layers:', err);
+        }
+    }
+
+    // Load GPX waypoints (comparative+antes) and render on map with route line
+    async function loadMapWaypoints() {
+        if (!CFG.endpoints.waypoints || !leafletMap) return;
+        try {
+            if (mapWaypointLayer) {
+                leafletMap.removeLayer(mapWaypointLayer);
+                mapWaypointLayer = null;
+            }
+
+            const url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}&usuario_id=${CFG.usuarioId}&format=json&estado=antes`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.ok || !data.waypoints || data.waypoints.length === 0) return;
+
+            mapWaypointLayer = L.layerGroup().addTo(leafletMap);
+
+            // Group waypoints by infrastructure to draw route lines
+            const byInfra = {};
+            data.waypoints.forEach(wp => {
+                const key = wp.infra_id;
+                if (!byInfra[key]) byInfra[key] = [];
+                byInfra[key].push(wp);
+            });
+
+            Object.values(byInfra).forEach(wps => {
+                // Draw route polyline connecting waypoints in order
+                if (wps.length >= 2) {
+                    const coords = wps.map(wp => [wp.lat, wp.lon]);
+                    L.polyline(coords, {
+                        color: '#22c55e', weight: 2, opacity: 0.6,
+                        dashArray: '6,4',
+                    }).addTo(mapWaypointLayer);
+                }
+
+                // Add waypoint markers
+                wps.forEach(wp => {
+                    const icon = L.divIcon({
+                        className: 'wp-marker',
+                        html: `<div style="width:22px;height:22px;border-radius:50%;background:#22c55e;
+                                border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:8px;font-weight:800;color:#fff;">W${wp.num}</div>`,
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11],
+                    });
+
+                    const fechaFmt = wp.fecha ? wp.fecha.substring(0, 16).replace('T', ' ') : '';
+                    L.marker([wp.lat, wp.lon], { icon, zIndexOffset: 200 })
+                        .bindTooltip(`<b>${escHtml(wp.nombre)}</b><br><small>${fechaFmt}</small>`, {
+                            direction: 'top', offset: [0, -12],
+                        })
+                        .addTo(mapWaypointLayer);
+                });
+            });
+        } catch (err) {
+            console.warn('Error loading waypoints:', err);
         }
     }
 
