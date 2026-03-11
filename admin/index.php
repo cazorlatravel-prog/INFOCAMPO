@@ -215,6 +215,9 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     <a href="descargar_fotos.php?infra_id=<?= $infraId ?>" class="btn btn-outline-success btn-sm">
                                         <i class="bi bi-file-earmark-zip"></i> ZIP
                                     </a>
+                                    <a href="/public/api/waypoints.php?empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?>" class="btn btn-outline-success btn-sm" title="Descargar waypoints comparativos GPX">
+                                        <i class="bi bi-geo-alt"></i> GPX
+                                    </a>
                                     <a href="generar_pdf.php?infra_id=<?= $infraId ?>" class="btn btn-outline-primary btn-sm" target="_blank">
                                         <i class="bi bi-file-pdf"></i> PDF
                                     </a>

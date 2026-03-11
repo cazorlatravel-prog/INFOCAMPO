@@ -811,7 +811,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '<br><small><i class="bi bi-camera"></i> ' + inf.num_fotos + ' foto' + (inf.num_fotos !== 1 ? 's' : '') + '</small>' +
                     '<div style="margin-top:6px;">' +
                     '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + inf.id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;"><i class="bi bi-clock-history"></i> Timeline</a> ' +
-                    '<a href="generar_pdf.php?infra_id=' + inf.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;"><i class="bi bi-file-pdf"></i> PDF</a>' +
+                    '<a href="generar_pdf.php?infra_id=' + inf.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;"><i class="bi bi-file-pdf"></i> PDF</a> ' +
+                    '<a href="/public/api/waypoints.php?empresa_id=' + empresaId + '&infra_id=' + inf.id + '" class="btn btn-sm btn-outline-success" style="font-size:0.7rem;" title="Waypoints GPX"><i class="bi bi-geo-alt"></i> GPX</a>' +
                     '</div></div>';
 
                 var marker = L.marker([inf.lat, inf.lon], { icon: icon, zIndexOffset: hasPhotos ? 100 : -50 });

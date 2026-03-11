@@ -298,9 +298,15 @@ if ($initials === '') $initials = 'OP';
 
         <!-- Botón Finalizar Visita (fijo abajo, rojo, fuera del scroll) -->
         <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
-            <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita">
-                <i class="bi bi-check-circle-fill"></i> Finalizar visita
-            </button>
+            <div style="display:flex;gap:8px;width:100%;">
+                <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita" style="flex:1;">
+                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
+                </button>
+                <button type="button" id="btn-waypoints-ficha" class="btn-finalizar-visita hidden"
+                    style="flex:none;background:#22c55e;padding:0 16px;" title="Descargar waypoints GPX">
+                    <i class="bi bi-geo-alt"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -607,6 +613,7 @@ if ($initials === '') $initials = 'OP';
                 registrosMapa: 'api/registros_mapa.php',
                 capasKml: 'api/capas_kml.php',
                 visitas: 'api/visitas.php',
+                waypoints: 'api/waypoints.php',
                 campos: 'api/campos.php',
             }
         };

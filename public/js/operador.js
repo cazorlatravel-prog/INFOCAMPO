@@ -1203,6 +1203,16 @@
         // Counters are already incremented in captureFrame for filename generation
         countAleatorias.textContent = state.countAleatorias;
         countComparativas.textContent = state.countComparativas;
+
+        // Show/hide waypoints download button
+        const btnWp = $('#btn-waypoints-ficha');
+        if (btnWp) {
+            if (state.countComparativas > 0) {
+                btnWp.classList.remove('hidden');
+            } else {
+                btnWp.classList.add('hidden');
+            }
+        }
     }
 
     // ===================================================================
@@ -1542,6 +1552,15 @@
 
         // Guardar visita (finalizar y resetear)
         if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
+
+        // Waypoints download from ficha
+        const btnWaypointsFicha = $('#btn-waypoints-ficha');
+        if (btnWaypointsFicha) {
+            btnWaypointsFicha.addEventListener('click', () => {
+                if (state.infraId) downloadWaypoints(state.infraId);
+                else downloadMyWaypoints();
+            });
+        }
 
         // Selector de situación en Ficha
         const situacionSelector = $('#situacion-selector');
@@ -2629,53 +2648,25 @@
     // FINALIZAR VISITA (Guardar y Resetear)
     // ===================================================================
     // ===================================================================
-    // WAYPOINTS — Export GPS waypoints for comparative photos
+    // WAYPOINTS — Download GPX from server
     // ===================================================================
-    function exportWaypoints() {
-        if (!state.waypoints || state.waypoints.length === 0) return;
+    function downloadWaypoints(infraId, fecha) {
+        let url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}`;
+        if (infraId) url += `&infra_id=${infraId}`;
+        if (fecha) url += `&fecha=${encodeURIComponent(fecha)}`;
+        // Open in new tab to trigger download
+        window.open(url, '_blank');
+    }
 
-        const infraName = sanitizeFilename(state.infraName || 'infraestructura');
-        const nowMadrid = new Date().toLocaleString('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/-/g, '');
-
-        // Build GPX file with waypoints named after their photo filenames
-        let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-        gpx += `<gpx version="1.1" creator="INFOCAMPO" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-        gpx += `  <metadata>\n`;
-        gpx += `    <name>Waypoints comparativos - ${escHtml(state.infraName)}</name>\n`;
-        gpx += `    <time>${new Date().toISOString()}</time>\n`;
-        gpx += `  </metadata>\n`;
-
-        state.waypoints.forEach(wp => {
-            gpx += `  <wpt lat="${wp.lat}" lon="${wp.lon}">\n`;
-            gpx += `    <name>${escHtml(wp.filename)}</name>\n`;
-            gpx += `    <time>${wp.timestamp}</time>\n`;
-            gpx += `    <desc>Foto comparativa seq ${wp.seq || 0} - ${escHtml(state.infraName)}</desc>\n`;
-            gpx += `  </wpt>\n`;
-        });
-
-        gpx += `</gpx>\n`;
-
-        // Download the GPX file
-        const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${infraName}_WAYPOINTS_${nowMadrid}.gpx`;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    function downloadMyWaypoints() {
+        let url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}&usuario_id=${CFG.usuarioId}`;
+        if (state.infraId) url += `&infra_id=${state.infraId}`;
+        window.open(url, '_blank');
     }
 
     function finalizarVisita() {
         const numFotos = state.photos.length;
         const infraName = state.infraName;
-
-        // Export waypoints if comparative photos were taken
-        if (state.waypoints.length > 0) {
-            exportWaypoints();
-        }
 
         showNotification(`Visita a "${infraName}" finalizada (${numFotos} foto${numFotos !== 1 ? 's' : ''})`);
 
@@ -2770,10 +2761,23 @@
                 });
 
                 html += `</div>
-                    <button type="button" class="btn-continuar-visita" data-visita-idx="${idx}">
-                        <i class="bi bi-pencil-square"></i> Continuar visita
-                    </button>
-                </div>`;
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 8px;">
+                        <button type="button" class="btn-continuar-visita" data-visita-idx="${idx}">
+                            <i class="bi bi-pencil-square"></i> Continuar visita
+                        </button>`;
+
+                // Show waypoints download if there are comparative photos
+                const hasComp = visita.fotos.some(f => f.tipo === 'comparativo');
+                if (hasComp) {
+                    html += `<button type="button" class="btn-descargar-waypoints" data-infra-id="${visita.infra_id}" data-fecha="${visita.fecha}"
+                                style="flex:none;padding:6px 14px;font-size:0.8rem;font-weight:600;
+                                border:none;border-radius:8px;background:#22c55e;color:#fff;cursor:pointer;
+                                display:flex;align-items:center;gap:4px;">
+                            <i class="bi bi-geo-alt"></i> Waypoints GPX
+                        </button>`;
+                }
+
+                html += `</div></div>`;
             });
 
             // Store visitas data for continuarVisita
@@ -2789,6 +2793,16 @@
                     if (window._visitasData && window._visitasData[idx]) {
                         continuarVisita(window._visitasData[idx]);
                     }
+                });
+            });
+
+            // Bind "Descargar waypoints" buttons
+            visitasBody.querySelectorAll('.btn-descargar-waypoints').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const infraId = btn.dataset.infraId;
+                    const fecha = btn.dataset.fecha;
+                    downloadWaypoints(infraId, fecha);
                 });
             });
         } catch (err) {
