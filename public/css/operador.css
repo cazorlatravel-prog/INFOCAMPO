@@ -1446,6 +1446,83 @@ select.input-field {
     z-index: 1;
 }
 
+/* --- Map Search Bar --- */
+.mapa-search-bar {
+    position: absolute;
+    top: 58px;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    animation: searchSlideDown 0.2s ease-out;
+}
+.mapa-search-bar.hidden { display: none; }
+@keyframes searchSlideDown {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.mapa-search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+.mapa-search-input-wrap i { color: #9ca3af; font-size: 0.9rem; }
+.mapa-search-input-wrap input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 0.88rem;
+    color: #1f2937;
+    outline: none;
+}
+.mapa-search-close {
+    background: none; border: none; color: #9ca3af;
+    font-size: 0.75rem; cursor: pointer; padding: 4px;
+}
+.mapa-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    border-radius: 0 0 12px 12px;
+    z-index: 1002;
+}
+.mapa-search-results.hidden { display: none; }
+.mapa-search-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.1s;
+}
+.mapa-search-item:hover { background: #f0f4ff; }
+.mapa-search-item:last-child { border-bottom: none; }
+.mapa-search-item .search-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.mapa-search-item .search-info { flex: 1; min-width: 0; }
+.mapa-search-item .search-info strong {
+    display: block; font-size: 0.85rem; color: #1f2937;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mapa-search-item .search-info small {
+    font-size: 0.7rem; color: #6b7280;
+}
+.mapa-search-item .search-dist {
+    font-size: 0.72rem; color: #4285f4; font-weight: 600; white-space: nowrap;
+}
+
 /* Botón Volver rojo fijo abajo */
 .mapa-volver-btn {
     position: absolute;

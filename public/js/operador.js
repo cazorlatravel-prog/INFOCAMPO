@@ -1744,6 +1744,9 @@
         btnDetailComparativo.addEventListener('click', () => startVisitFromMap('comparativo'));
         document.getElementById('btn-stop-nav').addEventListener('click', stopNavigation);
 
+        // Map search
+        initMapSearch();
+
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
@@ -1878,6 +1881,8 @@
     let mapWaypointLayer = null; // GPX waypoints layer
     let mapActiveBaseLayer = null;
     const mapBaseLayers = {};
+    let mapAdminPointsLayer = null; // Admin custom points layer
+    let mapAllInfrasCache = [];     // Cache for search
 
     // Navigation mode state
     let navActive = false;
@@ -2112,6 +2117,9 @@
                 if (!allInfras[id]) allInfras[id] = byInfra[id];
             });
 
+            // Cache for map search
+            mapAllInfrasCache = Object.values(allInfras);
+
             const bounds = [];
             const stateColors = {
                 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e',
@@ -2198,6 +2206,8 @@
             loadMapInfraLayers();
             // Load waypoints GPX layer (comparative photos, "antes" state)
             loadMapWaypoints();
+            // Load admin custom points
+            loadMapAdminPoints();
 
         } catch (err) {
             console.warn('Error loading map data:', err);
@@ -2423,6 +2433,159 @@
         } catch (err) {
             console.warn('Error loading waypoints:', err);
         }
+    }
+
+    // ===================================================================
+    // ADMIN CUSTOM POINTS (puntos_mapa)
+    // ===================================================================
+    const iconoMap = {
+        pin: 'bi-geo-alt-fill', star: 'bi-star-fill', flag: 'bi-flag-fill',
+        house: 'bi-house-fill', box: 'bi-box-fill', exclamation: 'bi-exclamation-triangle-fill',
+        tools: 'bi-tools', person: 'bi-person-fill',
+    };
+
+    async function loadMapAdminPoints() {
+        if (!CFG.endpoints.puntosMapa || !leafletMap) return;
+        try {
+            if (mapAdminPointsLayer) {
+                leafletMap.removeLayer(mapAdminPointsLayer);
+                mapAdminPointsLayer = null;
+            }
+
+            const res = await fetch(`${CFG.endpoints.puntosMapa}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (!data.ok || !data.puntos || data.puntos.length === 0) return;
+
+            mapAdminPointsLayer = L.layerGroup().addTo(leafletMap);
+
+            data.puntos.forEach(pt => {
+                const lat = parseFloat(pt.lat);
+                const lon = parseFloat(pt.lon);
+                if (!lat || !lon) return;
+
+                const biClass = iconoMap[pt.icono] || 'bi-geo-alt-fill';
+                const color = pt.color || '#e74c3c';
+
+                const icon = L.divIcon({
+                    className: 'admin-point-marker',
+                    html: `<div style="width:30px;height:30px;border-radius:50%;background:${color};
+                            border:3px solid rgba(255,255,255,0.95);box-shadow:0 2px 8px rgba(0,0,0,0.4);
+                            display:flex;align-items:center;justify-content:center;">
+                            <i class="bi ${biClass}" style="font-size:12px;color:#fff;"></i>
+                           </div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                });
+
+                let tooltipHtml = `<b>${escHtml(pt.nombre)}</b>`;
+                if (pt.descripcion) tooltipHtml += `<br><small>${escHtml(pt.descripcion)}</small>`;
+                if (state.gps.lat && state.gps.lon) {
+                    const dist = haversineDistance(state.gps.lat, state.gps.lon, lat, lon);
+                    tooltipHtml += `<br><span style="color:#4285f4;">${formatDistance(dist)}</span>`;
+                }
+
+                L.marker([lat, lon], { icon, zIndexOffset: 100 })
+                    .bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -12] })
+                    .addTo(mapAdminPointsLayer);
+            });
+        } catch (err) {
+            console.warn('Error loading admin points:', err);
+        }
+    }
+
+    // ===================================================================
+    // MAP SEARCH / FILTER
+    // ===================================================================
+    function initMapSearch() {
+        const toggleBtn = document.getElementById('btn-mapa-search-toggle');
+        const searchBar = document.getElementById('mapa-search-bar');
+        const searchInput = document.getElementById('mapa-search-input');
+        const searchResults = document.getElementById('mapa-search-results');
+        const closeBtn = document.getElementById('btn-mapa-search-close');
+        if (!toggleBtn || !searchBar || !searchInput) return;
+
+        let debounce = null;
+
+        toggleBtn.addEventListener('click', () => {
+            const visible = !searchBar.classList.contains('hidden');
+            if (visible) {
+                searchBar.classList.add('hidden');
+                searchResults.classList.add('hidden');
+                searchInput.value = '';
+            } else {
+                searchBar.classList.remove('hidden');
+                setTimeout(() => searchInput.focus(), 100);
+            }
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                searchBar.classList.add('hidden');
+                searchResults.classList.add('hidden');
+                searchInput.value = '';
+            });
+        }
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounce);
+            const q = searchInput.value.trim().toLowerCase();
+            if (q.length < 2) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+            debounce = setTimeout(() => doMapSearch(q, searchResults), 200);
+        });
+    }
+
+    function doMapSearch(query, resultsEl) {
+        const matches = mapAllInfrasCache.filter(inf => {
+            const nombre = (inf.nombre || '').toLowerCase();
+            const codigo = (inf.codigo || '').toLowerCase();
+            return nombre.includes(query) || codigo.includes(query);
+        }).slice(0, 15);
+
+        if (matches.length === 0) {
+            resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.82rem;">Sin resultados</div>';
+            resultsEl.classList.remove('hidden');
+            return;
+        }
+
+        let html = '';
+        matches.forEach(inf => {
+            const hasPhotos = inf.registros && inf.registros.length > 0;
+            const dotColor = hasPhotos ? '#22c55e' : '#9ca3af';
+            let distHtml = '';
+            if (state.gps.lat && state.gps.lon && inf.lat && inf.lon) {
+                const dist = haversineDistance(state.gps.lat, state.gps.lon, inf.lat, inf.lon);
+                distHtml = `<span class="search-dist">${formatDistance(dist)}</span>`;
+            }
+            html += `<div class="mapa-search-item" data-infra-id="${inf.id}">
+                <span class="search-dot" style="background:${dotColor};"></span>
+                <div class="search-info">
+                    <strong>${escHtml(inf.nombre)}</strong>
+                    <small>${escHtml(inf.codigo || '')}${hasPhotos ? ' · ' + inf.registros.length + ' fotos' : ' · Sin visitar'}</small>
+                </div>
+                ${distHtml}
+            </div>`;
+        });
+
+        resultsEl.innerHTML = html;
+        resultsEl.classList.remove('hidden');
+
+        // Click handler for results
+        resultsEl.querySelectorAll('.mapa-search-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const infraId = parseInt(el.dataset.infraId);
+                const infra = mapAllInfrasCache.find(i => i.id === infraId || i.id === String(infraId));
+                if (infra && infra.lat && infra.lon) {
+                    leafletMap.setView([infra.lat, infra.lon], 17, { animate: true });
+                    showInfraDetail(infra);
+                }
+                resultsEl.classList.add('hidden');
+                document.getElementById('mapa-search-bar').classList.add('hidden');
+                document.getElementById('mapa-search-input').value = '';
+            });
+        });
     }
 
     function showInfraDetail(infra) {

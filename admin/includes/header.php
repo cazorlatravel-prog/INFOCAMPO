@@ -239,6 +239,9 @@ if ($_navEmpresaId > 0) {
         <li role="none"><a href="/admin/capas_infra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'capas_infra' ? 'active' : '' ?>" role="menuitem">
             <i class="bi bi-layers"></i> <span>Capas</span>
         </a></li>
+        <li role="none"><a href="/admin/puntos_mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'puntos_mapa' ? 'active' : '' ?>" role="menuitem">
+            <i class="bi bi-geo-fill"></i> <span>Puntos</span>
+        </a></li>
         <li role="none"><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>" role="menuitem">
             <i class="bi bi-sliders2"></i> <span>Ajustes</span>
         </a></li>

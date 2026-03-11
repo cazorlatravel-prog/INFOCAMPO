@@ -268,7 +268,7 @@ if ($initials === '') $initials = 'OP';
                     <span class="foto-count" id="count-comparativas">0</span>
                 </button>
 
-                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa" <?= !$opMostrarMapa ? 'style="display:none;"' : '' ?>>
+                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa">
                     <div class="foto-btn-icon">
                         <i class="bi bi-map-fill"></i>
                     </div>
@@ -430,8 +430,23 @@ if ($initials === '') $initials = 'OP';
                 <strong>Mapa de Visitas</strong>
                 <span id="mapa-subtitle">Todas las infraestructuras</span>
             </div>
-            <div style="width:40px;"></div>
+            <button type="button" id="btn-mapa-search-toggle" class="cam-btn-back" title="Buscar infraestructura" style="font-size:1rem;">
+                <i class="bi bi-search"></i>
+            </button>
         </div>
+
+        <!-- Buscador de infraestructuras en mapa -->
+        <div id="mapa-search-bar" class="mapa-search-bar hidden">
+            <div class="mapa-search-input-wrap">
+                <i class="bi bi-search"></i>
+                <input type="text" id="mapa-search-input" placeholder="Buscar infraestructura..." autocomplete="off" spellcheck="false">
+                <button type="button" id="btn-mapa-search-close" class="mapa-search-close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div id="mapa-search-results" class="mapa-search-results hidden"></div>
+        </div>
+
         <div id="op-map" class="op-map"></div>
 
         <!-- Navigation overlay -->
@@ -644,6 +659,7 @@ if ($initials === '') $initials = 'OP';
                 capasInfra: 'api/capas_infra.php',
                 visitas: 'api/visitas.php',
                 waypoints: 'api/waypoints.php',
+                puntosMapa: 'api/puntos_mapa.php',
                 campos: 'api/campos.php',
             },
             formatoNombreFoto: <?= $formatoNombreFoto ?>,
