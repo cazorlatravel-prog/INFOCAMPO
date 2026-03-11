@@ -105,11 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     if ($q !== '') {
-        $where .= " AND (nombre LIKE :q OR codigo_unico LIKE :q)";
+        $where .= " AND (nombre LIKE :q OR codigo_unico LIKE :q OR descripcion LIKE :q)";
         $params[':q'] = '%' . $q . '%';
     }
 
-    $selectCols = "id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo";
+    $selectCols = "id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, descripcion";
     if ($hasLocationCols) {
         $selectCols .= ", provincia, municipio";
     }

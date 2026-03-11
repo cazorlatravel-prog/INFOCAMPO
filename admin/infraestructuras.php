@@ -220,6 +220,9 @@ if (isset($_GET['edit'])) {
                     <a href="exportar_csv.php?tipo=infraestructuras&empresa_id=<?= $empresaId ?>" class="btn btn-outline-secondary btn-sm" title="Exportar a CSV/Excel">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
                     </a>
+                    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalExcel">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Importar Excel
+                    </button>
                     <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalKml">
                         <i class="bi bi-file-earmark-arrow-up"></i> Importar KML
                     </button>
@@ -436,6 +439,82 @@ if (isset($_GET['edit'])) {
             </div>
         <?php endif; ?>
     </div>
+
+    <!-- Modal Importar Excel -->
+    <?php if ($empresaId > 0): ?>
+    <div class="modal fade" id="modalExcel" tabindex="-1" aria-labelledby="modalExcelLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #1e5f3a, #2d9f6a); color: #fff;">
+                    <h5 class="modal-title" id="modalExcelLabel">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Importar Infraestructuras desde Excel
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Sube un archivo <strong>.xlsx</strong>, <strong>.xls</strong> o <strong>.csv</strong> con las infraestructuras.
+                        <strong>No es necesario incluir coordenadas GPS</strong>; se georreferenciarán cuando el operador tome fotos en campo.
+                        <br><br>
+                        <strong>Columnas reconocidas:</strong>
+                        <ul class="mb-0 mt-1">
+                            <li><strong>nombre</strong> (obligatorio)</li>
+                            <li>codigo, tipo, provincia, municipio, descripción</li>
+                            <li>lat, lon (opcionales)</li>
+                        </ul>
+                    </div>
+
+                    <form id="form-excel" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                        <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+
+                        <div class="mb-3">
+                            <label for="archivo_excel" class="form-label fw-semibold">Archivo Excel / CSV</label>
+                            <input type="file" class="form-control" id="archivo_excel" name="archivo_excel"
+                                   accept=".xlsx,.xls,.csv" required>
+                            <div class="form-text">Tamaño máximo: 10 MB</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Duplicados</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="duplicados" id="excel_dup_omitir" value="omitir" checked>
+                                <label class="form-check-label" for="excel_dup_omitir">
+                                    Omitir duplicados (nombre o código coincidentes)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="duplicados" id="excel_dup_importar" value="importar">
+                                <label class="form-check-label" for="excel_dup_importar">
+                                    Importar todos (pueden crearse duplicados)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Resultado -->
+                    <div id="excel-result" style="display:none;" class="mt-3"></div>
+
+                    <!-- Progreso -->
+                    <div id="excel-progress" style="display:none;" class="mt-3">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%">
+                                Importando...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-success" id="btn-importar-excel" onclick="importarExcel()">
+                        <i class="bi bi-cloud-upload me-1"></i>Importar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Modal Importar KML -->
     <?php if ($empresaId > 0): ?>
@@ -757,6 +836,90 @@ if (isset($_GET['edit'])) {
             btnImportar.disabled = false;
             btnImportar.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Importar';
         }
+
+        // ---------------------------------------------------------------
+        // Excel Import
+        // ---------------------------------------------------------------
+        async function importarExcel() {
+            const form = document.getElementById('form-excel');
+            const fileInput = document.getElementById('archivo_excel');
+            const resultDiv = document.getElementById('excel-result');
+            const progressDiv = document.getElementById('excel-progress');
+            const btnImportar = document.getElementById('btn-importar-excel');
+
+            if (!fileInput.files[0]) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Selecciona un archivo Excel o CSV</div>';
+                return;
+            }
+
+            progressDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+            btnImportar.disabled = true;
+            btnImportar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Importando...';
+
+            const formData = new FormData(form);
+
+            try {
+                const resp = await fetch('importar_excel.php', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await resp.json();
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+
+                if (data.ok) {
+                    let html = '<div class="alert alert-success">' +
+                        '<i class="bi bi-check-circle me-1"></i>' +
+                        '<strong>' + data.importados + '</strong> infraestructura' + (data.importados !== 1 ? 's' : '') + ' importada' + (data.importados !== 1 ? 's' : '') + ' correctamente.';
+
+                    if (data.omitidos > 0) {
+                        html += '<br><small>' + data.omitidos + ' omitida' + (data.omitidos !== 1 ? 's' : '') + ' (duplicadas o sin nombre)</small>';
+                    }
+
+                    if (data.errores && data.errores.length > 0) {
+                        html += '<br><small class="text-warning">' + data.errores.join('<br>') + '</small>';
+                    }
+
+                    html += '</div>';
+
+                    if (data.detalles && data.detalles.length > 0) {
+                        html += '<div style="max-height: 200px; overflow-y: auto;">';
+                        html += '<table class="table table-sm table-striped small">';
+                        html += '<thead><tr><th>Nombre</th><th>Código</th><th>Provincia</th><th>Municipio</th></tr></thead><tbody>';
+                        data.detalles.forEach(d => {
+                            html += '<tr><td>' + (d.nombre || '') + '</td><td><code>' + (d.codigo || '') + '</code></td>' +
+                                    '<td>' + (d.provincia || '-') + '</td><td>' + (d.municipio || '-') + '</td></tr>';
+                        });
+                        html += '</tbody></table></div>';
+                    }
+
+                    resultDiv.innerHTML = html;
+
+                    if (data.importados > 0) {
+                        setTimeout(() => location.reload(), 2500);
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>' + (data.error || 'Error desconocido') + '</div>';
+                }
+            } catch (err) {
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>Error de conexión: ' + err.message + '</div>';
+            }
+
+            btnImportar.disabled = false;
+            btnImportar.innerHTML = '<i class="bi bi-cloud-upload me-1"></i>Importar';
+        }
+
+        // Limpiar modal Excel al cerrar
+        document.getElementById('modalExcel')?.addEventListener('hidden.bs.modal', function() {
+            document.getElementById('excel-result').style.display = 'none';
+            document.getElementById('excel-progress').style.display = 'none';
+            document.getElementById('archivo_excel').value = '';
+        });
 
         // Reinicializar preview al abrir el modal
         document.getElementById('modalKml')?.addEventListener('shown.bs.modal', function() {
