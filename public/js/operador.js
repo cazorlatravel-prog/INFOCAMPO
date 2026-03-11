@@ -2585,16 +2585,8 @@
             });
 
             Object.values(byInfra).forEach(wps => {
-                // Draw route polyline connecting waypoints in order
-                if (wps.length >= 2) {
-                    const coords = wps.map(wp => [wp.lat, wp.lon]);
-                    L.polyline(coords, {
-                        color: '#22c55e', weight: 2, opacity: 0.6,
-                        dashArray: '6,4',
-                    }).addTo(mapWaypointLayer);
-                }
-
-                // Add waypoint markers
+                // Only show waypoint markers (no route line between them)
+                // Navigation line is drawn only when user requests "ir a" a specific point
                 wps.forEach(wp => {
                     const icon = L.divIcon({
                         className: 'wp-marker',
