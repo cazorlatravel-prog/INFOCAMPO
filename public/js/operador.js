@@ -478,10 +478,16 @@
         }
 
         try {
+            // Timeout after 4s to avoid blocking capture on slow networks
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 4000);
+
             const res = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`,
-                { headers: { 'Accept-Language': 'es' } }
+                { headers: { 'Accept-Language': 'es' }, signal: controller.signal }
             );
+            clearTimeout(timeout);
+
             const data = await res.json();
             const addr = data.address || {};
             state.geoLocation = {
@@ -1119,110 +1125,131 @@
     // ===================================================================
     // CAPTURE
     // ===================================================================
+    let _capturing = false;
+
     async function captureFrame() {
-        const vw = camVideo.videoWidth;
-        const vh = camVideo.videoHeight;
+        // Guard: prevent double-tap while capture is in progress
+        if (_capturing) return;
+        _capturing = true;
 
-        // Force 3:4 portrait crop from center of video frame
-        let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
-        const targetRatio = 3 / 4; // width / height
-        const videoRatio = vw / vh;
+        try {
+            const vw = camVideo.videoWidth;
+            const vh = camVideo.videoHeight;
 
-        if (videoRatio > targetRatio) {
-            // Video is wider than 3:4 — crop sides
-            srcW = Math.round(vh * targetRatio);
-            srcX = Math.round((vw - srcW) / 2);
-        } else if (videoRatio < targetRatio) {
-            // Video is taller than 3:4 — crop top/bottom
-            srcH = Math.round(vw / targetRatio);
-            srcY = Math.round((vh - srcH) / 2);
-        }
-
-        camCapture.width = srcW;
-        camCapture.height = srcH;
-
-        const ctx = camCapture.getContext('2d');
-        ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
-
-        camVideo.pause();
-
-        // Freeze GPS coordinates at the exact moment of capture
-        state.capturedGps.lat = state.gps.lat;
-        state.capturedGps.lon = state.gps.lon;
-
-        // Update counters
-        state.countTotal++;
-        if (state.currentMode === 'comparativo') {
-            state.seqComparativa++;
-            state.countComparativas++;
-        } else {
-            state.countAleatorias++;
-        }
-
-        // Persist counter for this infrastructure
-        if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
-
-        // Generate filename based on company config (formatoNombreFoto)
-        const seqNum = String(state.countTotal).padStart(3, '0');
-        const codInfra = sanitizeFilename(state.infraCode || state.infraName);
-        const formato = CFG.formatoNombreFoto || 1;
-
-        let filename;
-        if (formato === 2) {
-            // CODIGO_INFRA_TIPO_TRABAJO_NºFOTO
-            const ttName = getSelectedTipoTrabajoName();
-            filename = ttName
-                ? `${codInfra}_${sanitizeFilename(ttName)}_${seqNum}`
-                : `${codInfra}_${seqNum}`;
-        } else if (formato === 3) {
-            // CODIGO_INFRA_TIPO_TRABAJO_TIPO_FOTO_NºFOTO
-            const ttName = getSelectedTipoTrabajoName();
-            const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
-            if (ttName) {
-                filename = `${codInfra}_${sanitizeFilename(ttName)}_${tipoFotoLabel}_${seqNum}`;
-            } else {
-                filename = `${codInfra}_${tipoFotoLabel}_${seqNum}`;
+            if (!vw || !vh) {
+                console.warn('captureFrame: video not ready (dimensions 0)');
+                _capturing = false;
+                return;
             }
-        } else {
-            // Default (1): CODIGO_INFRA_NºFOTO
-            filename = `${codInfra}_${seqNum}`;
+
+            // Force 3:4 portrait crop from center of video frame
+            let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
+            const targetRatio = 3 / 4; // width / height
+            const videoRatio = vw / vh;
+
+            if (videoRatio > targetRatio) {
+                srcW = Math.round(vh * targetRatio);
+                srcX = Math.round((vw - srcW) / 2);
+            } else if (videoRatio < targetRatio) {
+                srcH = Math.round(vw / targetRatio);
+                srcY = Math.round((vh - srcH) / 2);
+            }
+
+            // Free previous canvas memory before allocating new
+            state.baseImageData = null;
+            state.capturedBlob = null;
+
+            camCapture.width = srcW;
+            camCapture.height = srcH;
+
+            const ctx = camCapture.getContext('2d');
+            ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+
+            camVideo.pause();
+
+            // Freeze GPS coordinates at the exact moment of capture
+            state.capturedGps.lat = state.gps.lat;
+            state.capturedGps.lon = state.gps.lon;
+
+            // Update counters
+            state.countTotal++;
+            if (state.currentMode === 'comparativo') {
+                state.seqComparativa++;
+                state.countComparativas++;
+            } else {
+                state.countAleatorias++;
+            }
+
+            // Persist counter for this infrastructure
+            if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
+
+            // Generate filename based on company config (formatoNombreFoto)
+            const seqNum = String(state.countTotal).padStart(3, '0');
+            const codInfra = sanitizeFilename(state.infraCode || state.infraName);
+            const formato = CFG.formatoNombreFoto || 1;
+
+            let filename;
+            if (formato === 2) {
+                const ttName = getSelectedTipoTrabajoName();
+                filename = ttName
+                    ? `${codInfra}_${sanitizeFilename(ttName)}_${seqNum}`
+                    : `${codInfra}_${seqNum}`;
+            } else if (formato === 3) {
+                const ttName = getSelectedTipoTrabajoName();
+                const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+                if (ttName) {
+                    filename = `${codInfra}_${sanitizeFilename(ttName)}_${tipoFotoLabel}_${seqNum}`;
+                } else {
+                    filename = `${codInfra}_${tipoFotoLabel}_${seqNum}`;
+                }
+            } else {
+                filename = `${codInfra}_${seqNum}`;
+            }
+
+            // Freeze bearing at capture moment
+            const capturedBearing = state.bearing;
+
+            // Ensure reverse geocoding is done for capture location (with timeout)
+            let geoLoc = state.geoLocation;
+            if (state.capturedGps.lat != null && state.capturedGps.lon != null) {
+                geoLoc = await reverseGeocode(state.capturedGps.lat, state.capturedGps.lon);
+            }
+
+            // Apply watermark directly on previewCanvas (used for blob generation)
+            await applyWatermark(camCapture, previewCanvas, {
+                lat: state.capturedGps.lat,
+                lon: state.capturedGps.lon,
+                infraName: state.infraName,
+                infraCode: state.infraCode,
+                empresaName: CFG.empresaName,
+                situacion: SITUACIONES_UI[state.situacionIdx],
+                filename: filename,
+                mode: state.currentMode,
+                seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
+                bearing: capturedBearing,
+                geoLocation: geoLoc,
+            });
+
+            // Save base image for annotation overlay (before any annotation)
+            const prevCtx = previewCanvas.getContext('2d');
+            state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            state.pendingFilename = filename;
+            state.annotation = null;
+            state.annotationMode = false;
+
+            // Show preview screen for optional annotation before uploading
+            showScreen('preview');
+            if (previewFilename) previewFilename.textContent = filename;
+            resetAnnotationUI();
+
+        } catch (err) {
+            console.error('Error en captureFrame:', err);
+            // Resume camera so the user can retry
+            try { camVideo.play(); } catch (_) {}
+            alert('Error al capturar la foto. Inténtalo de nuevo.');
+        } finally {
+            _capturing = false;
         }
-
-        // Freeze bearing at capture moment
-        const capturedBearing = state.bearing;
-
-        // Ensure reverse geocoding is done for capture location
-        let geoLoc = state.geoLocation;
-        if (state.capturedGps.lat != null && state.capturedGps.lon != null) {
-            geoLoc = await reverseGeocode(state.capturedGps.lat, state.capturedGps.lon);
-        }
-
-        // Apply watermark directly on previewCanvas (used for blob generation)
-        await applyWatermark(camCapture, previewCanvas, {
-            lat: state.capturedGps.lat,
-            lon: state.capturedGps.lon,
-            infraName: state.infraName,
-            infraCode: state.infraCode,
-            empresaName: CFG.empresaName,
-            situacion: SITUACIONES_UI[state.situacionIdx],
-            filename: filename,
-            mode: state.currentMode,
-            seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
-            bearing: capturedBearing,
-            geoLocation: geoLoc,
-        });
-
-        // Save base image for annotation overlay (before any annotation)
-        const prevCtx = previewCanvas.getContext('2d');
-        state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-        state.pendingFilename = filename;
-        state.annotation = null;
-        state.annotationMode = false;
-
-        // Show preview screen for optional annotation before uploading
-        showScreen('preview');
-        if (previewFilename) previewFilename.textContent = filename;
-        resetAnnotationUI();
     }
 
     // ===================================================================
@@ -1256,6 +1283,13 @@
             showScreen('ficha');
             return;
         }
+
+        // Free large objects from memory before upload
+        state.capturedBlob = null;
+        state.baseImageData = null;
+        // Clear capture canvas to release memory
+        camCapture.width = 1;
+        camCapture.height = 1;
 
         // Show upload overlay
         uploadOverlay.classList.remove('hidden');
@@ -3058,7 +3092,9 @@
         state.annotation = null;
         state.annotationMode = false;
         state.pendingFilename = null;
+        // Free large ImageData from memory
         state.baseImageData = null;
+        state.capturedBlob = null;
 
         // Resume camera
         camVideo.play();
