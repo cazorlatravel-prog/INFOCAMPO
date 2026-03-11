@@ -41,6 +41,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         }
     }
 
+    if ($action === 'guardar_watermark') {
+        $targetEmpId = (int) ($_POST['empresa_id'] ?? $empresaId);
+        if ($targetEmpId > 0) {
+            $wmCodigoInfra = isset($_POST['wm_mostrar_codigo_infra']) ? 1 : 0;
+            $wmSituacion   = isset($_POST['wm_mostrar_situacion']) ? 1 : 0;
+            $wmTipoFoto    = isset($_POST['wm_mostrar_tipo_foto']) ? 1 : 0;
+            $wmMapa        = isset($_POST['wm_mostrar_mapa']) ? 1 : 0;
+            $wmMapaZoom    = (int) ($_POST['wm_mapa_zoom'] ?? 15);
+            $wmMapaTamano  = (int) ($_POST['wm_mapa_tamano'] ?? 2);
+
+            $allowedZooms = [13, 14, 15, 16, 17];
+            if (!in_array($wmMapaZoom, $allowedZooms, true)) $wmMapaZoom = 15;
+            $allowedSizes = [1, 2, 3];
+            if (!in_array($wmMapaTamano, $allowedSizes, true)) $wmMapaTamano = 2;
+
+            $stmt = $pdo->prepare(
+                "UPDATE empresas SET wm_mostrar_codigo_infra = :ci, wm_mostrar_situacion = :sit,
+                 wm_mostrar_tipo_foto = :tf, wm_mostrar_mapa = :mapa,
+                 wm_mapa_zoom = :zoom, wm_mapa_tamano = :tam WHERE id = :id"
+            );
+            $stmt->execute([
+                ':ci'   => $wmCodigoInfra,
+                ':sit'  => $wmSituacion,
+                ':tf'   => $wmTipoFoto,
+                ':mapa' => $wmMapa,
+                ':zoom' => $wmMapaZoom,
+                ':tam'  => $wmMapaTamano,
+                ':id'   => $targetEmpId,
+            ]);
+            $msg = 'Configuración de marca de agua actualizada correctamente.';
+            $msgType = 'success';
+
+            $stmtR = $pdo->prepare("SELECT * FROM empresas WHERE id = :id");
+            $stmtR->execute([':id' => $targetEmpId]);
+            $empresa = $stmtR->fetch();
+        }
+    }
+
     if ($action === 'guardar_campos_operador') {
         $targetEmpId = (int) ($_POST['empresa_id'] ?? $empresaId);
         if ($targetEmpId > 0) {
@@ -98,6 +136,14 @@ $opInfra     = (int) ($empresa['op_mostrar_infraestructura'] ?? 0);
 $opSituacion = (int) ($empresa['op_mostrar_situacion'] ?? 0);
 $opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
 $opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
+
+// Watermark settings
+$wmCodigoInfra = (int) ($empresa['wm_mostrar_codigo_infra'] ?? 0);
+$wmSituacion   = (int) ($empresa['wm_mostrar_situacion'] ?? 0);
+$wmTipoFoto    = (int) ($empresa['wm_mostrar_tipo_foto'] ?? 0);
+$wmMapa        = (int) ($empresa['wm_mostrar_mapa'] ?? 0);
+$wmMapaZoom    = (int) ($empresa['wm_mapa_zoom'] ?? 15);
+$wmMapaTamano  = (int) ($empresa['wm_mapa_tamano'] ?? 2);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -265,6 +311,87 @@ $opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
                 </div>
             </div>
 
+            <!-- Marca de agua en fotos -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-badge-wc me-2"></i>Marca de agua en fotos</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-2">
+                        Configura qué información adicional aparece sobre las fotos del operador.
+                    </p>
+                    <div class="alert alert-light border mb-3 py-2 px-3" style="font-size:0.82rem;">
+                        <strong>Siempre visible:</strong> Fecha/hora, coordenadas UTM, orientación (brújula), municipio/provincia, país.
+                        <br>
+                        <strong>Opcional:</strong> Marca las casillas para añadir más datos sobre la foto.
+                    </div>
+
+                    <form method="post">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="guardar_watermark">
+                        <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+
+                        <div class="mb-4">
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_codigo_infra" name="wm_mostrar_codigo_infra" value="1" <?= $wmCodigoInfra ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_codigo_infra">
+                                    <i class="bi bi-hash me-1"></i> Código de infraestructura
+                                </label>
+                                <div class="text-muted small mt-1">Muestra el código de la infraestructura en la foto (ej: <code>TORRE-A42</code>).</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_situacion" name="wm_mostrar_situacion" value="1" <?= $wmSituacion ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_situacion">
+                                    <i class="bi bi-flag me-1"></i> Situación de la obra
+                                </label>
+                                <div class="text-muted small mt-1">Muestra ANTES, DURANTE o DESPUÉS en la foto.</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_tipo_foto" name="wm_mostrar_tipo_foto" value="1" <?= $wmTipoFoto ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_tipo_foto">
+                                    <i class="bi bi-camera me-1"></i> Tipo de foto
+                                </label>
+                                <div class="text-muted small mt-1">Muestra <code>FOT ALE</code> (aleatoria) o <code>FOT COM</code> (comparativa).</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_mapa" name="wm_mostrar_mapa" value="1" <?= $wmMapa ? 'checked' : '' ?> onchange="toggleWmMapaOpts()">
+                                <label class="form-check-label fw-semibold" for="wm_mapa">
+                                    <i class="bi bi-map me-1"></i> Mini-mapa de localización
+                                </label>
+                                <div class="text-muted small mt-1">Muestra un pequeño mapa en la esquina inferior izquierda de la foto.</div>
+                                <div class="mt-2 ps-4 d-flex gap-3 flex-wrap" id="wm-mapa-opts" style="<?= $wmMapa ? '' : 'display:none !important;' ?>">
+                                    <div>
+                                        <label class="form-label small fw-semibold text-muted mb-1">Escala:</label>
+                                        <select name="wm_mapa_zoom" class="form-select form-select-sm" style="width:160px;">
+                                            <option value="13" <?= $wmMapaZoom === 13 ? 'selected' : '' ?>>Alejado (ciudad)</option>
+                                            <option value="14" <?= $wmMapaZoom === 14 ? 'selected' : '' ?>>Medio-lejos</option>
+                                            <option value="15" <?= $wmMapaZoom === 15 ? 'selected' : '' ?>>Medio (barrio)</option>
+                                            <option value="16" <?= $wmMapaZoom === 16 ? 'selected' : '' ?>>Cercano (calle)</option>
+                                            <option value="17" <?= $wmMapaZoom === 17 ? 'selected' : '' ?>>Muy cercano</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold text-muted mb-1">Tamaño:</label>
+                                        <select name="wm_mapa_tamano" class="form-select form-select-sm" style="width:160px;">
+                                            <option value="1" <?= $wmMapaTamano === 1 ? 'selected' : '' ?>>Pequeño</option>
+                                            <option value="2" <?= $wmMapaTamano === 2 ? 'selected' : '' ?>>Mediano</option>
+                                            <option value="3" <?= $wmMapaTamano === 3 ? 'selected' : '' ?>>Grande</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Guardar marca de agua
+                        </button>
+                    </form>
+                </div>
+            </div>
+
         <?php else: ?>
             <div class="text-center py-5">
                 <i class="bi bi-gear" style="font-size:3rem;color:#adb5bd;"></i>
@@ -299,6 +426,12 @@ $opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
         }
     }
     updatePreview();
+
+    function toggleWmMapaOpts() {
+        const checked = document.getElementById('wm_mapa').checked;
+        const opts = document.getElementById('wm-mapa-opts');
+        if (opts) opts.style.display = checked ? '' : 'none';
+    }
     </script>
 </body>
 </html>

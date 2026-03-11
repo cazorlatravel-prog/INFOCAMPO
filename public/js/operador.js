@@ -1504,16 +1504,18 @@
         targetCanvas.height = h;
 
         const ctx = targetCanvas.getContext('2d');
+        const wmCfg = CFG.watermark || {};
 
         // 1. Draw original photo
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 2. Text info — bottom-right, no background box, white with shadow
-        const fontSize = Math.max(16, Math.round(h * 0.022));
+        // 2. Text info — bottom-right, white with shadow, 50% larger than before
+        const fontSize = Math.max(22, Math.round(h * 0.033));
         const lineHeight = fontSize * 1.4;
-        const margin = Math.round(w * 0.02);
+        const margin = Math.round(w * 0.025);
 
         // Build text lines (bottom-up, right-aligned like GPS Camera app)
+        // Default lines always shown: fecha, coordenadas, orientación, municipio/provincia, país
         const lines = [];
 
         // Line 1 (bottom): Country
@@ -1539,20 +1541,35 @@
             lines.push(utm.str);
         }
 
-        // Line 5 (top): Date and time
+        // Optional fields (configurable by admin) — inserted between coordinates and date
+        // Tipo de foto: FOT ALE / FOT COM
+        if (wmCfg.tipoFoto && meta.mode) {
+            lines.push(meta.mode === 'comparativo' ? 'FOT COM' : 'FOT ALE');
+        }
+
+        // Situación de obra: ANTES / DURANTE / DESPUÉS
+        if (wmCfg.situacion && meta.situacion) {
+            lines.push(meta.situacion);
+        }
+
+        // Código de infraestructura
+        if (wmCfg.codigoInfra && meta.infraCode) {
+            lines.push(meta.infraCode);
+        }
+
+        // Line (top): Date and time — always last (drawn at the top)
         lines.push(formatDateMadrid());
 
         // Draw lines from bottom to top, right-aligned with text shadow
         ctx.textBaseline = 'bottom';
         ctx.textAlign = 'right';
-        ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
 
         const textX = w - margin;
         let textY = h - margin;
 
         // Text shadow settings for readability
         ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-        ctx.shadowBlur = Math.max(4, Math.round(fontSize * 0.25));
+        ctx.shadowBlur = Math.max(5, Math.round(fontSize * 0.3));
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 1;
         ctx.fillStyle = '#ffffff';
@@ -1573,6 +1590,11 @@
 
         // 3. Compass rose (top-left)
         drawCompassRose(ctx, w, h, meta.bearing);
+
+        // 4. Mini-map (bottom-left, optional)
+        if (wmCfg.mapa && meta.lat != null && meta.lon != null) {
+            await drawMiniMap(ctx, w, h, meta.lat, meta.lon, wmCfg.mapaZoom || 15, wmCfg.mapaTamano || 2);
+        }
 
         // Save blob for later
         state.capturedBlob = await canvasToBlob(targetCanvas, 'image/jpeg', 0.85);
@@ -1617,13 +1639,9 @@
         ctx.shadowBlur = 3;
 
         const labelR = outerR - fontSize * 0.7;
-        // N
         ctx.fillText('N', cx, cy - labelR);
-        // S
         ctx.fillText('S', cx, cy + labelR);
-        // E
         ctx.fillText('E', cx + labelR, cy);
-        // O
         ctx.fillText('O', cx - labelR, cy);
 
         ctx.shadowColor = 'transparent';
@@ -1632,13 +1650,12 @@
         // Bearing arrow (blue, pointing in bearing direction)
         if (bearing != null) {
             const arrowR = innerR - 4;
-            const bearingRad = (bearing - 90) * Math.PI / 180; // 0°=North → -90° in canvas coords
+            const bearingRad = (bearing - 90) * Math.PI / 180;
 
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(bearingRad);
 
-            // Arrow body
             ctx.beginPath();
             ctx.moveTo(arrowR, 0);
             ctx.lineTo(-arrowR * 0.3, -arrowR * 0.2);
@@ -1653,7 +1670,6 @@
 
             ctx.restore();
 
-            // Center dot
             ctx.beginPath();
             ctx.arc(cx, cy, 3, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
@@ -1661,6 +1677,130 @@
         }
 
         ctx.restore();
+    }
+
+    /**
+     * Draws a mini OpenStreetMap tile on the bottom-left of the photo.
+     * Uses static tile server to render a small location map.
+     */
+    async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon, zoom, tamano) {
+        // Map size based on tamano setting (1=small, 2=medium, 3=large)
+        const sizeFactors = { 1: 0.15, 2: 0.20, 3: 0.28 };
+        const factor = sizeFactors[tamano] || 0.20;
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) * factor);
+        const margin = Math.round(canvasWidth * 0.025);
+        const mapX = margin;
+        const mapY = canvasHeight - mapSize - margin;
+        const borderRadius = Math.round(mapSize * 0.06);
+        const borderWidth = Math.max(2, Math.round(mapSize * 0.015));
+
+        try {
+            // Calculate tile coordinates from lat/lon/zoom
+            const n = Math.pow(2, zoom);
+            const latRad = lat * Math.PI / 180;
+            const tileXFloat = ((lon + 180) / 360) * n;
+            const tileYFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+            const tileX = Math.floor(tileXFloat);
+            const tileY = Math.floor(tileYFloat);
+
+            // Pixel offset within tile (256px tiles)
+            const pixelX = Math.round((tileXFloat - tileX) * 256);
+            const pixelY = Math.round((tileYFloat - tileY) * 256);
+
+            // Load a 3x3 grid of tiles for context
+            const tilePromises = [];
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const tx = tileX + dx;
+                    const ty = tileY + dy;
+                    tilePromises.push(loadImage(
+                        `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`
+                    ).catch(() => null));
+                }
+            }
+            const tiles = await Promise.all(tilePromises);
+
+            // Create off-screen canvas for the composite tile area (768x768)
+            const tileCanvas = document.createElement('canvas');
+            tileCanvas.width = 768;
+            tileCanvas.height = 768;
+            const tileCtx = tileCanvas.getContext('2d');
+
+            let idx = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const tile = tiles[idx++];
+                    if (tile) {
+                        tileCtx.drawImage(tile, (dx + 1) * 256, (dy + 1) * 256, 256, 256);
+                    }
+                }
+            }
+
+            // Center point in the composite canvas
+            const centerX = 256 + pixelX;
+            const centerY = 256 + pixelY;
+
+            // Draw rounded rectangle clip path
+            ctx.save();
+            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
+            ctx.clip();
+
+            // Draw the tile composite, cropped and scaled to mapSize
+            const half = mapSize / 2;
+            const srcSize = mapSize * (256 / mapSize); // Keep 1:1 scale ratio
+            ctx.drawImage(tileCanvas,
+                centerX - srcSize / 2, centerY - srcSize / 2, srcSize, srcSize,
+                mapX, mapY, mapSize, mapSize
+            );
+
+            ctx.restore();
+
+            // Draw border
+            ctx.save();
+            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.lineWidth = borderWidth;
+            ctx.stroke();
+            ctx.restore();
+
+            // Draw red location pin in center
+            const pinX = mapX + mapSize / 2;
+            const pinY = mapY + mapSize / 2;
+            const pinSize = Math.max(6, Math.round(mapSize * 0.06));
+
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 2;
+
+            // Pin circle
+            ctx.beginPath();
+            ctx.arc(pinX, pinY - pinSize, pinSize, 0, Math.PI * 2);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = Math.max(1, Math.round(pinSize * 0.3));
+            ctx.stroke();
+
+            // Pin point (triangle)
+            ctx.beginPath();
+            ctx.moveTo(pinX - pinSize * 0.5, pinY - pinSize * 0.3);
+            ctx.lineTo(pinX, pinY + pinSize * 0.5);
+            ctx.lineTo(pinX + pinSize * 0.5, pinY - pinSize * 0.3);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fill();
+
+            // Inner dot
+            ctx.beginPath();
+            ctx.arc(pinX, pinY - pinSize, pinSize * 0.35, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+
+            ctx.restore();
+
+        } catch (err) {
+            console.warn('Error drawing mini-map:', err);
+        }
     }
 
     // ===================================================================
