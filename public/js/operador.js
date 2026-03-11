@@ -2,7 +2,7 @@
  * INFOCAMPO - Operador de Campo
  *
  * App principal del operador para recogida de datos en campo.
- * Soporta fotos aleatorias y comparativas con sistema Ghosting.
+ * Soporta fotos aleatorias y comparativas (solo comparativas tienen sistema Ghosting).
  * Watermarks estilo GPS Camera: UTM, brújula, geocoding, hora Madrid.
  */
 ;(function() {
