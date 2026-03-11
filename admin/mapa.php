@@ -18,11 +18,18 @@ requireRole(['admin', 'supervisor', 'superadmin']);
 $pdo = getDB();
 $currentPage = 'mapa';
 
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
 
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-)->fetchAll();
+// Admins y supervisores solo pueden ver su propia empresa
+if ($isSuperadmin) {
+    $empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+    $empresas = [];
+}
 
 // Cargar datos para filtros
 $operadores = [];
@@ -358,6 +365,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
     <!-- Filter bar -->
     <div class="map-filter-bar" id="filter-drawer">
         <button class="filter-close-btn" onclick="toggleFilterDrawer()"><i class="bi bi-x-lg"></i> Cerrar filtros</button>
+        <?php if ($isSuperadmin): ?>
         <div class="filter-group">
             <label>Empresa</label>
             <form method="get" id="form-empresa">
@@ -370,6 +378,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 </select>
             </form>
         </div>
+        <?php endif; ?>
         <div class="filter-group">
             <label>Operador</label>
             <select id="filter-operador" class="form-select" style="width:160px;">
@@ -518,6 +527,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div class="container-fluid py-4">
             <div class="text-center py-5">
                 <i class="bi bi-map" style="font-size:3rem;color:#adb5bd;"></i>
+                <?php if ($isSuperadmin): ?>
                 <h5 class="mt-3 text-muted">Selecciona una empresa</h5>
                 <form method="get" class="d-inline-flex gap-2 mt-3">
                     <select name="empresa_id" class="form-select" style="width:280px;">
@@ -528,6 +538,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     </select>
                     <button class="btn btn-primary">Ir</button>
                 </form>
+                <?php else: ?>
+                <h5 class="mt-3 text-muted">No se encontró tu empresa. Contacta con el administrador.</h5>
+                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>
