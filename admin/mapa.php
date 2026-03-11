@@ -109,6 +109,19 @@ if ($empresaId > 0) {
     $jsCapasKml = $stmtKml->fetchAll();
 }
 
+// Cargar capas de infraestructuras (SHP/KML/KMZ subidos como GeoJSON)
+$jsCapasInfra = [];
+if ($empresaId > 0) {
+    $stmtCI = $pdo->prepare(
+        "SELECT id, nombre, geojson, campo_capa, campo_tabla, color, grosor, opacidad
+         FROM capas_infraestructuras
+         WHERE empresa_id = :emp AND activa = 1
+         ORDER BY created_at DESC"
+    );
+    $stmtCI->execute([':emp' => $empresaId]);
+    $jsCapasInfra = $stmtCI->fetchAll();
+}
+
 // Preparar datos para JS
 $jsRegistros = [];
 foreach ($registros as $r) {
@@ -401,8 +414,11 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             <div id="saved-kml-list" class="d-flex gap-1 flex-wrap"></div>
         </div>
         <div class="filter-group">
-            <label>GPX</label>
-            <div class="d-flex gap-1 align-items-center">
+            <label>GPX / Waypoints</label>
+            <div class="d-flex gap-1 align-items-center flex-wrap">
+                <button class="btn btn-sm btn-outline-success" onclick="toggleWaypointLayer()" id="btn-toggle-waypoints" title="Mostrar/ocultar waypoints comparativos (estado: antes)">
+                    <i class="bi bi-geo-alt"></i> Waypoints
+                </button>
                 <button class="btn btn-sm btn-outline-info" onclick="exportPhotosAsGpx()" title="Exportar fotos visibles como GPX" aria-label="Exportar GPX">
                     <i class="bi bi-download"></i> GPX
                 </button>
@@ -811,7 +827,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '<br><small><i class="bi bi-camera"></i> ' + inf.num_fotos + ' foto' + (inf.num_fotos !== 1 ? 's' : '') + '</small>' +
                     '<div style="margin-top:6px;">' +
                     '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + inf.id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.7rem;"><i class="bi bi-clock-history"></i> Timeline</a> ' +
-                    '<a href="generar_pdf.php?infra_id=' + inf.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;"><i class="bi bi-file-pdf"></i> PDF</a>' +
+                    '<a href="generar_pdf.php?infra_id=' + inf.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.7rem;"><i class="bi bi-file-pdf"></i> PDF</a> ' +
+                    '<a href="/public/api/waypoints.php?empresa_id=' + empresaId + '&infra_id=' + inf.id + '&estado=antes" class="btn btn-sm btn-outline-success" style="font-size:0.7rem;" title="Descargar waypoints GPX (comparativas, estado: antes)"><i class="bi bi-geo-alt"></i> GPX</a>' +
                     '</div></div>';
 
                 var marker = L.marker([inf.lat, inf.lon], { icon: icon, zIndexOffset: hasPhotos ? 100 : -50 });
@@ -1379,6 +1396,224 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         updateKmlStats();
 
         // ---------------------------------------------------------------
+        // Capas de Infraestructuras (SHP/KML/KMZ → GeoJSON)
+        // ---------------------------------------------------------------
+        var capasInfraData = <?= json_encode($jsCapasInfra, JSON_UNESCAPED_UNICODE) ?>;
+        var capasInfraLayers = {};
+
+        function renderCapasInfra() {
+            // Remove old layers
+            Object.keys(capasInfraLayers).forEach(function(k) {
+                map.removeLayer(capasInfraLayers[k]);
+                delete capasInfraLayers[k];
+            });
+
+            capasInfraData.forEach(function(capa) {
+                try {
+                    var geojson = typeof capa.geojson === 'string' ? JSON.parse(capa.geojson) : capa.geojson;
+                    var color = capa.color || '#e74c3c';
+                    var weight = parseInt(capa.grosor) || 2;
+                    var opacity = parseFloat(capa.opacidad) || 0.8;
+                    var campoLink = capa.campo_capa || '';
+                    var campoTabla = capa.campo_tabla || 'codigo_unico';
+
+                    var layer = L.geoJSON(geojson, {
+                        style: function() {
+                            return { color: color, weight: weight, opacity: opacity, fillColor: color, fillOpacity: opacity * 0.2 };
+                        },
+                        pointToLayer: function(feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 6, fillColor: color, color: '#fff',
+                                weight: 2, opacity: 1, fillOpacity: opacity
+                            });
+                        },
+                        onEachFeature: function(feature, featureLayer) {
+                            var props = feature.properties || {};
+                            var linkValue = campoLink ? (props[campoLink] || '') : '';
+
+                            // Find linked infrastructure
+                            var linkedInfra = null;
+                            if (linkValue) {
+                                infraData.forEach(function(inf) {
+                                    if (campoTabla === 'codigo_unico' && inf.codigo === linkValue) linkedInfra = inf;
+                                    else if (campoTabla === 'nombre' && inf.nombre === linkValue) linkedInfra = inf;
+                                    else if (campoTabla === 'id' && inf.id === parseInt(linkValue)) linkedInfra = inf;
+                                });
+                            }
+
+                            var html = '<div style="max-width:280px;">';
+                            html += '<strong style="color:' + color + ';">' + capa.nombre + '</strong>';
+                            if (linkValue) html += '<br><code style="font-size:0.75rem;">' + campoLink + ': ' + linkValue + '</code>';
+
+                            // Show key attributes
+                            var shown = 0;
+                            Object.keys(props).forEach(function(k) {
+                                if (shown >= 5 || k === campoLink) return;
+                                html += '<br><small><b>' + k + ':</b> ' + String(props[k]).substring(0, 80) + '</small>';
+                                shown++;
+                            });
+
+                            if (linkedInfra) {
+                                html += '<hr style="margin:4px 0;">';
+                                html += '<small style="color:#059669;"><i class="bi bi-link-45deg"></i> Vinculado a: <b>' + linkedInfra.nombre + '</b></small>';
+                                html += '<br><small><i class="bi bi-camera"></i> ' + linkedInfra.num_fotos + ' fotos</small>';
+                                html += '<div style="margin-top:4px;">';
+                                html += '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + linkedInfra.id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.65rem;"><i class="bi bi-clock-history"></i> Timeline</a> ';
+                                html += '<a href="generar_pdf.php?infra_id=' + linkedInfra.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.65rem;"><i class="bi bi-file-pdf"></i> PDF</a>';
+                                html += '</div>';
+                            }
+
+                            html += '</div>';
+                            featureLayer.bindPopup(html, { maxWidth: 300 });
+                        }
+                    }).addTo(map);
+
+                    capasInfraLayers['ci-' + capa.id] = layer;
+                } catch (err) {
+                    console.warn('Error rendering capa infra "' + capa.nombre + '":', err);
+                }
+            });
+        }
+
+        if (capasInfraData.length > 0) {
+            renderCapasInfra();
+        }
+
+        // ---------------------------------------------------------------
+        // Waypoint Layer (comparativas en estado "antes")
+        // ---------------------------------------------------------------
+        var waypointLayerGroup = null;
+        var waypointsVisible = false;
+
+        window.toggleWaypointLayer = function() {
+            var btn = document.getElementById('btn-toggle-waypoints');
+            if (waypointsVisible) {
+                if (waypointLayerGroup) map.removeLayer(waypointLayerGroup);
+                waypointsVisible = false;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-success');
+            } else {
+                loadWaypointLayer();
+                waypointsVisible = true;
+                btn.classList.remove('btn-outline-success');
+                btn.classList.add('btn-success');
+            }
+        };
+
+        function loadWaypointLayer() {
+            if (waypointLayerGroup) map.removeLayer(waypointLayerGroup);
+            waypointLayerGroup = L.layerGroup().addTo(map);
+
+            var infraFilter = document.getElementById('filter-infra').value;
+            var url = '/public/api/waypoints.php?empresa_id=' + empresaId + '&format=json&estado=antes';
+            if (infraFilter) {
+                url += '&infra_id=' + infraFilter;
+            } else {
+                // Need infra_id or usuario_id — load for all infras by sending a special param
+                // Use usuario_id=0 workaround — actually the API needs at least one.
+                // Let's fetch per visible infra
+                var opFilter = document.getElementById('filter-operador').value;
+                if (opFilter) url += '&usuario_id=' + opFilter;
+                else {
+                    // Fetch all infras that have photos
+                    var infraIds = [];
+                    infraData.forEach(function(inf) { if (inf.num_fotos > 0) infraIds.push(inf.id); });
+                    if (infraIds.length === 0) {
+                        showDragToast('No hay infraestructuras con fotos', 'warning');
+                        return;
+                    }
+                    // Fetch first infrastructure, then batch
+                    loadWaypointsForInfras(infraIds);
+                    return;
+                }
+            }
+
+            fetch(url)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.ok || !data.waypoints || data.waypoints.length === 0) {
+                        showDragToast('No hay waypoints comparativos (estado: antes)', 'info');
+                        return;
+                    }
+                    renderWaypoints(data.waypoints);
+                    showDragToast(data.waypoints.length + ' waypoints cargados', 'success');
+                })
+                .catch(function(err) { console.warn('Error loading waypoints:', err); });
+        }
+
+        function loadWaypointsForInfras(infraIds) {
+            var allWaypoints = [];
+            var loaded = 0;
+
+            infraIds.forEach(function(iid) {
+                fetch('/public/api/waypoints.php?empresa_id=' + empresaId + '&infra_id=' + iid + '&format=json&estado=antes')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.ok && data.waypoints) {
+                            allWaypoints = allWaypoints.concat(data.waypoints);
+                        }
+                    })
+                    .finally(function() {
+                        loaded++;
+                        if (loaded >= infraIds.length && allWaypoints.length > 0) {
+                            renderWaypoints(allWaypoints);
+                            showDragToast(allWaypoints.length + ' waypoints cargados', 'success');
+                        } else if (loaded >= infraIds.length) {
+                            showDragToast('No hay waypoints comparativos (estado: antes)', 'info');
+                        }
+                    });
+            });
+        }
+
+        function renderWaypoints(waypoints) {
+            // Group by infrastructure for route lines
+            var byInfra = {};
+            waypoints.forEach(function(wp) {
+                if (!byInfra[wp.infra_id]) byInfra[wp.infra_id] = [];
+                byInfra[wp.infra_id].push(wp);
+            });
+
+            Object.keys(byInfra).forEach(function(iid) {
+                var wps = byInfra[iid];
+
+                // Route polyline connecting waypoints
+                if (wps.length >= 2) {
+                    var coords = wps.map(function(wp) { return [wp.lat, wp.lon]; });
+                    L.polyline(coords, {
+                        color: '#22c55e', weight: 3, opacity: 0.7,
+                        dashArray: '8,5',
+                    }).addTo(waypointLayerGroup);
+                }
+
+                // Waypoint markers with W1, W2... labels
+                wps.forEach(function(wp) {
+                    var icon = L.divIcon({
+                        className: 'wp-admin-marker',
+                        html: '<div style="width:26px;height:26px;border-radius:50%;background:#22c55e;' +
+                              'border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4);' +
+                              'display:flex;align-items:center;justify-content:center;' +
+                              'font-size:9px;font-weight:800;color:#fff;">W' + wp.num + '</div>',
+                        iconSize: [26, 26],
+                        iconAnchor: [13, 13],
+                    });
+
+                    var fecha = wp.fecha ? wp.fecha.substring(0, 16).replace('T', ' ') : '';
+                    var popup = '<div style="min-width:180px;">' +
+                        '<strong style="color:#22c55e;">' + escapeXml(wp.nombre) + '</strong><br>' +
+                        '<small>' + escapeXml(wp.infra_nombre) + '</small><br>' +
+                        '<small class="text-muted"><i class="bi bi-clock"></i> ' + fecha + '</small><br>' +
+                        '<small class="text-muted"><i class="bi bi-geo-alt"></i> ' + wp.lat.toFixed(7) + ', ' + wp.lon.toFixed(7) + '</small>' +
+                        '</div>';
+
+                    L.marker([wp.lat, wp.lon], { icon: icon, zIndexOffset: 300 })
+                        .bindPopup(popup, { maxWidth: 220 })
+                        .bindTooltip(escapeXml(wp.nombre), { direction: 'top', offset: [0, -14] })
+                        .addTo(waypointLayerGroup);
+                });
+            });
+        }
+
+        // ---------------------------------------------------------------
         // GPX Export / Import
         // ---------------------------------------------------------------
         var gpxLayerGroup = null;
@@ -1409,11 +1644,19 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 '<gpx version="1.1" creator="INFOCAMPO" xmlns="http://www.topografix.com/GPX/1/1">\n' +
                 '  <metadata><name>Fotos INFOCAMPO</name><time>' + new Date().toISOString() + '</time></metadata>\n';
 
+            // Number waypoints per infrastructure: CODIGO W1, W2, W3...
+            var wpCountByInfra = {};
             filtered.forEach(function(r) {
+                var key = r.infra_id || r.infra;
+                if (!wpCountByInfra[key]) wpCountByInfra[key] = 0;
+                wpCountByInfra[key]++;
+                var wpName = (r.codigo || r.infra) + ' W' + wpCountByInfra[key];
+
                 gpx += '  <wpt lat="' + r.lat + '" lon="' + r.lon + '">\n';
-                gpx += '    <name>' + escapeXml(r.infra + ' #' + r.id) + '</name>\n';
+                gpx += '    <name>' + escapeXml(wpName) + '</name>\n';
                 gpx += '    <desc>' + escapeXml(r.operador + ' | ' + r.estado + ' | ' + r.fecha + (r.obs ? ' | ' + r.obs : '')) + '</desc>\n';
                 gpx += '    <type>' + r.tipo + '</type>\n';
+                gpx += '    <sym>Flag, Blue</sym>\n';
                 gpx += '  </wpt>\n';
             });
 

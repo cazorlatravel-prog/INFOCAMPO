@@ -24,6 +24,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/imagekit_helper.php';
 require_once __DIR__ . '/../includes/cloudinary_helper.php';
 
@@ -33,6 +34,21 @@ require_once __DIR__ . '/../includes/cloudinary_helper.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'Método no permitido']);
+    exit;
+}
+
+// ---------------------------------------------------------------
+// Validar autenticación y CSRF
+// ---------------------------------------------------------------
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
+
+if (!validateCsrf()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
     exit;
 }
 
@@ -78,6 +94,7 @@ $tipoFoto              = $_POST['tipo_foto'] ?? 'aleatorio';
 $secuenciaComparativa  = isset($_POST['secuencia_comparativa']) && $_POST['secuencia_comparativa'] !== '' ? (int) $_POST['secuencia_comparativa'] : null;
 $nombreArchivo         = isset($_POST['nombre_archivo']) ? trim((string) $_POST['nombre_archivo']) : null;
 $unidadObraId          = isset($_POST['unidad_obra_id']) && $_POST['unidad_obra_id'] !== '' ? (int) $_POST['unidad_obra_id'] : null;
+$tipoTrabajoId         = isset($_POST['tipo_trabajo_id']) && $_POST['tipo_trabajo_id'] !== '' ? (int) $_POST['tipo_trabajo_id'] : null;
 
 // Validar enum de situación
 $situacionesPermitidas = ['antes', 'durante', 'despues'];
@@ -108,9 +125,97 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 }
 
 // ---------------------------------------------------------------
-// 2. Subir imagen a Cloudinary (o guardar localmente si no está configurado)
+// 2. Generar nombre de archivo según formato configurado por la empresa
+// ---------------------------------------------------------------
+try {
+    $pdo = getDB();
+
+    // Obtener código de infraestructura y empresa_id
+    $stmtInfra = $pdo->prepare(
+        "SELECT i.codigo, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
+    );
+    $stmtInfra->execute([':id' => $infraId]);
+    $infraRow = $stmtInfra->fetch();
+
+    if (!$infraRow) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Infraestructura no encontrada']);
+        exit;
+    }
+
+    $infraCodigo = $infraRow['codigo'] ?: $infraRow['nombre'];
+    $infraEmpresaId = (int) $infraRow['empresa_id'];
+
+    // Obtener formato de nombre configurado para la empresa
+    $stmtFmt = $pdo->prepare("SELECT formato_nombre_foto FROM empresas WHERE id = :id");
+    $stmtFmt->execute([':id' => $infraEmpresaId]);
+    $fmtRow = $stmtFmt->fetch();
+    $formatoNombre = (int) ($fmtRow['formato_nombre_foto'] ?? 1);
+
+    // Contar fotos existentes para esta infraestructura (para numeración secuencial)
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM registros WHERE infra_id = :infra_id");
+    $stmtCount->execute([':infra_id' => $infraId]);
+    $numFoto = (int) $stmtCount->fetchColumn() + 1;
+    $numFotoStr = str_pad((string) $numFoto, 3, '0', STR_PAD_LEFT);
+
+    // Sanitizar código de infraestructura para nombre de archivo
+    $codigoSafe = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $infraCodigo);
+    $codigoSafe = substr($codigoSafe, 0, 60);
+
+    // Construir nombre según formato
+    switch ($formatoNombre) {
+        case 2:
+            // CODIGO_INFRA_TIPO_TRABAJO_NºFOTO
+            $tipoTrabajoNombre = '';
+            if ($tipoTrabajoId) {
+                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
+                $stmtTT->execute([':id' => $tipoTrabajoId]);
+                $ttRow = $stmtTT->fetch();
+                if ($ttRow) {
+                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
+                }
+            }
+            $nombreArchivo = $tipoTrabajoNombre
+                ? "{$codigoSafe}_{$tipoTrabajoNombre}_{$numFotoStr}"
+                : "{$codigoSafe}_{$numFotoStr}";
+            break;
+
+        case 3:
+            // CODIGO_INFRA_TIPO_TRABAJO_TIPO_FOTO_NºFOTO
+            $tipoTrabajoNombre = '';
+            if ($tipoTrabajoId) {
+                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
+                $stmtTT->execute([':id' => $tipoTrabajoId]);
+                $ttRow = $stmtTT->fetch();
+                if ($ttRow) {
+                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
+                }
+            }
+            $tipoFotoLabel = $tipoFoto === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+            if ($tipoTrabajoNombre) {
+                $nombreArchivo = "{$codigoSafe}_{$tipoTrabajoNombre}_{$tipoFotoLabel}_{$numFotoStr}";
+            } else {
+                $nombreArchivo = "{$codigoSafe}_{$tipoFotoLabel}_{$numFotoStr}";
+            }
+            break;
+
+        default: // case 1
+            // CODIGO_INFRA_NºFOTO
+            $nombreArchivo = "{$codigoSafe}_{$numFotoStr}";
+            break;
+    }
+} catch (\Exception $e) {
+    // Si falla la generación de nombre, usar el nombre original del frontend
+    if (!$nombreArchivo) {
+        $nombreArchivo = 'foto_' . time();
+    }
+}
+
+// ---------------------------------------------------------------
+// 3. Subir imagen a ImageKit (o Cloudinary legacy, o local)
 // ---------------------------------------------------------------
 $cloudinaryUrl = '';
+
 try {
     if (ImageKitHelper::isConfigured()) {
         // ImageKit configurado — subir
@@ -136,7 +241,7 @@ try {
             $publicId
         );
     } else {
-        // Cloudinary NO configurado — guardar en uploads/ local
+        // Ningún servicio de imágenes configurado — guardar en uploads/ local
         $uploadsDir = __DIR__ . '/uploads';
         if (!is_dir($uploadsDir)) {
             mkdir($uploadsDir, 0755, true);
@@ -206,17 +311,17 @@ try {
 }
 
 // ---------------------------------------------------------------
-// 3. Guardar en base de datos (prepared statement)
+// 4. Guardar en base de datos (prepared statement)
 // ---------------------------------------------------------------
 try {
-    $pdo = getDB();
+    if (!isset($pdo)) $pdo = getDB();
 
     $sql = "INSERT INTO registros
-                (infra_id, unidad_obra_id, usuario_id, fecha, lat_real, lon_real,
+                (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
                  url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
                  tipo_foto, secuencia_comparativa, nombre_archivo)
             VALUES
-                (:infra_id, :unidad_obra_id, :usuario_id, NOW(), :lat_real, :lon_real,
+                (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
                  :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
                  :tipo_foto, :secuencia_comp, :nombre_archivo)";
 
@@ -224,6 +329,7 @@ try {
     $stmt->execute([
         ':infra_id'          => $infraId,
         ':unidad_obra_id'    => $unidadObraId,
+        ':tipo_trabajo_id'   => $tipoTrabajoId,
         ':usuario_id'        => $usuarioId,
         ':lat_real'          => $latReal,
         ':lon_real'          => $lonReal,
@@ -239,7 +345,7 @@ try {
     $registroId = (int) $pdo->lastInsertId();
 
     // ---------------------------------------------------------------
-    // 4. Guardar campos dinámicos (si existen)
+    // 5. Guardar campos dinámicos (si existen)
     // ---------------------------------------------------------------
     $camposDinamicos = $_POST['campos'] ?? [];
     if (is_array($camposDinamicos) && !empty($camposDinamicos)) {

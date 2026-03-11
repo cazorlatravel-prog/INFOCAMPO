@@ -170,8 +170,8 @@ $opcionDuplicados = $_POST['duplicados'] ?? 'omitir'; // 'omitir' o 'importar'
 
 // Preparar INSERT
 $insertStmt = $pdo->prepare(
-    "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, descripcion, activa)
-     VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :desc, 1)"
+    "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
+     VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
 );
 
 $importados = 0;
@@ -244,6 +244,7 @@ try {
             ':tipo'      => $pm['tipo'] ? mb_substr($pm['tipo'], 0, 100) : null,
             ':provincia' => $pm['provincia'] ? mb_substr($pm['provincia'], 0, 100) : null,
             ':municipio' => $pm['municipio'] ? mb_substr($pm['municipio'], 0, 150) : null,
+            ':monte'     => ($pm['monte'] ?? '') !== '' ? mb_substr($pm['monte'], 0, 200) : null,
             ':desc'      => $pm['descripcion'] ? mb_substr($pm['descripcion'], 0, 500) : null,
         ]);
 
@@ -335,6 +336,7 @@ function extractPlacemarks(SimpleXMLElement $element, string $ns, array &$result
             $tipo = '';
             $provincia = '';
             $municipio = '';
+            $monte = '';
 
             $extData = $pm->xpath('.//kml:ExtendedData/kml:Data');
             if (!$extData) $extData = $pm->xpath('.//ExtendedData/Data');
@@ -352,6 +354,8 @@ function extractPlacemarks(SimpleXMLElement $element, string $ns, array &$result
                         $provincia = $value;
                     } elseif (in_array($attrName, ['municipio', 'municipality', 'city', 'ciudad', 'localidad'])) {
                         $municipio = $value;
+                    } elseif (in_array($attrName, ['monte', 'forest', 'bosque', 'zona_forestal'])) {
+                        $monte = $value;
                     }
                 }
             }
@@ -371,6 +375,8 @@ function extractPlacemarks(SimpleXMLElement $element, string $ns, array &$result
                         $provincia = $value;
                     } elseif (in_array($attrName, ['municipio', 'municipality', 'city', 'ciudad', 'localidad'])) {
                         $municipio = $value;
+                    } elseif (in_array($attrName, ['monte', 'forest', 'bosque', 'zona_forestal'])) {
+                        $monte = $value;
                     }
                 }
             }
@@ -383,6 +389,7 @@ function extractPlacemarks(SimpleXMLElement $element, string $ns, array &$result
                 'tipo'        => $tipo,
                 'provincia'   => $provincia,
                 'municipio'   => $municipio,
+                'monte'       => $monte,
             ];
         }
     }

@@ -195,17 +195,19 @@ foreach ($registros as $r) {
     #report-map { height: 300px; border: 1px solid #dee2e6; border-radius: 6px; margin-bottom: 8px; }
     .map-scale-info { font-size: 10px; color: #888; text-align: center; }
 
-    /* Fotos */
-    .foto-block { border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 14px; page-break-inside: avoid; }
-    .foto-block img { max-width: 100%; max-height: 300px; display: block; margin: 8px auto; border-radius: 4px; }
-    .foto-meta { font-size: 11px; color: #666; line-height: 1.6; }
-    .foto-meta strong { color: #333; }
-
+    /* Fotos comparativas lado a lado */
     .comp-pair { display: flex; gap: 12px; margin-bottom: 14px; page-break-inside: avoid; }
     .comp-col { flex: 1; }
     .comp-col img { width: 100%; max-height: 220px; object-fit: contain; border-radius: 4px; }
     .comp-label { text-align: center; font-size: 11px; font-weight: bold; color: #6d28d9; margin-bottom: 6px; }
     .comp-gps { text-align: center; font-size: 9px; color: #888; margin-top: 4px; }
+
+    /* Fotos aleatorias — grid 3 por fila */
+    .alea-row { display: flex; gap: 10px; margin-bottom: 12px; page-break-inside: avoid; }
+    .alea-col { flex: 1; border: 1px solid #dee2e6; border-radius: 6px; padding: 8px; min-width: 0; }
+    .alea-col img { width: 100%; max-height: 180px; object-fit: contain; display: block; margin: 6px auto; border-radius: 4px; }
+    .alea-col .foto-meta { font-size: 9px; color: #666; line-height: 1.4; }
+    .alea-col .foto-meta strong { color: #333; }
 
     /* Observaciones */
     .obs-item { background: #f8f9fa; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; font-size: 12px; border-left: 3px solid #2d6a9f; }
@@ -228,7 +230,8 @@ foreach ($registros as $r) {
         .report-header, table.data th, .section h3 { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
         .section { padding: 14px 24px; }
         .page-break { page-break-before: always; }
-        .foto-block, .comp-pair { page-break-inside: avoid; }
+        .alea-row, .comp-pair { page-break-inside: avoid; }
+        .alea-col img { max-height: 160px; }
         .section h2 { page-break-after: avoid; }
         #report-map { height: 250px; }
     }
@@ -236,6 +239,7 @@ foreach ($registros as $r) {
     @media (max-width: 600px) {
         .section { padding: 16px; }
         .comp-pair { flex-direction: column; }
+        .alea-row { flex-direction: column; }
         .page-content { padding: 12px; }
     }
 </style>
@@ -550,33 +554,41 @@ foreach ($registros as $r) {
                 <h2><i class="bi bi-camera me-1"></i> Fotos Aleatorias</h2>
                 <?php
                 $fotosAlea = array_values($aleatorias);
-                foreach ($fotosAlea as $idx => $reg):
-                    if ($idx > 0 && $idx % 4 === 0):
+                $filas = array_chunk($fotosAlea, 3);
+                $filaCount = 0;
+                foreach ($filas as $fila):
+                    $filaCount++;
+                    if ($filaCount > 1 && ($filaCount - 1) % 3 === 0):
                 ?>
             </div>
             <div class="page-break"></div>
             <div class="section">
                 <h2><i class="bi bi-camera me-1"></i> Fotos Aleatorias (cont.)</h2>
-                <?php endif;
-                    $fecha = date('d/m/Y H:i', strtotime($reg['fecha']));
-                    $operador = htmlspecialchars($reg['usuario_nombre']);
-                    $estado = strtoupper($reg['estado_incidencia']);
-                    $badgeClass = "badge-{$reg['estado_incidencia']}";
-                    $url = htmlspecialchars($reg['url_cloudinary']);
-                    $uo = !empty($reg['unidad_obra_nombre']) ? ' | U.Obra: ' . htmlspecialchars($reg['unidad_obra_nombre']) : '';
-                ?>
-                <div class="foto-block">
-                    <div class="foto-meta">
-                        <strong><?= $fecha ?></strong> &mdash; <?= $operador ?>
-                        &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span>
-                        &mdash; GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?><?= $uo ?>
-                    </div>
-                    <img src="<?= $url ?>" alt="Inspección" loading="lazy">
-                    <?php if (!empty($reg['observaciones'])): ?>
-                        <div style="font-size:11px;color:#555;margin-top:6px;padding:6px 10px;background:#f8f9fa;border-radius:4px;">
-                            <i class="bi bi-chat-text"></i> <?= htmlspecialchars($reg['observaciones']) ?>
+                <?php endif; ?>
+                <div class="alea-row">
+                    <?php foreach ($fila as $reg):
+                        $fecha = date('d/m/Y H:i', strtotime($reg['fecha']));
+                        $operador = htmlspecialchars($reg['usuario_nombre']);
+                        $estado = strtoupper($reg['estado_incidencia']);
+                        $badgeClass = "badge-{$reg['estado_incidencia']}";
+                        $url = htmlspecialchars($reg['url_cloudinary']);
+                        $uo = !empty($reg['unidad_obra_nombre']) ? ' | ' . htmlspecialchars($reg['unidad_obra_nombre']) : '';
+                    ?>
+                    <div class="alea-col">
+                        <img src="<?= $url ?>" alt="Inspección" loading="lazy">
+                        <div class="foto-meta">
+                            <strong><?= $fecha ?></strong><br>
+                            <?= $operador ?> &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span><?= $uo ?><br>
+                            <span style="font-size:8px;">GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?></span>
+                            <?php if (!empty($reg['observaciones'])): ?>
+                                <br><span style="font-size:8px;color:#555;"><i class="bi bi-chat-text"></i> <?= htmlspecialchars(mb_substr($reg['observaciones'], 0, 60)) ?></span>
+                            <?php endif; ?>
                         </div>
-                    <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php for ($i = 0, $vacias = 3 - count($fila); $i < $vacias; $i++): ?>
+                    <div class="alea-col" style="border:none;"></div>
+                    <?php endfor; ?>
                 </div>
                 <?php endforeach; ?>
             </div>

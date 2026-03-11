@@ -93,23 +93,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     if ($action === 'delete') {
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0 && $id !== 9999) {
-            // Eliminar en cascada: valores_campo -> registros -> infraestructuras -> campos_formulario -> unidades_obra -> usuarios -> empresa
-            $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id IN (SELECT id FROM infraestructuras WHERE empresa_id = :eid))")
-                ->execute([':eid' => $id]);
-            $pdo->prepare("DELETE FROM registros WHERE infra_id IN (SELECT id FROM infraestructuras WHERE empresa_id = :eid)")
-                ->execute([':eid' => $id]);
-            $pdo->prepare("DELETE FROM infraestructuras WHERE empresa_id = :eid")
-                ->execute([':eid' => $id]);
-            $pdo->prepare("DELETE FROM campos_formulario WHERE empresa_id = :eid")
-                ->execute([':eid' => $id]);
-            $pdo->prepare("DELETE FROM unidades_obra WHERE empresa_id = :eid")
-                ->execute([':eid' => $id]);
-            $pdo->prepare("DELETE FROM usuarios WHERE empresa_id = :eid AND rol != 'superadmin'")
-                ->execute([':eid' => $id]);
-            $pdo->prepare("DELETE FROM empresas WHERE id = :eid AND id != 9999")
-                ->execute([':eid' => $id]);
-            $msg = 'Empresa eliminada correctamente con todos sus datos.';
-            $msgType = 'success';
+            try {
+                $pdo->beginTransaction();
+                // Eliminar en cascada: valores_campo -> registros -> infraestructuras -> campos_formulario -> unidades_obra -> usuarios -> empresa
+                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id IN (SELECT id FROM infraestructuras WHERE empresa_id = :eid))")
+                    ->execute([':eid' => $id]);
+                $pdo->prepare("DELETE FROM registros WHERE infra_id IN (SELECT id FROM infraestructuras WHERE empresa_id = :eid)")
+                    ->execute([':eid' => $id]);
+                $pdo->prepare("DELETE FROM infraestructuras WHERE empresa_id = :eid")
+                    ->execute([':eid' => $id]);
+                $pdo->prepare("DELETE FROM campos_formulario WHERE empresa_id = :eid")
+                    ->execute([':eid' => $id]);
+                $pdo->prepare("DELETE FROM unidades_obra WHERE empresa_id = :eid")
+                    ->execute([':eid' => $id]);
+                $pdo->prepare("DELETE FROM usuarios WHERE empresa_id = :eid AND rol != 'superadmin'")
+                    ->execute([':eid' => $id]);
+                $pdo->prepare("DELETE FROM empresas WHERE id = :eid AND id != 9999")
+                    ->execute([':eid' => $id]);
+                $pdo->commit();
+                $msg = 'Empresa eliminada correctamente con todos sus datos.';
+                $msgType = 'success';
+            } catch (\PDOException $e) {
+                $pdo->rollBack();
+                $msg = 'Error al eliminar la empresa. Inténtalo de nuevo.';
+                $msgType = 'danger';
+            }
         }
     }
 }

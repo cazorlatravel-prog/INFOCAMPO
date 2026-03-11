@@ -19,12 +19,19 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/auth.php';
+
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
 
 $pdo = getDB();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $usuarioId = isset($_GET['usuario_id']) ? (int) $_GET['usuario_id'] : 0;
-    $empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : 0;
+    $usuarioId = (int) ($_SESSION['user_id'] ?? 0);
+    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
     $action = $_GET['action'] ?? 'listar';
 
     if ($usuarioId <= 0 || $empresaId <= 0) {
@@ -122,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $registroId = isset($_POST['registro_id']) ? (int) $_POST['registro_id'] : 0;
-    $usuarioId = isset($_POST['usuario_id']) ? (int) $_POST['usuario_id'] : 0;
+    $usuarioId = (int) ($_SESSION['user_id'] ?? 0);
 
     if ($action === 'editar') {
         if ($registroId <= 0 || $usuarioId <= 0) {

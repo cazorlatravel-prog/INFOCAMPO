@@ -93,7 +93,7 @@ try {
     echo "<span class='ok'>[OK]</span> Conexión establecida: " . DB_HOST . " / " . DB_NAME . "\n\n";
 
     // Leer archivos SQL (schema.sql + schema_v2.sql si existe)
-    $sqlFiles = ['schema.sql', 'schema_v2.sql', 'schema_v3.sql', 'schema_v4.sql', 'schema_v5.sql', 'schema_v6.sql', 'schema_v7.sql', 'schema_v8.sql', 'schema_v9.sql'];
+    $sqlFiles = ['schema.sql', 'schema_v2.sql', 'schema_v3.sql', 'schema_v4.sql', 'schema_v5.sql', 'schema_v6.sql', 'schema_v7.sql', 'schema_v8.sql', 'schema_v9.sql', 'schema_v10.sql', 'schema_v11.sql', 'schema_v12.sql', 'schema_v13.sql', 'schema_v14.sql', 'schema_v15.sql', 'schema_v16.sql', 'schema_v17.sql'];
     $sql = '';
     foreach ($sqlFiles as $sf) {
         $sqlFile = __DIR__ . '/' . $sf;
@@ -160,8 +160,25 @@ try {
             }
             $success++;
         } catch (PDOException $e) {
-            echo "<span class='error'>[ERROR]</span> Sentencia #" . ($i + 1) . ": " . $e->getMessage() . "\n";
-            $errors++;
+            // Errores conocidos e inofensivos al re-ejecutar migraciones (idempotencia)
+            $harmless = [
+                '1061', // Duplicate key name (índice ya existe)
+                '1060', // Duplicate column name (columna ya existe)
+                '1050', // Table already exists
+                '1062', // Duplicate entry (dato ya insertado)
+            ];
+            $sqlState = $e->getCode();
+            $errorCode = '';
+            if (preg_match('/:\s*(\d{4})\s/', $e->getMessage(), $ec)) {
+                $errorCode = $ec[1];
+            }
+            if (in_array($errorCode, $harmless)) {
+                echo "<span class='warn'>[AVISO]</span> Sentencia #" . ($i + 1) . ": ya aplicada, se omite (" . trim($e->getMessage()) . ")\n";
+                $success++;
+            } else {
+                echo "<span class='error'>[ERROR]</span> Sentencia #" . ($i + 1) . ": " . $e->getMessage() . "\n";
+                $errors++;
+            }
         }
     }
 

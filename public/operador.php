@@ -37,11 +37,41 @@ if ($usuarioId > 0) {
     $row = $stmt->fetch();
     if ($row) $userName = $row['nombre'];
 }
+$formatoNombreFoto = 1;
+$opMostrarEmpresa = 0;
+$opMostrarInfra = 0;
+$opMostrarSituacion = 0;
+$opMostrarMapa = 0;
+$opMapaZoom = 9;
+$wmFecha = 1; $wmCoordenadas = 1; $wmOrientacion = 1; $wmUbicacion = 1; $wmPais = 1; $wmBrujula = 1;
+$wmCodigoInfra = 0; $wmSituacion = 0; $wmTipoFoto = 0;
+$wmMapa = 0; $wmMapaZoom = 15; $wmMapaTamano = 2; $wmTextoTamano = 2;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_fecha, wm_mostrar_coordenadas, wm_mostrar_orientacion, wm_mostrar_ubicacion, wm_mostrar_pais, wm_mostrar_brujula, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
-    if ($row) $empresaName = $row['nombre'];
+    if ($row) {
+        $empresaName = $row['nombre'];
+        $formatoNombreFoto = (int) ($row['formato_nombre_foto'] ?? 1);
+        $opMostrarEmpresa = (int) ($row['op_mostrar_empresa'] ?? 0);
+        $opMostrarInfra = (int) ($row['op_mostrar_infraestructura'] ?? 0);
+        $opMostrarSituacion = (int) ($row['op_mostrar_situacion'] ?? 0);
+        $opMostrarMapa = (int) ($row['op_mostrar_mapa'] ?? 0);
+        $opMapaZoom = (int) ($row['op_mapa_zoom'] ?? 9);
+        $wmFecha = (int) ($row['wm_mostrar_fecha'] ?? 1);
+        $wmCoordenadas = (int) ($row['wm_mostrar_coordenadas'] ?? 1);
+        $wmOrientacion = (int) ($row['wm_mostrar_orientacion'] ?? 1);
+        $wmUbicacion = (int) ($row['wm_mostrar_ubicacion'] ?? 1);
+        $wmPais = (int) ($row['wm_mostrar_pais'] ?? 1);
+        $wmBrujula = (int) ($row['wm_mostrar_brujula'] ?? 1);
+        $wmCodigoInfra = (int) ($row['wm_mostrar_codigo_infra'] ?? 0);
+        $wmSituacion = (int) ($row['wm_mostrar_situacion'] ?? 0);
+        $wmTipoFoto = (int) ($row['wm_mostrar_tipo_foto'] ?? 0);
+        $wmMapa = (int) ($row['wm_mostrar_mapa'] ?? 0);
+        $wmMapaZoom = (int) ($row['wm_mapa_zoom'] ?? 15);
+        $wmMapaTamano = (int) ($row['wm_mapa_tamano'] ?? 2);
+        $wmTextoTamano = (int) ($row['wm_texto_tamano'] ?? 2);
+    }
 }
 
 // Iniciales del usuario para el avatar
@@ -56,7 +86,7 @@ if ($initials === '') $initials = 'OP';
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#4f6ef7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -73,6 +103,20 @@ if ($initials === '') $initials = 'OP';
          PANTALLA 1: FICHA DE VISITA
          ======================================================== -->
     <div id="screen-ficha" class="screen active">
+        <!-- Banner: Instalar App (sticky top) -->
+        <div id="install-banner" class="install-banner hidden">
+            <div class="install-banner-inner">
+                <i class="bi bi-phone-fill install-banner-pulse"></i>
+                <span class="install-banner-label"><strong>Instala FotoGPS</strong> en tu movil</span>
+                <button type="button" id="btn-install-app" class="install-btn">
+                    <i class="bi bi-download"></i> Instalar
+                </button>
+                <button type="button" id="btn-install-dismiss" class="install-dismiss" aria-label="Cerrar">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+
         <!-- Header -->
         <div class="ficha-header">
             <div class="ficha-brand">
@@ -81,7 +125,9 @@ if ($initials === '') $initials = 'OP';
                 </div>
                 <div class="brand-text">
                     <strong>FotoGPS</strong>
+                    <?php if ($opMostrarEmpresa): ?>
                     <span><?= htmlspecialchars($empresaName) ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="ficha-header-right">
@@ -107,27 +153,6 @@ if ($initials === '') $initials = 'OP';
         <!-- Body -->
         <div class="ficha-body">
 
-            <!-- Banner: Instalar App -->
-            <div id="install-banner" class="install-banner hidden">
-                <div class="install-banner-content">
-                    <div class="install-banner-icon">
-                        <i class="bi bi-download"></i>
-                    </div>
-                    <div class="install-banner-text">
-                        <strong>Instalar FotoGPS</strong>
-                        <small>Acceso directo desde tu pantalla de inicio</small>
-                    </div>
-                </div>
-                <div class="install-banner-actions">
-                    <button type="button" id="btn-install-app" class="install-btn">
-                        <i class="bi bi-phone-fill"></i> Instalar App
-                    </button>
-                    <button type="button" id="btn-install-dismiss" class="install-dismiss">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-            </div>
-
             <!-- Card: Ubicacion -->
             <div class="card">
                 <div class="card-label">
@@ -139,6 +164,9 @@ if ($initials === '') $initials = 'OP';
                     </select>
                     <select id="filter-municipio" class="input-field" disabled>
                         <option value="">Todos los municipios</option>
+                    </select>
+                    <select id="filter-monte" class="input-field" disabled>
+                        <option value="">Todos los montes</option>
                     </select>
                 </div>
             </div>
@@ -174,6 +202,16 @@ if ($initials === '') $initials = 'OP';
                 </button>
             </div>
 
+            <!-- Card: Tipo de Trabajo -->
+            <div class="card">
+                <div class="card-label">
+                    <i class="bi bi-briefcase"></i> Tipo de Trabajo
+                </div>
+                <select id="tipo-trabajo" class="input-field">
+                    <option value="">Seleccionar tipo de trabajo</option>
+                </select>
+            </div>
+
             <!-- Card: Unidad de Obra -->
             <div class="card">
                 <div class="card-label">
@@ -204,7 +242,7 @@ if ($initials === '') $initials = 'OP';
             </div>
 
             <!-- Card: Situación de la obra -->
-            <div class="card">
+            <div class="card" id="card-situacion" <?= !$opMostrarSituacion ? 'style="display:none;"' : '' ?>>
                 <div class="card-label"><i class="bi bi-flag-fill"></i> Situación de la obra</div>
                 <div class="situacion-selector" id="situacion-selector">
                     <button type="button" class="situacion-option active" data-sit="0">
@@ -298,9 +336,15 @@ if ($initials === '') $initials = 'OP';
 
         <!-- Botón Finalizar Visita (fijo abajo, rojo, fuera del scroll) -->
         <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
-            <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita">
-                <i class="bi bi-check-circle-fill"></i> Finalizar visita
-            </button>
+            <div style="display:flex;gap:8px;width:100%;">
+                <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita" style="flex:1;">
+                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
+                </button>
+                <button type="button" id="btn-waypoints-ficha" class="btn-finalizar-visita hidden"
+                    style="flex:none;background:#22c55e;padding:0 16px;" title="Descargar waypoints GPX">
+                    <i class="bi bi-geo-alt"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -330,6 +374,15 @@ if ($initials === '') $initials = 'OP';
 
         <div id="cam-seq-counter" class="cam-seq hidden">
             <span id="cam-seq-label">W1</span>
+        </div>
+
+        <!-- Ghost opacity slider -->
+        <div id="ghost-opacity-bar" class="ghost-opacity-bar hidden">
+            <i class="bi bi-eye-slash" style="font-size:12px;opacity:0.7;"></i>
+            <input type="range" id="ghost-opacity-slider" min="0" max="100" value="50" step="5"
+                   class="ghost-opacity-slider" title="Transparencia ghost">
+            <i class="bi bi-eye" style="font-size:12px;opacity:0.7;"></i>
+            <span id="ghost-opacity-value" class="ghost-opacity-value">50%</span>
         </div>
 
         <div class="cam-controls">
@@ -396,8 +449,23 @@ if ($initials === '') $initials = 'OP';
                 <strong>Mapa de Visitas</strong>
                 <span id="mapa-subtitle">Todas las infraestructuras</span>
             </div>
-            <div style="width:40px;"></div>
+            <button type="button" id="btn-mapa-search-toggle" class="cam-btn-back" title="Buscar infraestructura" style="font-size:1rem;">
+                <i class="bi bi-search"></i>
+            </button>
         </div>
+
+        <!-- Buscador de infraestructuras en mapa -->
+        <div id="mapa-search-bar" class="mapa-search-bar hidden">
+            <div class="mapa-search-input-wrap">
+                <i class="bi bi-search"></i>
+                <input type="text" id="mapa-search-input" placeholder="Buscar infraestructura..." autocomplete="off" spellcheck="false">
+                <button type="button" id="btn-mapa-search-close" class="mapa-search-close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div id="mapa-search-results" class="mapa-search-results hidden"></div>
+        </div>
+
         <div id="op-map" class="op-map"></div>
 
         <!-- Navigation overlay -->
@@ -603,12 +671,37 @@ if ($initials === '') $initials = 'OP';
                 upload: 'subir.php',
                 infraestructuras: 'api/infraestructuras.php',
                 unidadesObra: 'api/unidades_obra.php',
+                tiposTrabajo: 'api/tipos_trabajo.php',
                 fotosComparativas: 'api/fotos_comparativas.php',
                 registrosMapa: 'api/registros_mapa.php',
                 capasKml: 'api/capas_kml.php',
+                capasInfra: 'api/capas_infra.php',
                 visitas: 'api/visitas.php',
+                waypoints: 'api/waypoints.php',
+                puntosMapa: 'api/puntos_mapa.php',
                 campos: 'api/campos.php',
-            }
+            },
+            formatoNombreFoto: <?= $formatoNombreFoto ?>,
+            opMostrarEmpresa: <?= $opMostrarEmpresa ?>,
+            opMostrarInfra: <?= $opMostrarInfra ?>,
+            opMostrarSituacion: <?= $opMostrarSituacion ?>,
+            opMostrarMapa: <?= $opMostrarMapa ?>,
+            opMapaZoom: <?= $opMapaZoom ?>,
+            watermark: {
+                fecha: <?= $wmFecha ?>,
+                coordenadas: <?= $wmCoordenadas ?>,
+                orientacion: <?= $wmOrientacion ?>,
+                ubicacion: <?= $wmUbicacion ?>,
+                pais: <?= $wmPais ?>,
+                brujula: <?= $wmBrujula ?>,
+                codigoInfra: <?= $wmCodigoInfra ?>,
+                situacion: <?= $wmSituacion ?>,
+                tipoFoto: <?= $wmTipoFoto ?>,
+                mapa: <?= $wmMapa ?>,
+                mapaZoom: <?= $wmMapaZoom ?>,
+                mapaTamano: <?= $wmMapaTamano ?>,
+                textoTamano: <?= $wmTextoTamano ?>,
+            },
         };
     </script>
     <script>

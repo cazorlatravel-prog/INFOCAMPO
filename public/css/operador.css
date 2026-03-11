@@ -92,6 +92,7 @@ html, body {
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: #ffffff;
     border-bottom: 1px solid #e8ecf1;
     position: sticky;
@@ -286,86 +287,72 @@ html, body {
 }
 
 
-/* --- Install Banner --- */
+/* --- Install Banner (sticky top bar) --- */
 .install-banner {
-    background: linear-gradient(135deg, #4f6ef7, #3b5de7);
-    border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    box-shadow: 0 4px 16px rgba(79, 110, 247, 0.3);
+    background: linear-gradient(90deg, #4f6ef7, #6366f1, #8b5cf6);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 20px rgba(79, 110, 247, 0.4);
+    animation: installSlideDown 0.4s ease-out;
 }
 
 .install-banner.hidden { display: none !important; }
 
-.install-banner-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1;
-    min-width: 0;
+@keyframes installSlideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
-.install-banner-icon {
-    width: 42px;
-    height: 42px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 12px;
+.install-banner-inner {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 10px;
+    padding: 10px 16px;
+    color: #fff;
+    font-size: 0.88rem;
+    flex-wrap: wrap;
+}
+
+.install-banner-pulse {
     font-size: 1.2rem;
+    animation: pwaPulse 2s infinite;
+}
+
+@keyframes pwaPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.install-banner-label {
+    font-size: 0.85rem;
     color: #fff;
-    flex-shrink: 0;
 }
 
-.install-banner-text {
-    min-width: 0;
-}
-
-.install-banner-text strong {
-    display: block;
-    font-size: 0.9rem;
+.install-banner-label strong {
     font-weight: 800;
-    color: #fff;
-}
-
-.install-banner-text small {
-    display: block;
-    font-size: 0.7rem;
-    color: rgba(255,255,255,0.75);
-    margin-top: 1px;
-}
-
-.install-banner-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
 }
 
 .install-btn {
     background: #ffffff;
     border: none;
     color: #4f6ef7;
-    padding: 10px 16px;
-    border-radius: 10px;
+    padding: 7px 16px;
+    border-radius: 8px;
     font-size: 0.82rem;
     font-weight: 800;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     white-space: nowrap;
-    min-height: 40px;
     transition: all 0.15s;
 }
 
 .install-btn:hover {
     background: #eef2ff;
+    transform: scale(1.04);
 }
 
 .install-btn:active {
@@ -373,23 +360,23 @@ html, body {
 }
 
 .install-dismiss {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.2);
     border: none;
-    color: rgba(255,255,255,0.7);
-    width: 32px;
-    height: 32px;
+    color: #fff;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s;
+    flex-shrink: 0;
 }
 
 .install-dismiss:hover {
-    background: rgba(255,255,255,0.25);
-    color: #fff;
+    background: rgba(255,255,255,0.35);
 }
 
 
@@ -946,6 +933,62 @@ select.input-field {
 .cam-ghost.active { display: block; }
 .cam-ghost.off { opacity: 0; }
 
+/* Ghost opacity slider bar */
+.ghost-opacity-bar {
+    position: absolute;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 6px 14px;
+    color: #fff;
+}
+.ghost-opacity-bar.hidden { display: none; }
+
+.ghost-opacity-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+.ghost-opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.ghost-opacity-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.ghost-opacity-value {
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: center;
+}
+
 .cam-topbar {
     position: absolute;
     top: 0;
@@ -956,6 +999,7 @@ select.input-field {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: linear-gradient(180deg, rgba(0,0,0,0.65) 0%, transparent 100%);
 }
 
@@ -963,8 +1007,8 @@ select.input-field {
     background: rgba(255,255,255,0.18);
     border: none;
     color: #fff;
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1008,8 +1052,8 @@ select.input-field {
 
 .cam-gps {
     position: absolute;
-    top: 64px;
-    right: 12px;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
     z-index: 10;
     display: flex;
     align-items: center;
@@ -1386,6 +1430,7 @@ select.input-field {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: rgba(255,255,255,0.92);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
@@ -1402,6 +1447,83 @@ select.input-field {
     top: 60px;
     bottom: 70px;
     z-index: 1;
+}
+
+/* --- Map Search Bar --- */
+.mapa-search-bar {
+    position: absolute;
+    top: 58px;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    animation: searchSlideDown 0.2s ease-out;
+}
+.mapa-search-bar.hidden { display: none; }
+@keyframes searchSlideDown {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.mapa-search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+.mapa-search-input-wrap i { color: #9ca3af; font-size: 0.9rem; }
+.mapa-search-input-wrap input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 0.88rem;
+    color: #1f2937;
+    outline: none;
+}
+.mapa-search-close {
+    background: none; border: none; color: #9ca3af;
+    font-size: 0.75rem; cursor: pointer; padding: 4px;
+}
+.mapa-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    border-radius: 0 0 12px 12px;
+    z-index: 1002;
+}
+.mapa-search-results.hidden { display: none; }
+.mapa-search-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.1s;
+}
+.mapa-search-item:hover { background: #f0f4ff; }
+.mapa-search-item:last-child { border-bottom: none; }
+.mapa-search-item .search-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.mapa-search-item .search-info { flex: 1; min-width: 0; }
+.mapa-search-item .search-info strong {
+    display: block; font-size: 0.85rem; color: #1f2937;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mapa-search-item .search-info small {
+    font-size: 0.7rem; color: #6b7280;
+}
+.mapa-search-item .search-dist {
+    font-size: 0.72rem; color: #4285f4; font-weight: 600; white-space: nowrap;
 }
 
 /* Botón Volver rojo fijo abajo */
@@ -1753,6 +1875,17 @@ select.input-field {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* User location marker pulse animation */
+@keyframes userPulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(3); opacity: 0; }
+}
+
+.user-location-marker {
+    background: transparent !important;
+    border: none !important;
+}
 
 .modal-overlay {
     position: fixed;
@@ -2307,6 +2440,7 @@ select.input-field {
    ========================================================== */
 .guardar-visita-fixed {
     padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     background: #fff;
     border-top: 1px solid #e8ecf1;
     flex-shrink: 0;
@@ -2366,6 +2500,7 @@ select.input-field {
    ========================================================== */
 .visitas-footer {
     padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
     background: #fff;
     border-top: 1px solid #e8ecf1;
 }
@@ -2399,6 +2534,7 @@ select.input-field {
     display: flex;
     align-items: center;
     padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
     background: #fff;
     border-bottom: 1px solid #e8ecf1;
     gap: 12px;

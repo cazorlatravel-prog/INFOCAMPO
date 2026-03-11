@@ -10,8 +10,16 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/auth.php';
+
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
 
 $infraId = isset($_GET['infra_id']) ? (int) $_GET['infra_id'] : 0;
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
 if ($infraId <= 0) {
     echo json_encode(['ok' => false, 'error' => 'infra_id requerido']);
@@ -20,6 +28,15 @@ if ($infraId <= 0) {
 
 try {
     $pdo = getDB();
+
+    // Verificar que la infra pertenece a la empresa del usuario
+    $stmtCheck = $pdo->prepare("SELECT id FROM infraestructuras WHERE id = :id AND empresa_id = :emp");
+    $stmtCheck->execute([':id' => $infraId, ':emp' => $empresaId]);
+    if (!$stmtCheck->fetch()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+        exit;
+    }
 
     // Obtener la fecha de la última visita comparativa
     $stmtFecha = $pdo->prepare(

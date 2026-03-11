@@ -180,6 +180,35 @@ $totalAlea       = count($aleatorias);
         border-radius: 4px;
     }
 
+    /* Banner logo personalizado */
+    .report-logo-banner {
+        width: 100%;
+        background: #fff;
+        text-align: center;
+        display: none; /* oculto hasta que se suba logo */
+    }
+
+    .report-logo-banner img {
+        width: 100%;
+        display: block;
+        object-fit: contain;
+    }
+
+    .report-logo-banner.has-logo { display: block; }
+
+    /* Titulo personalizado */
+    .report-custom-title {
+        background: #1e3a5f;
+        color: #fff;
+        text-align: center;
+        padding: 14px 36px;
+        font-size: 20px;
+        font-weight: 800;
+        display: none; /* oculto hasta que se escriba título */
+    }
+
+    .report-custom-title.has-title { display: block; }
+
     /* Cabecera del informe */
     .report-header {
         background: #1e3a5f;
@@ -196,6 +225,91 @@ $totalAlea       = count($aleatorias);
     .report-header p {
         opacity: 0.7;
         font-size: 11px;
+    }
+
+    /* Controles personalización cabecera (solo pantalla) */
+    .header-controls {
+        background: #eef2ff;
+        border: 1px dashed #6b7fbd;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 0 36px 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 12px;
+    }
+
+    .header-controls .ctrl-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .header-controls .ctrl-label {
+        font-weight: 700;
+        color: #1e3a5f;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+
+    .header-controls input[type="text"] {
+        border: 1px solid #c5cee0;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12px;
+        width: 260px;
+        outline: none;
+    }
+
+    .header-controls input[type="text"]:focus {
+        border-color: #1e3a5f;
+        box-shadow: 0 0 0 2px rgba(30,58,95,0.15);
+    }
+
+    .header-controls .btn-upload-logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 14px;
+        background: #1e3a5f;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .header-controls .btn-upload-logo:hover { background: #2a4f7f; }
+
+    .header-controls .btn-remove-logo {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 10px;
+        background: #dc3545;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 11px;
+        cursor: pointer;
+    }
+
+    .header-controls .btn-remove-logo.visible { display: inline-flex; }
+
+    .header-controls .logo-filename {
+        font-size: 10px;
+        color: #666;
+        font-style: italic;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* Secciones */
@@ -269,46 +383,56 @@ $totalAlea       = count($aleatorias);
     .badge-comp    { color: #6d28d9; font-weight: bold; }
     .badge-alea    { color: #1d4ed8; font-weight: bold; }
 
-    /* Foto blocks */
-    .foto-block {
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 12px;
-        margin-bottom: 16px;
+    /* Fotos aleatorias — grid de 3 por fila, ancho completo */
+    .alea-row {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 12px;
         page-break-inside: avoid;
     }
 
-    .foto-block img {
-        max-width: 100%;
-        max-height: 320px;
+    .alea-col {
+        flex: 1;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px;
+        min-width: 0;
+    }
+
+    .alea-col img {
+        width: 100%;
+        object-fit: contain;
         display: block;
-        margin: 10px auto;
+        margin: 4px auto;
         border-radius: 4px;
     }
 
-    .foto-meta {
-        font-size: 11px;
+    .alea-col .foto-meta {
+        font-size: 9px;
         color: #666;
-        line-height: 1.6;
+        line-height: 1.4;
     }
 
-    .foto-meta strong { color: #333; }
+    .alea-col .foto-meta strong { color: #333; }
 
-    /* Comparativas lado a lado */
+    /* Comparativas lado a lado — 2 fotos = ancho completo */
     .comp-pair {
         display: flex;
-        gap: 12px;
+        gap: 4px;
         margin-bottom: 16px;
         page-break-inside: avoid;
     }
 
     .comp-col {
         flex: 1;
+        min-width: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px;
     }
 
     .comp-col img {
         width: 100%;
-        max-height: 240px;
         object-fit: contain;
         display: block;
         margin: 0 auto;
@@ -328,6 +452,14 @@ $totalAlea       = count($aleatorias);
         font-size: 9px;
         color: #888;
         margin-top: 4px;
+    }
+
+    .comp-meta {
+        text-align: center;
+        font-size: 9px;
+        color: #666;
+        margin-top: 3px;
+        line-height: 1.4;
     }
 
     /* Separador de sección */
@@ -395,7 +527,7 @@ $totalAlea       = count($aleatorias);
         /* Controlar saltos de página */
         .page-break { page-break-before: always; }
 
-        .foto-block,
+        .alea-row,
         .comp-pair {
             page-break-inside: avoid;
         }
@@ -408,13 +540,71 @@ $totalAlea       = count($aleatorias);
         .section { padding: 14px 24px; }
         .report-header { padding: 20px 24px; }
 
-        /* Imágenes a tamaño razonable */
-        .foto-block img { max-height: 280px; }
-        .comp-col img { max-height: 220px; }
+        /* Ocultar controles en impresión */
+        .info-controls { display: none !important; }
+        .header-controls { display: none !important; }
+
+        /* Ocultar elementos marcados como hidden antes de imprimir */
+        .meta-hidden { display: none !important; }
+
+        /* Logo y título personalizado en impresión */
+        .report-logo-banner.has-logo {
+            display: block !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .report-custom-title.has-title {
+            display: block !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
+        }
 
         /* Footer */
         .report-footer { position: fixed; bottom: 0; left: 0; right: 0; }
     }
+
+    /* Panel de controles de info en fotos (solo pantalla) */
+    .info-controls {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-size: 12px;
+    }
+
+    .info-controls label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        user-select: none;
+        font-weight: 500;
+        color: #333;
+    }
+
+    .info-controls input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+        accent-color: #1e3a5f;
+    }
+
+    .info-controls .controls-title {
+        font-weight: 700;
+        color: #1e3a5f;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .meta-hidden { display: none !important; }
 
     /* Responsive para vista en pantalla */
     @media (max-width: 600px) {
@@ -423,7 +613,10 @@ $totalAlea       = count($aleatorias);
         .report-header { padding: 20px 16px; }
         .report-header h1 { font-size: 17px; }
         .comp-pair { flex-direction: column; }
+        .alea-row { flex-direction: column; }
         .toolbar-title span { display: none; }
+        .header-controls { margin: 0 16px; flex-direction: column; align-items: flex-start; }
+        .header-controls input[type="text"] { width: 100%; }
     }
 </style>
 </head>
@@ -448,10 +641,38 @@ $totalAlea       = count($aleatorias);
 <!-- Contenido del informe -->
 <div class="page-container">
 
+    <!-- Logo personalizado (oculto por defecto) -->
+    <div class="report-logo-banner" id="logoBanner">
+        <img id="logoImg" src="" alt="Logo">
+    </div>
+
+    <!-- Título personalizado (oculto por defecto) -->
+    <div class="report-custom-title" id="customTitle"></div>
+
     <!-- Cabecera -->
     <div class="report-header">
         <h1>FotoGPS.app &mdash; Informe de Inspección</h1>
         <p>Generado el <?= $fechaGeneracion ?> &mdash; <?= $empresaNombre ?></p>
+    </div>
+
+    <!-- Controles de personalización (solo pantalla) -->
+    <div class="header-controls">
+        <span class="ctrl-label"><i class="bi bi-palette"></i> Personalizar cabecera:</span>
+        <div class="ctrl-group">
+            <label class="ctrl-label" style="font-size:10px;">Logo:</label>
+            <button type="button" class="btn-upload-logo" id="btnUploadLogo">
+                <i class="bi bi-image"></i> Subir logo
+            </button>
+            <span class="logo-filename" id="logoFilename"></span>
+            <button type="button" class="btn-remove-logo" id="btnRemoveLogo">
+                <i class="bi bi-x"></i> Quitar
+            </button>
+            <input type="file" id="inputLogo" accept="image/*" style="display:none;">
+        </div>
+        <div class="ctrl-group">
+            <label class="ctrl-label" style="font-size:10px;">Título:</label>
+            <input type="text" id="inputTitulo" placeholder="Título personalizado del informe...">
+        </div>
     </div>
 
     <!-- Datos de la infraestructura -->
@@ -562,6 +783,15 @@ $totalAlea       = count($aleatorias);
         <?php endif; ?>
     </div>
 
+    <?php if (!empty($visitasComp) || !empty($aleatorias)): ?>
+    <div class="section info-controls">
+        <span class="controls-title"><i class="bi bi-gear"></i> Info visible en fotos:</span>
+        <label><input type="checkbox" id="chkOperador" checked> Operador</label>
+        <label><input type="checkbox" id="chkSituacion" checked> Situación</label>
+        <label><input type="checkbox" id="chkTrabajo" checked> Tipo de trabajo</label>
+    </div>
+    <?php endif; ?>
+
     <?php
     // ---------------------------------------------------------------
     // Fotos comparativas (agrupadas por visita)
@@ -606,9 +836,15 @@ $totalAlea       = count($aleatorias);
                     $badgeF  = "badge-{$f['estado_incidencia']}";
                 ?>
                 <div class="comp-col">
-                    <div class="comp-label">W<?= $seq ?> &mdash; <span class="<?= $badgeF ?>"><?= $estadoF ?></span></div>
+                    <div class="comp-label">W<?= $seq ?> &mdash; <span class="<?= $badgeF ?>" data-meta="situacion"><?= $estadoF ?></span></div>
                     <img src="<?= $url ?>" alt="W<?= $seq ?>">
                     <div class="comp-gps">GPS: <?= $f['lat_real'] ?>, <?= $f['lon_real'] ?></div>
+                    <div class="comp-meta">
+                        <span data-meta="operador"><?= htmlspecialchars($f['usuario_nombre']) ?></span>
+                        <?php if (!empty($f['unidad_obra_nombre'])): ?>
+                        <span data-meta="trabajo"> | <?= htmlspecialchars($f['unidad_obra_nombre']) ?></span>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <?php endforeach; ?>
                 <?php if (count($par) === 1): ?>
@@ -633,28 +869,46 @@ $totalAlea       = count($aleatorias);
 
         <?php
         $fotosAlea = array_values($aleatorias);
-        foreach ($fotosAlea as $idx => $reg):
-            if ($idx > 0 && $idx % 4 === 0):
+        $totalAleaFotos = count($fotosAlea);
+        // 3 fotos por fila, ~3 filas por página = 9 fotos por página
+        $filas = array_chunk($fotosAlea, 3);
+        $filaCount = 0;
+        foreach ($filas as $fila):
+            $filaCount++;
+            if ($filaCount > 1 && ($filaCount - 1) % 3 === 0):
         ?>
         </div>
         <div class="page-break"></div>
         <div class="section">
             <h2>Fotos Aleatorias (cont.)</h2>
-        <?php endif;
-            $fecha      = date('d/m/Y H:i', strtotime($reg['fecha']));
-            $operador   = htmlspecialchars($reg['usuario_nombre']);
-            $estado     = strtoupper($reg['estado_incidencia']);
-            $badgeClass = "badge-{$reg['estado_incidencia']}";
-            $url        = htmlspecialchars($reg['url_cloudinary']);
-            $uo         = !empty($reg['unidad_obra_nombre']) ? ' | U.Obra: ' . htmlspecialchars($reg['unidad_obra_nombre']) : '';
-        ?>
-            <div class="foto-block">
-                <div class="foto-meta">
-                    <strong><?= $fecha ?></strong> &mdash; Operador: <?= $operador ?>
-                    &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span>
-                    &mdash; GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?><?= $uo ?>
+        <?php endif; ?>
+            <div class="alea-row">
+                <?php foreach ($fila as $reg):
+                    $fecha      = date('d/m/Y H:i', strtotime($reg['fecha']));
+                    $operador   = htmlspecialchars($reg['usuario_nombre']);
+                    $estado     = strtoupper($reg['estado_incidencia']);
+                    $badgeClass = "badge-{$reg['estado_incidencia']}";
+                    $url        = htmlspecialchars($reg['url_cloudinary']);
+                    $uo         = !empty($reg['unidad_obra_nombre']) ? ' | ' . htmlspecialchars($reg['unidad_obra_nombre']) : '';
+                ?>
+                <div class="alea-col">
+                    <img src="<?= $url ?>" alt="Inspección">
+                    <div class="foto-meta">
+                        <strong><?= $fecha ?></strong><br>
+                        <span data-meta="operador"><?= $operador ?></span>
+                        <span data-meta="situacion"> &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span></span>
+                        <span data-meta="trabajo"><?= $uo ?></span><br>
+                        <span style="font-size:8px;">GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?></span>
+                    </div>
                 </div>
-                <img src="<?= $url ?>" alt="Inspección">
+                <?php endforeach; ?>
+                <?php
+                // Rellenar celdas vacías si la fila tiene menos de 3
+                $vacias = 3 - count($fila);
+                for ($i = 0; $i < $vacias; $i++):
+                ?>
+                <div class="alea-col" style="border:none;"></div>
+                <?php endfor; ?>
             </div>
         <?php endforeach; ?>
     </div>
@@ -666,6 +920,87 @@ $totalAlea       = count($aleatorias);
     </div>
 
 </div><!-- /page-container -->
+
+<script>
+(() => {
+    const map = {
+        chkOperador:  'operador',
+        chkSituacion: 'situacion',
+        chkTrabajo:   'trabajo'
+    };
+
+    function toggleMeta(metaName, visible) {
+        document.querySelectorAll(`[data-meta="${metaName}"]`).forEach(el => {
+            if (visible) {
+                el.classList.remove('meta-hidden');
+            } else {
+                el.classList.add('meta-hidden');
+            }
+        });
+    }
+
+    Object.entries(map).forEach(([checkboxId, metaName]) => {
+        const cb = document.getElementById(checkboxId);
+        if (!cb) return;
+        cb.addEventListener('change', () => toggleMeta(metaName, cb.checked));
+    });
+
+    // --- Logo personalizado ---
+    const btnUpload = document.getElementById('btnUploadLogo');
+    const btnRemove = document.getElementById('btnRemoveLogo');
+    const inputLogo = document.getElementById('inputLogo');
+    const logoBanner = document.getElementById('logoBanner');
+    const logoImg = document.getElementById('logoImg');
+    const logoFilename = document.getElementById('logoFilename');
+
+    if (btnUpload) {
+        btnUpload.addEventListener('click', () => inputLogo.click());
+    }
+
+    if (inputLogo) {
+        inputLogo.addEventListener('change', () => {
+            const file = inputLogo.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                logoImg.src = e.target.result;
+                logoBanner.classList.add('has-logo');
+                logoFilename.textContent = file.name;
+                btnRemove.classList.add('visible');
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (btnRemove) {
+        btnRemove.addEventListener('click', () => {
+            logoImg.src = '';
+            logoBanner.classList.remove('has-logo');
+            logoFilename.textContent = '';
+            btnRemove.classList.remove('visible');
+            inputLogo.value = '';
+        });
+    }
+
+    // --- Título personalizado ---
+    const inputTitulo = document.getElementById('inputTitulo');
+    const customTitle = document.getElementById('customTitle');
+
+    if (inputTitulo) {
+        inputTitulo.addEventListener('input', () => {
+            const val = inputTitulo.value.trim();
+            if (val) {
+                customTitle.textContent = val;
+                customTitle.classList.add('has-title');
+            } else {
+                customTitle.textContent = '';
+                customTitle.classList.remove('has-title');
+            }
+        });
+    }
+})();
+</script>
 
 </body>
 </html>

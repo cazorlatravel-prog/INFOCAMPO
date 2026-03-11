@@ -8,10 +8,17 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-$empresaId = (int) ($_GET['empresa_id'] ?? 0);
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
 if ($empresaId <= 0) {
     http_response_code(400);

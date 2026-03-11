@@ -2,8 +2,8 @@
  * INFOCAMPO - Operador de Campo
  *
  * App principal del operador para recogida de datos en campo.
- * Soporta fotos aleatorias y comparativas con sistema Ghosting.
- * Watermarks con coordenadas ETRS89 y hora de Madrid.
+ * Soporta fotos aleatorias y comparativas (solo comparativas tienen sistema Ghosting).
+ * Watermarks estilo GPS Camera: UTM, brújula, geocoding, hora Madrid.
  */
 ;(function() {
     'use strict';
@@ -14,19 +14,23 @@
     // STATE
     // ===================================================================
     const state = {
+        screen: 'ficha', // current screen name
         infraId: null,
         infraName: '',
         infraCode: '',
+        tipoTrabajoId: null,
         unidadObraId: null,
         currentMode: null, // 'aleatorio' | 'comparativo'
         gps: { lat: null, lon: null },
         gpsWatchId: null,
         stream: null,
         capturedBlob: null,
+        capturedGps: { lat: null, lon: null }, // GPS frozen at capture moment
         ghostUrl: null,
         ghostActive: false,
         seqComparativa: 0,
         photos: [], // { url, type, seq, name }
+        waypoints: [], // { lat, lon, filename, timestamp } — waypoints for comparative photos
         countAleatorias: 0,
         countComparativas: 0,
         countTotal: 0, // contador global por infraestructura
@@ -37,6 +41,10 @@
         annotationMode: false,
         pendingFilename: null,
         baseImageData: null,       // ImageData snapshot without annotation
+        // Compass bearing (device orientation)
+        bearing: null, // degrees 0-360, null if unavailable
+        // Reverse geocoding cache
+        geoLocation: null, // { city, province, postcode, country }
     };
 
     const SITUACIONES = ['antes', 'durante', 'despues'];
@@ -64,6 +72,7 @@
     const infraSelected    = $('#infra-selected');
     const infraSelectedName = $('#infra-selected-name');
     const infraClear       = $('#infra-clear');
+    const tipoTrabajo      = $('#tipo-trabajo');
     const unidadObra       = $('#unidad-obra');
     const fechaDisplay     = $('#fecha-display');
     const btnAleatorias    = $('#btn-fotos-aleatorias');
@@ -89,6 +98,9 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
+    const ghostOpacityBar    = $('#ghost-opacity-bar');
+    const ghostOpacitySlider = $('#ghost-opacity-slider');
+    const ghostOpacityValue  = $('#ghost-opacity-value');
 
     // Preview
     const previewCanvas  = $('#preview-canvas');
@@ -134,11 +146,47 @@
         updateDate();
         setInterval(updateClock, 30000);
         loadProvincias();
+        loadMontes();
+        loadTiposTrabajo();
         loadUnidadesObra();
         bindEvents();
         initGPS();
+        initCompass();
         initOffline();
         registerServiceWorker();
+        initExitConfirmation();
+    }
+
+    // ===================================================================
+    // EXIT CONFIRMATION — prevent accidental close with unsaved data
+    // ===================================================================
+    function initExitConfirmation() {
+        window.addEventListener('beforeunload', (e) => {
+            // Always ask before leaving the app
+            e.preventDefault();
+            e.returnValue = '¿Seguro que quieres salir de INFOCAMPO?';
+            return e.returnValue;
+        });
+
+        // Intercept mobile back button via popstate
+        if (history.pushState) {
+            history.pushState(null, '', location.href);
+            window.addEventListener('popstate', () => {
+                // If on a sub-screen (camera, preview, map, etc.), go back to ficha instead of leaving
+                if (state.screen !== 'ficha') {
+                    history.pushState(null, '', location.href);
+                    showScreen('ficha');
+                    return;
+                }
+                // On ficha screen, ask before leaving the app
+                if (!confirm('¿Quieres salir de INFOCAMPO? Asegúrate de haber guardado tus datos antes de cerrar.')) {
+                    history.pushState(null, '', location.href);
+                    return;
+                }
+                // Allow navigation out
+                history.back();
+            });
+        }
     }
 
     // ===================================================================
@@ -346,12 +394,157 @@
 
     function formatDateMadrid(date) {
         if (!date) date = new Date();
-        return date.toLocaleString('es-ES', {
+        // Format: "24 feb 2026 18:46:04" matching GPS Camera app style
+        const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        const parts = new Intl.DateTimeFormat('es-ES', {
             timeZone: 'Europe/Madrid',
-            day: '2-digit', month: '2-digit', year: 'numeric',
+            day: 'numeric', month: 'numeric', year: 'numeric',
             hour: '2-digit', minute: '2-digit', second: '2-digit',
             hour12: false,
-        });
+        }).formatToParts(date);
+        const get = (type) => (parts.find(p => p.type === type) || {}).value || '';
+        const day = get('day');
+        const month = parseInt(get('month'), 10);
+        const year = get('year');
+        const hour = get('hour');
+        const minute = get('minute');
+        const second = get('second');
+        return `${day} ${meses[month - 1]} ${year} ${hour}:${minute}:${second}`;
+    }
+
+    // ===================================================================
+    // UTM CONVERSION (lat/lon WGS84 → UTM)
+    // ===================================================================
+    function latLonToUTM(lat, lon) {
+        const a = 6378137; // WGS84 semi-major axis
+        const f = 1 / 298.257223563;
+        const e2 = 2 * f - f * f;
+        const e_prime2 = e2 / (1 - e2);
+        const k0 = 0.9996;
+
+        const latRad = lat * Math.PI / 180;
+        const zone = Math.floor((lon + 180) / 6) + 1;
+        const lonOrigin = (zone - 1) * 6 - 180 + 3;
+        const lonOriginRad = lonOrigin * Math.PI / 180;
+
+        const N = a / Math.sqrt(1 - e2 * Math.sin(latRad) * Math.sin(latRad));
+        const T = Math.tan(latRad) * Math.tan(latRad);
+        const C = e_prime2 * Math.cos(latRad) * Math.cos(latRad);
+        const A = Math.cos(latRad) * (lon * Math.PI / 180 - lonOriginRad);
+
+        const M = a * (
+            (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * latRad
+            - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * latRad)
+            + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * latRad)
+            - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * latRad)
+        );
+
+        let easting = k0 * N * (A + (1 - T + C) * A * A * A / 6
+            + (5 - 18 * T + T * T + 72 * C - 58 * e_prime2) * A * A * A * A * A / 120) + 500000;
+
+        let northing = k0 * (M + N * Math.tan(latRad) * (
+            A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24
+            + (61 - 58 * T + T * T + 600 * C - 330 * e_prime2) * A * A * A * A * A * A / 720
+        ));
+
+        if (lat < 0) northing += 10000000;
+
+        const band = 'CDEFGHJKLMNPQRSTUVWX'.charAt(Math.floor((lat + 80) / 8));
+
+        return {
+            zone: zone,
+            band: band,
+            easting: Math.round(easting),
+            northing: Math.round(northing),
+            str: `${zone}${band} ${Math.round(easting)} ${Math.round(northing)}`
+        };
+    }
+
+    // ===================================================================
+    // REVERSE GEOCODING (Nominatim OpenStreetMap)
+    // ===================================================================
+    let _lastGeocodeLat = null;
+    let _lastGeocodeLon = null;
+
+    async function reverseGeocode(lat, lon) {
+        // Only re-fetch if moved >200m from last geocode
+        if (_lastGeocodeLat != null && _lastGeocodeLon != null) {
+            const dist = Haversine.distance(lat, lon, _lastGeocodeLat, _lastGeocodeLon);
+            if (dist < 200 && state.geoLocation) return state.geoLocation;
+        }
+
+        try {
+            // Timeout after 4s to avoid blocking capture on slow networks
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 4000);
+
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`,
+                { headers: { 'Accept-Language': 'es' }, signal: controller.signal }
+            );
+            clearTimeout(timeout);
+
+            const data = await res.json();
+            const addr = data.address || {};
+            state.geoLocation = {
+                city: addr.city || addr.town || addr.village || addr.municipality || '',
+                province: addr.state || addr.province || addr.county || '',
+                postcode: addr.postcode || '',
+                country: addr.country || '',
+            };
+            _lastGeocodeLat = lat;
+            _lastGeocodeLon = lon;
+            return state.geoLocation;
+        } catch {
+            return state.geoLocation || { city: '', province: '', postcode: '', country: '' };
+        }
+    }
+
+    // ===================================================================
+    // COMPASS BEARING (Device Orientation)
+    // ===================================================================
+    function initCompass() {
+        // iOS 13+ requires permission
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // Will request on first user interaction (camera start)
+            return;
+        }
+        // Android / other browsers — start immediately
+        _startCompassListener();
+    }
+
+    async function requestCompassPermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                const perm = await DeviceOrientationEvent.requestPermission();
+                if (perm === 'granted') _startCompassListener();
+            } catch { /* permission denied */ }
+        }
+    }
+
+    function _startCompassListener() {
+        window.addEventListener('deviceorientationabsolute', (e) => {
+            if (e.absolute && e.alpha != null) {
+                state.bearing = Math.round(360 - e.alpha) % 360;
+            }
+        }, true);
+        // Fallback to non-absolute
+        window.addEventListener('deviceorientation', (e) => {
+            if (state.bearing != null) return; // prefer absolute
+            if (e.webkitCompassHeading != null) {
+                state.bearing = Math.round(e.webkitCompassHeading);
+            } else if (e.alpha != null) {
+                state.bearing = Math.round(360 - e.alpha) % 360;
+            }
+        }, true);
+    }
+
+    function bearingToCardinal(deg) {
+        if (deg == null) return '';
+        const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+        return dirs[Math.round(deg / 45) % 8];
     }
 
     function updateDate() {
@@ -375,7 +568,7 @@
     // ===================================================================
     function initGPS() {
         if (!('geolocation' in navigator)) {
-            camGpsText.textContent = 'ETRS89: Sin GPS';
+            camGpsText.textContent = 'UTM: Sin GPS';
             return;
         }
 
@@ -384,10 +577,13 @@
                 state.gps.lat = pos.coords.latitude;
                 state.gps.lon = pos.coords.longitude;
                 camGpsDot.classList.add('active');
-                camGpsText.textContent = `ETRS89: ${state.gps.lat.toFixed(7)}, ${state.gps.lon.toFixed(7)}`;
+                const utm = latLonToUTM(state.gps.lat, state.gps.lon);
+                camGpsText.textContent = `UTM: ${utm.str}`;
+                // Trigger reverse geocoding in background (throttled internally)
+                reverseGeocode(state.gps.lat, state.gps.lon);
             },
             () => {
-                camGpsText.textContent = 'ETRS89: Error GPS';
+                camGpsText.textContent = 'UTM: Error GPS';
             },
             { enableHighAccuracy: true, maximumAge: 3000 }
         );
@@ -398,6 +594,7 @@
     // ===================================================================
     const filterProvincia = $('#filter-provincia');
     const filterMunicipio = $('#filter-municipio');
+    const filterMonte     = $('#filter-monte');
 
     async function loadProvincias() {
         if (!CFG.empresaId) return;
@@ -442,12 +639,40 @@
         }
     }
 
+    async function loadMontes() {
+        if (!CFG.empresaId || !filterMonte) return;
+        const prov = filterProvincia ? filterProvincia.value : '';
+        const muni = filterMunicipio ? filterMunicipio.value : '';
+        try {
+            let url = `${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&action=montes`;
+            if (prov) url += `&provincia=${encodeURIComponent(prov)}`;
+            if (muni) url += `&municipio=${encodeURIComponent(muni)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.ok && data.montes && data.montes.length > 0) {
+                let html = '<option value="">-- Todos los montes --</option>';
+                data.montes.forEach(m => {
+                    html += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
+                });
+                filterMonte.innerHTML = html;
+                filterMonte.disabled = false;
+            } else {
+                filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
+                filterMonte.disabled = true;
+            }
+        } catch (err) {
+            console.warn('Error loading montes:', err);
+        }
+    }
+
     function getFilterParams() {
         let params = '';
         const prov = filterProvincia ? filterProvincia.value : '';
         const muni = filterMunicipio ? filterMunicipio.value : '';
+        const monte = filterMonte ? filterMonte.value : '';
         if (prov) params += `&provincia=${encodeURIComponent(prov)}`;
         if (muni) params += `&municipio=${encodeURIComponent(muni)}`;
+        if (monte) params += `&monte=${encodeURIComponent(monte)}`;
         return params;
     }
 
@@ -482,7 +707,7 @@
                 }
 
                 data.infraestructuras.forEach(inf => {
-                    const loc = [inf.municipio, inf.provincia].filter(Boolean).join(', ');
+                    const loc = [inf.monte, inf.municipio, inf.provincia].filter(Boolean).join(', ');
                     html += `<div class="result-item" data-id="${inf.id}" data-name="${escHtml(inf.nombre)}" data-code="${escHtml(inf.codigo_unico)}">
                         ${escHtml(inf.nombre)} <span class="result-code">${escHtml(inf.codigo_unico)}</span>
                         ${loc ? `<span class="result-location">${escHtml(loc)}</span>` : ''}
@@ -574,6 +799,10 @@
         state.countTotal = 0;
         state.seqComparativa = 0;
         state.photos = [];
+        // Revocar blob URLs de fotos previas cacheadas para liberar memoria
+        if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
+            window.InfocampoOffline.revokeBlobUrls(state.prevPhotos);
+        }
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;
@@ -685,6 +914,27 @@
     }
 
     // ===================================================================
+    // TIPOS DE TRABAJO
+    // ===================================================================
+    async function loadTiposTrabajo() {
+        if (!CFG.empresaId || !tipoTrabajo) return;
+        try {
+            const res = await fetch(`${CFG.endpoints.tiposTrabajo}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (data.ok && data.tipos) {
+                let html = '<option value="">-- Seleccionar tipo de trabajo --</option>';
+                data.tipos.forEach(t => {
+                    const label = t.codigo ? `${t.codigo} - ${t.nombre}` : t.nombre;
+                    html += `<option value="${t.id}">${escHtml(label)}</option>`;
+                });
+                tipoTrabajo.innerHTML = html;
+            }
+        } catch (err) {
+            console.warn('Error loading tipos de trabajo:', err);
+        }
+    }
+
+    // ===================================================================
     // UNIDADES DE OBRA
     // ===================================================================
     async function loadUnidadesObra() {
@@ -732,6 +982,7 @@
     function showScreen(name) {
         Object.values(screens).forEach(s => s.classList.remove('active'));
         screens[name].classList.add('active');
+        state.screen = name;
     }
 
     // ===================================================================
@@ -763,16 +1014,21 @@
             btnGhostToggle.classList.add('hidden');
             btnLoadPrev.classList.add('hidden');
             camGhost.classList.remove('active');
+            camGhost.style.opacity = '';
+            if (ghostOpacityBar) ghostOpacityBar.classList.add('hidden');
         }
 
-        // Start camera
+        // Request compass permission on iOS (needs user gesture context)
+        requestCompassPermission();
+
+        // Start camera — request max resolution for high-quality watermarked photos
         try {
             if (!state.stream) {
                 state.stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: { ideal: 'environment' },
-                        width: { ideal: 1080 },
-                        height: { ideal: 1440 },
+                        width: { ideal: 3264 },
+                        height: { ideal: 2448 },
                         aspectRatio: { ideal: 3 / 4 },
                     },
                     audio: false,
@@ -781,6 +1037,12 @@
             camVideo.srcObject = state.stream;
             await camVideo.play();
         } catch (err) {
+            // Limpiar stream si fue adquirido pero play() falló
+            if (state.stream) {
+                state.stream.getTracks().forEach(t => t.stop());
+                state.stream = null;
+            }
+            camVideo.srcObject = null;
             alert('No se pudo acceder a la cámara: ' + err.message);
             return;
         }
@@ -790,7 +1052,14 @@
 
     function closeCamera() {
         stopCameraStream();
+        // Limpiar GPS watch para ahorrar batería
+        if (state.gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(state.gpsWatchId);
+            state.gpsWatchId = null;
+        }
         camGhost.classList.remove('active');
+        camGhost.style.opacity = '';
+        if (ghostOpacityBar) ghostOpacityBar.classList.add('hidden');
         showScreen('ficha');
     }
 
@@ -887,84 +1156,141 @@
         camGhost.classList.add('active');
         camGhost.classList.remove('off');
         btnGhostToggle.classList.add('active');
+        // Apply current slider opacity and show bar
+        if (ghostOpacitySlider) {
+            camGhost.style.opacity = parseInt(ghostOpacitySlider.value, 10) / 100;
+        }
+        if (ghostOpacityBar) ghostOpacityBar.classList.remove('hidden');
     }
 
     // ===================================================================
     // CAPTURE
     // ===================================================================
+    let _capturing = false;
+
     async function captureFrame() {
-        const vw = camVideo.videoWidth;
-        const vh = camVideo.videoHeight;
+        // Guard: prevent double-tap while capture is in progress
+        if (_capturing) return;
+        _capturing = true;
 
-        // Force 3:4 portrait crop from center of video frame
-        let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
-        const targetRatio = 3 / 4; // width / height
-        const videoRatio = vw / vh;
+        try {
+            const vw = camVideo.videoWidth;
+            const vh = camVideo.videoHeight;
 
-        if (videoRatio > targetRatio) {
-            // Video is wider than 3:4 — crop sides
-            srcW = Math.round(vh * targetRatio);
-            srcX = Math.round((vw - srcW) / 2);
-        } else if (videoRatio < targetRatio) {
-            // Video is taller than 3:4 — crop top/bottom
-            srcH = Math.round(vw / targetRatio);
-            srcY = Math.round((vh - srcH) / 2);
+            if (!vw || !vh) {
+                console.warn('captureFrame: video not ready (dimensions 0)');
+                _capturing = false;
+                return;
+            }
+
+            // Force 3:4 portrait crop from center of video frame
+            let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
+            const targetRatio = 3 / 4; // width / height
+            const videoRatio = vw / vh;
+
+            if (videoRatio > targetRatio) {
+                srcW = Math.round(vh * targetRatio);
+                srcX = Math.round((vw - srcW) / 2);
+            } else if (videoRatio < targetRatio) {
+                srcH = Math.round(vw / targetRatio);
+                srcY = Math.round((vh - srcH) / 2);
+            }
+
+            // Free previous canvas memory before allocating new
+            state.baseImageData = null;
+            state.capturedBlob = null;
+
+            camCapture.width = srcW;
+            camCapture.height = srcH;
+
+            const ctx = camCapture.getContext('2d');
+            ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+
+            camVideo.pause();
+
+            // Freeze GPS coordinates at the exact moment of capture
+            state.capturedGps.lat = state.gps.lat;
+            state.capturedGps.lon = state.gps.lon;
+
+            // Update counters
+            state.countTotal++;
+            if (state.currentMode === 'comparativo') {
+                state.seqComparativa++;
+                state.countComparativas++;
+            } else {
+                state.countAleatorias++;
+            }
+
+            // Persist counter for this infrastructure
+            if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
+
+            // Generate filename based on company config (formatoNombreFoto)
+            const seqNum = String(state.countTotal).padStart(3, '0');
+            const codInfra = sanitizeFilename(state.infraCode || state.infraName);
+            const formato = CFG.formatoNombreFoto || 1;
+
+            let filename;
+            if (formato === 2) {
+                const ttName = getSelectedTipoTrabajoName();
+                filename = ttName
+                    ? `${codInfra}_${sanitizeFilename(ttName)}_${seqNum}`
+                    : `${codInfra}_${seqNum}`;
+            } else if (formato === 3) {
+                const ttName = getSelectedTipoTrabajoName();
+                const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+                if (ttName) {
+                    filename = `${codInfra}_${sanitizeFilename(ttName)}_${tipoFotoLabel}_${seqNum}`;
+                } else {
+                    filename = `${codInfra}_${tipoFotoLabel}_${seqNum}`;
+                }
+            } else {
+                filename = `${codInfra}_${seqNum}`;
+            }
+
+            // Freeze bearing at capture moment
+            const capturedBearing = state.bearing;
+
+            // Ensure reverse geocoding is done for capture location (with timeout)
+            let geoLoc = state.geoLocation;
+            if (state.capturedGps.lat != null && state.capturedGps.lon != null) {
+                geoLoc = await reverseGeocode(state.capturedGps.lat, state.capturedGps.lon);
+            }
+
+            // Apply watermark directly on previewCanvas (used for blob generation)
+            await applyWatermark(camCapture, previewCanvas, {
+                lat: state.capturedGps.lat,
+                lon: state.capturedGps.lon,
+                infraName: state.infraName,
+                infraCode: state.infraCode,
+                empresaName: CFG.empresaName,
+                situacion: SITUACIONES_UI[state.situacionIdx],
+                filename: filename,
+                mode: state.currentMode,
+                seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
+                bearing: capturedBearing,
+                geoLocation: geoLoc,
+            });
+
+            // Save base image for annotation overlay (before any annotation)
+            const prevCtx = previewCanvas.getContext('2d');
+            state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            state.pendingFilename = filename;
+            state.annotation = null;
+            state.annotationMode = false;
+
+            // Show preview screen for optional annotation before uploading
+            showScreen('preview');
+            if (previewFilename) previewFilename.textContent = filename;
+            resetAnnotationUI();
+
+        } catch (err) {
+            console.error('Error en captureFrame:', err);
+            // Resume camera so the user can retry
+            try { camVideo.play(); } catch (_) {}
+            alert('Error al capturar la foto. Inténtalo de nuevo.');
+        } finally {
+            _capturing = false;
         }
-
-        camCapture.width = srcW;
-        camCapture.height = srcH;
-
-        const ctx = camCapture.getContext('2d');
-        ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
-
-        camVideo.pause();
-
-        // Generate filename: NombreInfra_ALE_ANT_20260301_001
-        const sitCodes = { antes: 'ANT', durante: 'DUR', despues: 'DES' };
-        const sitCode = sitCodes[SITUACIONES[state.situacionIdx]] || 'ANT';
-        const modeCode = state.currentMode === 'comparativo' ? 'COMP' : 'ALE';
-
-        state.countTotal++;
-        if (state.currentMode === 'comparativo') {
-            state.seqComparativa++;
-            state.countComparativas++;
-        } else {
-            state.countAleatorias++;
-        }
-
-        // Persist counter for this infrastructure
-        if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
-
-        // Date stamp (YYYYMMDD Madrid timezone) to avoid filename collisions across visits
-        const nowMadrid = new Date().toLocaleString('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/-/g, '');
-
-        const seqNum = String(state.countTotal).padStart(3, '0');
-        const filename = `${sanitizeFilename(state.infraName)}_${modeCode}_${sitCode}_${nowMadrid}_${seqNum}`;
-
-        // Apply watermark directly on previewCanvas (used for blob generation)
-        await applyWatermark(camCapture, previewCanvas, {
-            lat: state.gps.lat,
-            lon: state.gps.lon,
-            infraName: state.infraName,
-            infraCode: state.infraCode,
-            empresaName: CFG.empresaName,
-            situacion: SITUACIONES_UI[state.situacionIdx],
-            filename: filename,
-            mode: state.currentMode,
-            seq: state.currentMode === 'comparativo' ? state.seqComparativa : null,
-        });
-
-        // Save base image for annotation overlay (before any annotation)
-        const prevCtx = previewCanvas.getContext('2d');
-        state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-        state.pendingFilename = filename;
-        state.annotation = null;
-        state.annotationMode = false;
-
-        // Show preview screen for optional annotation before uploading
-        showScreen('preview');
-        if (previewFilename) previewFilename.textContent = filename;
-        resetAnnotationUI();
     }
 
     // ===================================================================
@@ -999,6 +1325,13 @@
             return;
         }
 
+        // Free large objects from memory before upload
+        state.capturedBlob = null;
+        state.baseImageData = null;
+        // Clear capture canvas to release memory
+        camCapture.width = 1;
+        camCapture.height = 1;
+
         // Show upload overlay
         uploadOverlay.classList.remove('hidden');
 
@@ -1010,28 +1343,48 @@
             seq = state.seqComparativa;
         }
 
+        // Use GPS frozen at capture moment for accuracy
+        const captureLat = state.capturedGps.lat || state.gps.lat || 0;
+        const captureLon = state.capturedGps.lon || state.gps.lon || 0;
+
         // Build upload data
         const uploadData = {
             infra_id: state.infraId,
             usuario_id: CFG.usuarioId,
-            lat_real: state.gps.lat || 0,
-            lon_real: state.gps.lon || 0,
+            lat_real: captureLat,
+            lon_real: captureLon,
             estado_incidencia: SITUACIONES[state.situacionIdx],
             tipo_foto: state.currentMode,
             nombre_archivo: filename,
             observaciones: $('#observaciones-general').value || '',
             secuencia_comparativa: seq,
+            tipo_trabajo_id: tipoTrabajo ? tipoTrabajo.value || null : null,
             unidad_obra_id: unidadObra.value || null,
             datos_tecnicos: JSON.stringify({
                 timestamp: new Date().toISOString(),
-                etrs89_lat: state.gps.lat,
-                etrs89_lon: state.gps.lon,
+                etrs89_lat: captureLat,
+                etrs89_lon: captureLon,
                 timezone: 'Europe/Madrid',
                 mode: state.currentMode,
             }),
             uploadUrl: CFG.endpoints.upload,
             campos: collectDynamicFields(),
         };
+
+        // Save waypoint for comparative photos in "antes" situation
+        // GPX waypoints only for comparativas+antes, named CODIGO_W1, CODIGO_W2...
+        if (state.currentMode === 'comparativo' && SITUACIONES[state.situacionIdx] === 'antes' && captureLat && captureLon) {
+            const wpNum = state.waypoints.length + 1;
+            const wpName = (state.infraCode || 'INF') + ' W' + wpNum;
+            state.waypoints.push({
+                lat: captureLat,
+                lon: captureLon,
+                name: wpName,
+                filename: filename,
+                timestamp: new Date().toISOString(),
+                seq: seq,
+            });
+        }
 
         // Stop camera stream since we return to ficha
         stopCameraStream();
@@ -1072,6 +1425,9 @@
 
         if (seq !== null) {
             formData.append('secuencia_comparativa', seq);
+        }
+        if (tipoTrabajo && tipoTrabajo.value) {
+            formData.append('tipo_trabajo_id', tipoTrabajo.value);
         }
         if (unidadObra.value) {
             formData.append('unidad_obra_id', unidadObra.value);
@@ -1143,6 +1499,16 @@
         // Counters are already incremented in captureFrame for filename generation
         countAleatorias.textContent = state.countAleatorias;
         countComparativas.textContent = state.countComparativas;
+
+        // Show/hide waypoints download button
+        const btnWp = $('#btn-waypoints-ficha');
+        if (btnWp) {
+            if (state.countComparativas > 0) {
+                btnWp.classList.remove('hidden');
+            } else {
+                btnWp.classList.add('hidden');
+            }
+        }
     }
 
     // ===================================================================
@@ -1179,128 +1545,312 @@
         targetCanvas.height = h;
 
         const ctx = targetCanvas.getContext('2d');
+        const wmCfg = CFG.watermark || {};
 
         // 1. Draw original photo
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 2. Info text block — bottom-right
-        // Lines: Empresa, Infraestructura, Situación, Fecha, Coordenadas
-        const fontSize = Math.max(14, Math.round(h * 0.02));
-        const lineHeight = fontSize * 1.5;
-        const numLines = 5;
-        const padding = 16;
-        const blockHeight = lineHeight * numLines + padding * 2;
+        // 2. Text info — bottom-right, white with shadow
+        // Text size: 1=small(0.020), 2=medium(0.028), 3=large(0.036), 4=xlarge(0.044)
+        const textSizeFactors = { 1: 0.020, 2: 0.028, 3: 0.036, 4: 0.044 };
+        const sizeFactor = textSizeFactors[wmCfg.textoTamano] || 0.028;
+        const fontSize = Math.max(16, Math.round(h * sizeFactor));
+        const lineHeight = fontSize * 1.4;
+        const margin = Math.round(w * 0.025);
 
-        // Prepare text lines first to measure widths
-        const empresaStr = meta.empresaName || '';
-        const infraStr = meta.infraName || '';
-        const situacionStr = meta.situacion ? `Situación: ${meta.situacion}` : '';
-        const dateStr = formatDateMadrid();
-        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
-        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
-        const coordStr = `ETRS89: ${latStr}, ${lonStr}`;
+        // Build text lines (bottom-up, right-aligned like GPS Camera app)
+        // All fields are configurable by the admin (default: all ON for base fields)
+        const lines = [];
+        const geo = meta.geoLocation || {};
 
-        // Measure max text width to auto-size block
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        const boldWidths = [ctx.measureText(empresaStr).width, ctx.measureText(situacionStr).width];
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        const normalWidths = [
-            ctx.measureText(infraStr).width,
-            ctx.measureText(dateStr).width,
-            ctx.measureText(coordStr).width,
-        ];
-        const maxTextWidth = Math.max(...boldWidths, ...normalWidths);
-        const blockWidth = Math.min(w - 24, maxTextWidth + padding * 2);
+        // País (bottom)
+        if (wmCfg.pais !== 0 && geo.country) lines.push(geo.country);
 
-        // Semi-transparent background block (bottom-right)
-        const bx = w - blockWidth - 12;
-        const by = h - blockHeight - 12;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-        roundRect(ctx, bx, by, blockWidth, blockHeight, 8);
-        ctx.fill();
+        // Municipio, provincia CP
+        if (wmCfg.ubicacion !== 0) {
+            const locationParts = [];
+            if (geo.city) locationParts.push(geo.city);
+            if (geo.province || geo.postcode) {
+                locationParts.push((geo.province || '') + (geo.postcode ? ' ' + geo.postcode : ''));
+            }
+            if (locationParts.length) lines.push(locationParts.join(', '));
+        }
 
+        // Orientación (e.g. "99° E")
+        if (wmCfg.orientacion !== 0 && meta.bearing != null) {
+            lines.push(`${meta.bearing}° ${bearingToCardinal(meta.bearing)}`);
+        }
+
+        // Coordenadas UTM
+        if (wmCfg.coordenadas !== 0 && meta.lat != null && meta.lon != null) {
+            const utm = latLonToUTM(meta.lat, meta.lon);
+            lines.push(utm.str);
+        }
+
+        // --- Campos adicionales (admin opt-in) ---
+
+        // Tipo de foto: FOT ALE / FOT COM
+        if (wmCfg.tipoFoto && meta.mode) {
+            lines.push(meta.mode === 'comparativo' ? 'FOT COM' : 'FOT ALE');
+        }
+
+        // Situación de obra: ANTES / DURANTE / DESPUÉS
+        if (wmCfg.situacion && meta.situacion) {
+            lines.push(meta.situacion);
+        }
+
+        // Código de infraestructura
+        if (wmCfg.codigoInfra && meta.infraCode) {
+            lines.push(meta.infraCode);
+        }
+
+        // Fecha y hora (top line)
+        if (wmCfg.fecha !== 0) {
+            lines.push(formatDateMadrid());
+        }
+
+        // Draw lines from bottom to top, right-aligned with text shadow
+        ctx.textBaseline = 'bottom';
+        ctx.textAlign = 'right';
+
+        const textX = w - margin;
+        let textY = h - margin;
+
+        // Text shadow settings for readability
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = Math.max(5, Math.round(fontSize * 0.3));
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        ctx.textBaseline = 'top';
-        ctx.textAlign = 'left';
 
-        const textX = bx + padding;
-        let textY = by + padding;
+        for (let i = 0; i < lines.length; i++) {
+            ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+            ctx.fillText(lines[i], textX, textY);
+            textY -= lineHeight;
+        }
 
-        // Line 1: Nombre Empresa
-        ctx.fillText(empresaStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 2: Infraestructura
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(infraStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 3: Situación
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(situacionStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 4: Fecha
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(dateStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 5: Coordenadas
-        ctx.fillText(coordStr, textX, textY);
-
-        // Reset text align
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
         ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
 
-        // 3. Mini-map OSM (top-left, 1/6 of image)
-        await drawMiniMap(ctx, w, h, meta.lat, meta.lon);
+        // 3. Compass rose (top-left) — configurable
+        if (wmCfg.brujula !== 0) {
+            drawCompassRose(ctx, w, h, meta.bearing);
+        }
+
+        // 4. Mini-map (bottom-left, optional)
+        if (wmCfg.mapa && meta.lat != null && meta.lon != null) {
+            await drawMiniMap(ctx, w, h, meta.lat, meta.lon, wmCfg.mapaZoom || 15, wmCfg.mapaTamano || 2);
+        }
 
         // Save blob for later
         state.capturedBlob = await canvasToBlob(targetCanvas, 'image/jpeg', 0.85);
     }
 
-    async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
-        if (lat == null || lon == null) return;
+    /**
+     * Draws a compass rose graphic in the top-left corner.
+     * Shows N/S/E/O cardinal points and a blue arrow pointing to the device bearing.
+     */
+    function drawCompassRose(ctx, canvasWidth, canvasHeight, bearing) {
+        const size = Math.round(Math.min(canvasWidth, canvasHeight) / 7);
+        const cx = Math.round(size * 0.6);
+        const cy = Math.round(size * 0.6);
+        const outerR = Math.round(size * 0.42);
+        const innerR = Math.round(size * 0.32);
+        const fontSize = Math.max(10, Math.round(size * 0.12));
 
-        // 1/6 of image size, positioned top-left, flush to corner
-        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 6);
-        const x = 0;
-        const y = 0;
+        ctx.save();
 
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(x, y, mapSize, mapSize);
-        ctx.strokeStyle = '#ffffff';
+        // Semi-transparent circle background
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, mapSize, mapSize);
+        ctx.stroke();
+
+        // Inner ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Cardinal direction labels
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 3;
+
+        const labelR = outerR - fontSize * 0.7;
+        ctx.fillText('N', cx, cy - labelR);
+        ctx.fillText('S', cx, cy + labelR);
+        ctx.fillText('E', cx + labelR, cy);
+        ctx.fillText('O', cx - labelR, cy);
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // Bearing arrow (blue, pointing in bearing direction)
+        if (bearing != null) {
+            const arrowR = innerR - 4;
+            const bearingRad = (bearing - 90) * Math.PI / 180;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(bearingRad);
+
+            ctx.beginPath();
+            ctx.moveTo(arrowR, 0);
+            ctx.lineTo(-arrowR * 0.3, -arrowR * 0.2);
+            ctx.lineTo(-arrowR * 0.15, 0);
+            ctx.lineTo(-arrowR * 0.3, arrowR * 0.2);
+            ctx.closePath();
+            ctx.fillStyle = '#00bcd4';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * Draws a mini OpenStreetMap tile on the bottom-left of the photo.
+     * Uses static tile server to render a small location map.
+     */
+    async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon, zoom, tamano) {
+        // Map size based on tamano setting (1=small, 2=medium, 3=large)
+        const sizeFactors = { 1: 0.15, 2: 0.20, 3: 0.28 };
+        const factor = sizeFactors[tamano] || 0.20;
+        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) * factor);
+        const margin = Math.round(canvasWidth * 0.025);
+        const mapX = margin;
+        const mapY = canvasHeight - mapSize - margin;
+        const borderRadius = Math.round(mapSize * 0.06);
+        const borderWidth = Math.max(2, Math.round(mapSize * 0.015));
 
         try {
-            const zoom = 17;
+            // Calculate tile coordinates from lat/lon/zoom
             const n = Math.pow(2, zoom);
-            const xTile = Math.floor((lon + 180) / 360 * n);
-            const yTile = Math.floor(
-                (1 - Math.log(Math.tan(lat * Math.PI / 180) +
-                1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n
+            const latRad = lat * Math.PI / 180;
+            const tileXFloat = ((lon + 180) / 360) * n;
+            const tileYFloat = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+            const tileX = Math.floor(tileXFloat);
+            const tileY = Math.floor(tileYFloat);
+
+            // Pixel offset within tile (256px tiles)
+            const pixelX = Math.round((tileXFloat - tileX) * 256);
+            const pixelY = Math.round((tileYFloat - tileY) * 256);
+
+            // Load a 3x3 grid of tiles for context
+            const tilePromises = [];
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const tx = tileX + dx;
+                    const ty = tileY + dy;
+                    tilePromises.push(loadImage(
+                        `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`
+                    ).catch(() => null));
+                }
+            }
+            const tiles = await Promise.all(tilePromises);
+
+            // Create off-screen canvas for the composite tile area (768x768)
+            const tileCanvas = document.createElement('canvas');
+            tileCanvas.width = 768;
+            tileCanvas.height = 768;
+            const tileCtx = tileCanvas.getContext('2d');
+
+            let idx = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const tile = tiles[idx++];
+                    if (tile) {
+                        tileCtx.drawImage(tile, (dx + 1) * 256, (dy + 1) * 256, 256, 256);
+                    }
+                }
+            }
+
+            // Center point in the composite canvas
+            const centerX = 256 + pixelX;
+            const centerY = 256 + pixelY;
+
+            // Draw rounded rectangle clip path
+            ctx.save();
+            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
+            ctx.clip();
+
+            // Draw the tile composite, cropped and scaled to mapSize
+            const half = mapSize / 2;
+            const srcSize = mapSize * (256 / mapSize); // Keep 1:1 scale ratio
+            ctx.drawImage(tileCanvas,
+                centerX - srcSize / 2, centerY - srcSize / 2, srcSize, srcSize,
+                mapX, mapY, mapSize, mapSize
             );
-            const tileUrl = `https://tile.openstreetmap.org/${zoom}/${xTile}/${yTile}.png`;
 
-            const img = await loadImage(tileUrl);
-            ctx.drawImage(img, x, y, mapSize, mapSize);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, mapSize, mapSize);
+            ctx.restore();
 
-            // Pin
-            ctx.fillStyle = '#ef4444';
+            // Draw border
+            ctx.save();
+            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.lineWidth = borderWidth;
+            ctx.stroke();
+            ctx.restore();
+
+            // Draw red location pin in center
+            const pinX = mapX + mapSize / 2;
+            const pinY = mapY + mapSize / 2;
+            const pinSize = Math.max(6, Math.round(mapSize * 0.06));
+
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 2;
+
+            // Pin circle
             ctx.beginPath();
-            ctx.arc(x + mapSize / 2, y + mapSize / 2, 4, 0, Math.PI * 2);
+            ctx.arc(pinX, pinY - pinSize, pinSize, 0, Math.PI * 2);
+            ctx.fillStyle = '#e74c3c';
             ctx.fill();
-        } catch {
-            ctx.font = 'bold 11px sans-serif';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = Math.max(1, Math.round(pinSize * 0.3));
+            ctx.stroke();
+
+            // Pin point (triangle)
+            ctx.beginPath();
+            ctx.moveTo(pinX - pinSize * 0.5, pinY - pinSize * 0.3);
+            ctx.lineTo(pinX, pinY + pinSize * 0.5);
+            ctx.lineTo(pinX + pinSize * 0.5, pinY - pinSize * 0.3);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fill();
+
+            // Inner dot
+            ctx.beginPath();
+            ctx.arc(pinX, pinY - pinSize, pinSize * 0.35, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
-            ctx.fillText('MAPA', x + mapSize / 2, y + mapSize / 2);
-            ctx.textAlign = 'start';
+            ctx.fill();
+
+            ctx.restore();
+
+        } catch (err) {
+            console.warn('Error drawing mini-map:', err);
         }
     }
 
@@ -1373,15 +1923,26 @@
     // EVENTS
     // ===================================================================
     function bindEvents() {
-        // Provincia / municipio filters
+        // Provincia / municipio / monte filters
         if (filterProvincia) {
             filterProvincia.addEventListener('change', () => {
                 loadMunicipios(filterProvincia.value);
+                if (filterMonte) {
+                    filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
+                    filterMonte.disabled = true;
+                }
+                loadMontes();
                 clearInfra();
             });
         }
         if (filterMunicipio) {
             filterMunicipio.addEventListener('change', () => {
+                loadMontes();
+                clearInfra();
+            });
+        }
+        if (filterMonte) {
+            filterMonte.addEventListener('change', () => {
                 clearInfra();
             });
         }
@@ -1419,6 +1980,9 @@
         btnDetailComparativo.addEventListener('click', () => startVisitFromMap('comparativo'));
         document.getElementById('btn-stop-nav').addEventListener('click', stopNavigation);
 
+        // Map search
+        initMapSearch();
+
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
@@ -1427,9 +1991,30 @@
         btnGhostToggle.addEventListener('click', () => {
             if (!state.ghostUrl) return;
             state.ghostActive = !state.ghostActive;
-            camGhost.classList.toggle('off', !state.ghostActive);
             btnGhostToggle.classList.toggle('active', state.ghostActive);
+            if (state.ghostActive) {
+                const val = ghostOpacitySlider ? parseInt(ghostOpacitySlider.value, 10) / 100 : 0.5;
+                camGhost.style.opacity = val;
+                camGhost.classList.remove('off');
+            } else {
+                camGhost.style.opacity = '0';
+            }
+            if (ghostOpacityBar) {
+                ghostOpacityBar.classList.toggle('hidden', !state.ghostActive);
+            }
         });
+
+        // Ghost opacity slider
+        if (ghostOpacitySlider) {
+            ghostOpacitySlider.addEventListener('input', () => {
+                const val = parseInt(ghostOpacitySlider.value, 10);
+                const opacity = val / 100;
+                camGhost.style.opacity = opacity;
+                if (ghostOpacityValue) ghostOpacityValue.textContent = val + '%';
+                // If slider is at 0, visually treat as off but keep ghost active state
+                // so the user can slide back up without re-toggling
+            });
+        }
 
         // Load previous photos
         btnLoadPrev.addEventListener('click', () => checkPreviousPhotos());
@@ -1483,6 +2068,15 @@
         // Guardar visita (finalizar y resetear)
         if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
 
+        // Waypoints download from ficha
+        const btnWaypointsFicha = $('#btn-waypoints-ficha');
+        if (btnWaypointsFicha) {
+            btnWaypointsFicha.addEventListener('click', () => {
+                if (state.infraId) downloadWaypoints(state.infraId);
+                else downloadMyWaypoints();
+            });
+        }
+
         // Selector de situación en Ficha
         const situacionSelector = $('#situacion-selector');
         if (situacionSelector) {
@@ -1517,9 +2111,14 @@
     let mapMarkers = [];
     let mapSelectedInfra = null; // { id, nombre, codigo, lat, lon, registros }
     let mapUserMarker = null;
+    let mapUserAccuracyCircle = null; // GPS accuracy radius
+    let mapGpsWatchId = null; // dedicated GPS watch for map auto-update
     let mapKmlLayers = []; // KML layer groups
+    let mapWaypointLayer = null; // GPX waypoints layer
     let mapActiveBaseLayer = null;
     const mapBaseLayers = {};
+    let mapAdminPointsLayer = null; // Admin custom points layer
+    let mapAllInfrasCache = [];     // Cache for search
 
     // Navigation mode state
     let navActive = false;
@@ -1605,27 +2204,52 @@
             }
         }
 
-        // Show user position on map
+        // Invalidate map size after screen transition
+        setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 100);
+
+        // Show user position on map and start auto-tracking
         updateUserPositionOnMap();
+        startMapGpsTracking();
 
         // Load data
         await loadMapData();
     }
 
+    // Invalidate map size on device rotation / resize
+    window.addEventListener('resize', () => {
+        if (leafletMap && state.screen === 'mapa') {
+            leafletMap.invalidateSize();
+        }
+    });
+
     function closeMapScreen() {
         if (navActive) stopNavigation();
+        stopMapGpsTracking();
+        // Limpiar marcador y círculo de precisión del usuario para evitar memory leak
+        if (mapUserMarker) {
+            leafletMap.removeLayer(mapUserMarker);
+            mapUserMarker = null;
+        }
+        if (mapUserAccuracyCircle) {
+            leafletMap.removeLayer(mapUserAccuracyCircle);
+            mapUserAccuracyCircle = null;
+        }
         showScreen('ficha');
     }
 
-    function updateUserPositionOnMap() {
+    function updateUserPositionOnMap(accuracy) {
         if (!leafletMap || !state.gps.lat || !state.gps.lon) return;
 
         const userIcon = L.divIcon({
             className: 'user-location-marker',
-            html: `<div style="width:16px;height:16px;border-radius:50%;background:#4285f4;
-                    border:3px solid #fff;box-shadow:0 0 0 2px rgba(66,133,244,0.3),0 2px 6px rgba(0,0,0,0.3);"></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
+            html: `<div style="width:22px;height:22px;position:relative;">
+                    <div style="position:absolute;inset:0;border-radius:50%;background:rgba(66,133,244,0.2);animation:userPulse 2s ease-out infinite;"></div>
+                    <div style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+                         background:#4285f4;border:3px solid #fff;
+                         box-shadow:0 0 0 2px rgba(66,133,244,0.4),0 2px 8px rgba(0,0,0,0.3);"></div>
+                   </div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
         });
 
         if (mapUserMarker) {
@@ -1634,7 +2258,49 @@
             mapUserMarker = L.marker([state.gps.lat, state.gps.lon], {
                 icon: userIcon, zIndexOffset: 1000,
             }).addTo(leafletMap);
-            mapUserMarker.bindTooltip('Tu ubicación', { direction: 'top', offset: [0, -10] });
+            mapUserMarker.bindTooltip('Tu ubicación', { direction: 'top', offset: [0, -14] });
+        }
+
+        // Show accuracy circle (hide when accuracy degrades above 500m)
+        if (accuracy && accuracy < 500) {
+            if (mapUserAccuracyCircle) {
+                mapUserAccuracyCircle.setLatLng([state.gps.lat, state.gps.lon]);
+                mapUserAccuracyCircle.setRadius(accuracy);
+            } else {
+                mapUserAccuracyCircle = L.circle([state.gps.lat, state.gps.lon], {
+                    radius: accuracy,
+                    color: '#4285f4',
+                    fillColor: '#4285f4',
+                    fillOpacity: 0.08,
+                    weight: 1,
+                    opacity: 0.3,
+                }).addTo(leafletMap);
+            }
+        } else if (mapUserAccuracyCircle) {
+            leafletMap.removeLayer(mapUserAccuracyCircle);
+            mapUserAccuracyCircle = null;
+        }
+    }
+
+    function startMapGpsTracking() {
+        if (mapGpsWatchId !== null) return;
+        if (!('geolocation' in navigator)) return;
+
+        mapGpsWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                state.gps.lat = pos.coords.latitude;
+                state.gps.lon = pos.coords.longitude;
+                updateUserPositionOnMap(pos.coords.accuracy);
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 3000 }
+        );
+    }
+
+    function stopMapGpsTracking() {
+        if (mapGpsWatchId !== null) {
+            navigator.geolocation.clearWatch(mapGpsWatchId);
+            mapGpsWatchId = null;
         }
     }
 
@@ -1709,6 +2375,9 @@
                 if (!allInfras[id]) allInfras[id] = byInfra[id];
             });
 
+            // Cache for map search
+            mapAllInfrasCache = Object.values(allInfras);
+
             const bounds = [];
             const stateColors = {
                 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e',
@@ -1775,9 +2444,9 @@
                 bounds.push([state.gps.lat, state.gps.lon]);
             }
 
-            // Fit bounds
+            // Fit bounds (zoom configurable: 9=1:500k, 10=1:250k, 12=1:100k, 13=1:50k)
             if (bounds.length > 0) {
-                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: CFG.opMapaZoom || 9 });
             }
 
             // Update subtitle
@@ -1791,6 +2460,12 @@
 
             // Load KML layers from DB
             loadMapKmlLayers();
+            // Load infrastructure GeoJSON layers
+            loadMapInfraLayers();
+            // Load waypoints GPX layer (comparative photos, "antes" state)
+            loadMapWaypoints();
+            // Load admin custom points
+            loadMapAdminPoints();
 
         } catch (err) {
             console.warn('Error loading map data:', err);
@@ -1895,6 +2570,272 @@
             }
         });
         return coords;
+    }
+
+    // ---------------------------------------------------------------
+    // Infrastructure GeoJSON Layers (from capas_infraestructuras)
+    // ---------------------------------------------------------------
+    let mapInfraLayers = [];
+
+    async function loadMapInfraLayers() {
+        if (!CFG.endpoints.capasInfra) return;
+        try {
+            mapInfraLayers.forEach(lg => leafletMap.removeLayer(lg));
+            mapInfraLayers = [];
+
+            const res = await fetch(`${CFG.endpoints.capasInfra}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (!data.ok || !data.capas || data.capas.length === 0) return;
+
+            data.capas.forEach(capa => {
+                try {
+                    const geojson = typeof capa.geojson === 'string' ? JSON.parse(capa.geojson) : capa.geojson;
+                    const color = capa.color || '#e74c3c';
+                    const weight = parseInt(capa.grosor) || 2;
+                    const opacity = parseFloat(capa.opacidad) || 0.8;
+                    const campoLink = capa.campo_capa || '';
+
+                    const layer = L.geoJSON(geojson, {
+                        style: () => ({
+                            color, weight, opacity,
+                            fillColor: color, fillOpacity: opacity * 0.2
+                        }),
+                        pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+                            radius: 6, fillColor: color, color: '#fff',
+                            weight: 2, opacity: 1, fillOpacity: opacity
+                        }),
+                        onEachFeature: (feature, featureLayer) => {
+                            const props = feature.properties || {};
+                            const linkValue = campoLink ? (props[campoLink] || '') : '';
+
+                            let html = `<div style="max-width:240px;">`;
+                            html += `<strong style="color:${color};">${capa.nombre}</strong>`;
+                            if (linkValue) html += `<br><code style="font-size:0.75rem;">${campoLink}: ${linkValue}</code>`;
+
+                            let shown = 0;
+                            Object.keys(props).forEach(k => {
+                                if (shown >= 4 || k === campoLink) return;
+                                html += `<br><small><b>${k}:</b> ${String(props[k]).substring(0, 60)}</small>`;
+                                shown++;
+                            });
+                            html += '</div>';
+
+                            featureLayer.bindPopup(html, { maxWidth: 260 });
+                        }
+                    }).addTo(leafletMap);
+
+                    mapInfraLayers.push(layer);
+                } catch (err) {
+                    console.warn('Error rendering capa infra:', err);
+                }
+            });
+        } catch (err) {
+            console.warn('Error loading infra layers:', err);
+        }
+    }
+
+    // Load GPX waypoints (comparative+antes) and render on map with route line
+    async function loadMapWaypoints() {
+        if (!CFG.endpoints.waypoints || !leafletMap) return;
+        try {
+            if (mapWaypointLayer) {
+                leafletMap.removeLayer(mapWaypointLayer);
+                mapWaypointLayer = null;
+            }
+
+            const url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}&usuario_id=${CFG.usuarioId}&format=json&estado=antes`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.ok || !data.waypoints || data.waypoints.length === 0) return;
+
+            mapWaypointLayer = L.layerGroup().addTo(leafletMap);
+
+            // Group waypoints by infrastructure to draw route lines
+            const byInfra = {};
+            data.waypoints.forEach(wp => {
+                const key = wp.infra_id;
+                if (!byInfra[key]) byInfra[key] = [];
+                byInfra[key].push(wp);
+            });
+
+            Object.values(byInfra).forEach(wps => {
+                // Only show waypoint markers (no route line between them)
+                // Navigation line is drawn only when user requests "ir a" a specific point
+                wps.forEach(wp => {
+                    const icon = L.divIcon({
+                        className: 'wp-marker',
+                        html: `<div style="width:22px;height:22px;border-radius:50%;background:#22c55e;
+                                border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.4);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:8px;font-weight:800;color:#fff;">W${wp.num}</div>`,
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11],
+                    });
+
+                    const fechaFmt = wp.fecha ? wp.fecha.substring(0, 16).replace('T', ' ') : '';
+                    L.marker([wp.lat, wp.lon], { icon, zIndexOffset: 200 })
+                        .bindTooltip(`<b>${escHtml(wp.nombre)}</b><br><small>${fechaFmt}</small>`, {
+                            direction: 'top', offset: [0, -12],
+                        })
+                        .addTo(mapWaypointLayer);
+                });
+            });
+        } catch (err) {
+            console.warn('Error loading waypoints:', err);
+        }
+    }
+
+    // ===================================================================
+    // ADMIN CUSTOM POINTS (puntos_mapa)
+    // ===================================================================
+    const iconoMap = {
+        pin: 'bi-geo-alt-fill', star: 'bi-star-fill', flag: 'bi-flag-fill',
+        house: 'bi-house-fill', box: 'bi-box-fill', exclamation: 'bi-exclamation-triangle-fill',
+        tools: 'bi-tools', person: 'bi-person-fill',
+    };
+
+    async function loadMapAdminPoints() {
+        if (!CFG.endpoints.puntosMapa || !leafletMap) return;
+        try {
+            if (mapAdminPointsLayer) {
+                leafletMap.removeLayer(mapAdminPointsLayer);
+                mapAdminPointsLayer = null;
+            }
+
+            const res = await fetch(`${CFG.endpoints.puntosMapa}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (!data.ok || !data.puntos || data.puntos.length === 0) return;
+
+            mapAdminPointsLayer = L.layerGroup().addTo(leafletMap);
+
+            data.puntos.forEach(pt => {
+                const lat = parseFloat(pt.lat);
+                const lon = parseFloat(pt.lon);
+                if (!lat || !lon) return;
+
+                const biClass = iconoMap[pt.icono] || 'bi-geo-alt-fill';
+                const color = pt.color || '#e74c3c';
+
+                const icon = L.divIcon({
+                    className: 'admin-point-marker',
+                    html: `<div style="width:30px;height:30px;border-radius:50%;background:${color};
+                            border:3px solid rgba(255,255,255,0.95);box-shadow:0 2px 8px rgba(0,0,0,0.4);
+                            display:flex;align-items:center;justify-content:center;">
+                            <i class="bi ${biClass}" style="font-size:12px;color:#fff;"></i>
+                           </div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                });
+
+                let tooltipHtml = `<b>${escHtml(pt.nombre)}</b>`;
+                if (pt.descripcion) tooltipHtml += `<br><small>${escHtml(pt.descripcion)}</small>`;
+                if (state.gps.lat && state.gps.lon) {
+                    const dist = haversineDistance(state.gps.lat, state.gps.lon, lat, lon);
+                    tooltipHtml += `<br><span style="color:#4285f4;">${formatDistance(dist)}</span>`;
+                }
+
+                L.marker([lat, lon], { icon, zIndexOffset: 100 })
+                    .bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -12] })
+                    .addTo(mapAdminPointsLayer);
+            });
+        } catch (err) {
+            console.warn('Error loading admin points:', err);
+        }
+    }
+
+    // ===================================================================
+    // MAP SEARCH / FILTER
+    // ===================================================================
+    function initMapSearch() {
+        const toggleBtn = document.getElementById('btn-mapa-search-toggle');
+        const searchBar = document.getElementById('mapa-search-bar');
+        const searchInput = document.getElementById('mapa-search-input');
+        const searchResults = document.getElementById('mapa-search-results');
+        const closeBtn = document.getElementById('btn-mapa-search-close');
+        if (!toggleBtn || !searchBar || !searchInput) return;
+
+        let debounce = null;
+
+        toggleBtn.addEventListener('click', () => {
+            const visible = !searchBar.classList.contains('hidden');
+            if (visible) {
+                searchBar.classList.add('hidden');
+                searchResults.classList.add('hidden');
+                searchInput.value = '';
+            } else {
+                searchBar.classList.remove('hidden');
+                setTimeout(() => searchInput.focus(), 100);
+            }
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                searchBar.classList.add('hidden');
+                searchResults.classList.add('hidden');
+                searchInput.value = '';
+            });
+        }
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounce);
+            const q = searchInput.value.trim().toLowerCase();
+            if (q.length < 2) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+            debounce = setTimeout(() => doMapSearch(q, searchResults), 200);
+        });
+    }
+
+    function doMapSearch(query, resultsEl) {
+        const matches = mapAllInfrasCache.filter(inf => {
+            const nombre = (inf.nombre || '').toLowerCase();
+            const codigo = (inf.codigo || '').toLowerCase();
+            return nombre.includes(query) || codigo.includes(query);
+        }).slice(0, 15);
+
+        if (matches.length === 0) {
+            resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.82rem;">Sin resultados</div>';
+            resultsEl.classList.remove('hidden');
+            return;
+        }
+
+        let html = '';
+        matches.forEach(inf => {
+            const hasPhotos = inf.registros && inf.registros.length > 0;
+            const dotColor = hasPhotos ? '#22c55e' : '#9ca3af';
+            let distHtml = '';
+            if (state.gps.lat && state.gps.lon && inf.lat && inf.lon) {
+                const dist = haversineDistance(state.gps.lat, state.gps.lon, inf.lat, inf.lon);
+                distHtml = `<span class="search-dist">${formatDistance(dist)}</span>`;
+            }
+            html += `<div class="mapa-search-item" data-infra-id="${inf.id}">
+                <span class="search-dot" style="background:${dotColor};"></span>
+                <div class="search-info">
+                    <strong>${escHtml(inf.nombre)}</strong>
+                    <small>${escHtml(inf.codigo || '')}${hasPhotos ? ' · ' + inf.registros.length + ' fotos' : ' · Sin visitar'}</small>
+                </div>
+                ${distHtml}
+            </div>`;
+        });
+
+        resultsEl.innerHTML = html;
+        resultsEl.classList.remove('hidden');
+
+        // Click handler for results
+        resultsEl.querySelectorAll('.mapa-search-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const infraId = parseInt(el.dataset.infraId);
+                const infra = mapAllInfrasCache.find(i => i.id === infraId || i.id === String(infraId));
+                if (infra && infra.lat && infra.lon) {
+                    leafletMap.setView([infra.lat, infra.lon], 17, { animate: true });
+                    showInfraDetail(infra);
+                }
+                resultsEl.classList.add('hidden');
+                document.getElementById('mapa-search-bar').classList.add('hidden');
+                document.getElementById('mapa-search-input').value = '';
+            });
+        });
     }
 
     function showInfraDetail(infra) {
@@ -2051,6 +2992,11 @@
         const bounds = [[navTarget.lat, navTarget.lon]];
         if (state.gps.lat && state.gps.lon) {
             bounds.push([state.gps.lat, state.gps.lon]);
+        }
+        // fitBounds necesita al menos 2 puntos distintos; con 1 solo usar setView
+        if (bounds.length < 2) {
+            leafletMap.setView([navTarget.lat, navTarget.lon], 16);
+            return;
         }
         leafletMap.fitBounds(bounds, { padding: [80, 80], maxZoom: 18 });
     }
@@ -2367,7 +3313,9 @@
         state.annotation = null;
         state.annotationMode = false;
         state.pendingFilename = null;
+        // Free large ImageData from memory
         state.baseImageData = null;
+        state.capturedBlob = null;
 
         // Resume camera
         camVideo.play();
@@ -2408,6 +3356,16 @@
 
     function sanitizeFilename(name) {
         return name.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/g, '_').substring(0, 60);
+    }
+
+    function getSelectedTipoTrabajoName() {
+        if (!tipoTrabajo || !tipoTrabajo.value) return '';
+        const opt = tipoTrabajo.options[tipoTrabajo.selectedIndex];
+        if (!opt || !opt.value) return '';
+        // Remove codigo prefix if present (e.g. "INSP - Inspección" → "Inspección")
+        const text = opt.textContent.trim();
+        const dashIdx = text.indexOf(' - ');
+        return dashIdx >= 0 ? text.substring(dashIdx + 3) : text;
     }
 
     function canvasToBlob(canvas, type, quality) {
@@ -2521,6 +3479,23 @@
     // ===================================================================
     // FINALIZAR VISITA (Guardar y Resetear)
     // ===================================================================
+    // ===================================================================
+    // WAYPOINTS — Download GPX from server
+    // ===================================================================
+    function downloadWaypoints(infraId, fecha) {
+        let url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}`;
+        if (infraId) url += `&infra_id=${infraId}`;
+        if (fecha) url += `&fecha=${encodeURIComponent(fecha)}`;
+        // Open in new tab to trigger download
+        window.open(url, '_blank');
+    }
+
+    function downloadMyWaypoints() {
+        let url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}&usuario_id=${CFG.usuarioId}`;
+        if (state.infraId) url += `&infra_id=${state.infraId}`;
+        window.open(url, '_blank');
+    }
+
     function finalizarVisita() {
         const numFotos = state.photos.length;
         const infraName = state.infraName;
@@ -2536,6 +3511,10 @@
         state.countTotal = 0;
         state.seqComparativa = 0;
         state.photos = [];
+        state.waypoints = [];
+        if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
+            window.InfocampoOffline.revokeBlobUrls(state.prevPhotos);
+        }
         state.prevPhotos = [];
         state.ghostUrl = null;
         state.ghostActive = false;
@@ -2617,10 +3596,23 @@
                 });
 
                 html += `</div>
-                    <button type="button" class="btn-continuar-visita" data-visita-idx="${idx}">
-                        <i class="bi bi-pencil-square"></i> Continuar visita
-                    </button>
-                </div>`;
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 8px;">
+                        <button type="button" class="btn-continuar-visita" data-visita-idx="${idx}">
+                            <i class="bi bi-pencil-square"></i> Continuar visita
+                        </button>`;
+
+                // Show waypoints download if there are comparative photos
+                const hasComp = visita.fotos.some(f => f.tipo === 'comparativo');
+                if (hasComp) {
+                    html += `<button type="button" class="btn-descargar-waypoints" data-infra-id="${visita.infra_id}" data-fecha="${visita.fecha}"
+                                style="flex:none;padding:6px 14px;font-size:0.8rem;font-weight:600;
+                                border:none;border-radius:8px;background:#22c55e;color:#fff;cursor:pointer;
+                                display:flex;align-items:center;gap:4px;">
+                            <i class="bi bi-geo-alt"></i> Waypoints GPX
+                        </button>`;
+                }
+
+                html += `</div></div>`;
             });
 
             // Store visitas data for continuarVisita
@@ -2636,6 +3628,16 @@
                     if (window._visitasData && window._visitasData[idx]) {
                         continuarVisita(window._visitasData[idx]);
                     }
+                });
+            });
+
+            // Bind "Descargar waypoints" buttons
+            visitasBody.querySelectorAll('.btn-descargar-waypoints').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const infraId = btn.dataset.infraId;
+                    const fecha = btn.dataset.fecha;
+                    downloadWaypoints(infraId, fecha);
                 });
             });
         } catch (err) {

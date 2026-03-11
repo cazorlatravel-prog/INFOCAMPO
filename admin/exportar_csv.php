@@ -57,7 +57,7 @@ $output = fopen('php://output', 'w');
 if ($tipo === 'infraestructuras') {
     // Cabeceras
     fputcsv($output, [
-        'ID', 'Nombre', 'Código', 'Tipo', 'Provincia', 'Municipio',
+        'ID', 'Nombre', 'Código', 'Tipo', 'Provincia', 'Municipio', 'Monte',
         'Latitud', 'Longitud', 'Descripción', 'Activa',
         'Nº Inspecciones', 'Fecha Creación',
     ], ';');
@@ -79,6 +79,7 @@ if ($tipo === 'infraestructuras') {
             $row['tipo'] ?? '',
             $row['provincia'] ?? '',
             $row['municipio'] ?? '',
+            $row['monte'] ?? '',
             $row['lat_teorica'],
             $row['lon_teorica'],
             $row['descripcion'] ?? '',
