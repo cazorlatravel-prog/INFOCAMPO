@@ -123,8 +123,16 @@ if ($vendorExists) {
     echo '<p class="info">→ Ejecutando composer install... (puede tardar 1-2 minutos)</p>';
     flush();
 
+    // Fijar HOME y COMPOSER_HOME para hosting compartido
+    $homeDir = getenv('HOME') ?: (getenv('USERPROFILE') ?: $baseDir);
+    $composerHome = $baseDir . '/.composer_cache';
+    if (!is_dir($composerHome)) {
+        @mkdir($composerHome, 0755, true);
+    }
+
     $installOutput = [];
-    $cmd = 'cd ' . escapeshellarg($baseDir) . ' && ' . $composerCmd . ' install --no-dev --optimize-autoloader 2>&1';
+    $envVars = 'HOME=' . escapeshellarg($homeDir) . ' COMPOSER_HOME=' . escapeshellarg($composerHome);
+    $cmd = 'cd ' . escapeshellarg($baseDir) . ' && ' . $envVars . ' ' . $composerCmd . ' install --no-dev --optimize-autoloader 2>&1';
     exec($cmd, $installOutput, $installRet);
 
     if (file_exists($baseDir . '/vendor/autoload.php')) {
