@@ -48,16 +48,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $opInfra     = isset($_POST['op_mostrar_infraestructura']) ? 1 : 0;
             $opSituacion = isset($_POST['op_mostrar_situacion']) ? 1 : 0;
             $opMapa      = isset($_POST['op_mostrar_mapa']) ? 1 : 0;
+            $opMapaZoom  = (int) ($_POST['op_mapa_zoom'] ?? 9);
+            $allowedZooms = [9, 10, 12, 13];
+            if (!in_array($opMapaZoom, $allowedZooms, true)) $opMapaZoom = 9;
 
             $stmt = $pdo->prepare(
                 "UPDATE empresas SET op_mostrar_empresa = :emp, op_mostrar_infraestructura = :inf,
-                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa WHERE id = :id"
+                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa, op_mapa_zoom = :zoom WHERE id = :id"
             );
             $stmt->execute([
                 ':emp'  => $opEmpresa,
                 ':inf'  => $opInfra,
                 ':sit'  => $opSituacion,
                 ':mapa' => $opMapa,
+                ':zoom' => $opMapaZoom,
                 ':id'   => $targetEmpId,
             ]);
             $msg = 'Campos del operador actualizados correctamente.';
@@ -93,6 +97,7 @@ $opEmpresa   = (int) ($empresa['op_mostrar_empresa'] ?? 0);
 $opInfra     = (int) ($empresa['op_mostrar_infraestructura'] ?? 0);
 $opSituacion = (int) ($empresa['op_mostrar_situacion'] ?? 0);
 $opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
+$opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -240,7 +245,16 @@ $opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
                                 <label class="form-check-label fw-semibold" for="op_mapa">
                                     <i class="bi bi-map me-1"></i> Mapa de localización
                                 </label>
-                                <div class="text-muted small mt-1">Muestra el botón de mapa de visitas. El mapa usa escala 1:500.000.</div>
+                                <div class="text-muted small mt-1">Muestra el botón de mapa de visitas para el operador.</div>
+                                <div class="mt-2 ps-4">
+                                    <label class="form-label small fw-semibold text-muted mb-1">Escala inicial del mapa:</label>
+                                    <select name="op_mapa_zoom" class="form-select form-select-sm" style="width:200px;">
+                                        <option value="13" <?= $opMapaZoom === 13 ? 'selected' : '' ?>>1:50.000</option>
+                                        <option value="12" <?= $opMapaZoom === 12 ? 'selected' : '' ?>>1:100.000</option>
+                                        <option value="10" <?= $opMapaZoom === 10 ? 'selected' : '' ?>>1:250.000</option>
+                                        <option value="9" <?= $opMapaZoom === 9 ? 'selected' : '' ?>>1:500.000</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 

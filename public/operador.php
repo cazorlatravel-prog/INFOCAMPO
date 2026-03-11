@@ -42,8 +42,9 @@ $opMostrarEmpresa = 0;
 $opMostrarInfra = 0;
 $opMostrarSituacion = 0;
 $opMostrarMapa = 0;
+$opMapaZoom = 9;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) {
@@ -53,6 +54,7 @@ if ($empresaId > 0) {
         $opMostrarInfra = (int) ($row['op_mostrar_infraestructura'] ?? 0);
         $opMostrarSituacion = (int) ($row['op_mostrar_situacion'] ?? 0);
         $opMostrarMapa = (int) ($row['op_mostrar_mapa'] ?? 0);
+        $opMapaZoom = (int) ($row['op_mapa_zoom'] ?? 9);
     }
 }
 
@@ -656,6 +658,7 @@ if ($initials === '') $initials = 'OP';
             opMostrarInfra: <?= $opMostrarInfra ?>,
             opMostrarSituacion: <?= $opMostrarSituacion ?>,
             opMostrarMapa: <?= $opMostrarMapa ?>,
+            opMapaZoom: <?= $opMapaZoom ?>,
         };
     </script>
     <script>

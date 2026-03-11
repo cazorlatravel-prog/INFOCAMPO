@@ -2173,9 +2173,9 @@
                 bounds.push([state.gps.lat, state.gps.lon]);
             }
 
-            // Fit bounds (maxZoom ~9 ≈ escala 1:500.000)
+            // Fit bounds (zoom configurable: 9=1:500k, 10=1:250k, 12=1:100k, 13=1:50k)
             if (bounds.length > 0) {
-                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 9 });
+                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: CFG.opMapaZoom || 9 });
             }
 
             // Update subtitle
