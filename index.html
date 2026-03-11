@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FotoGPS.app - Tu APP de recogida de datos en Campo</title>
-    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark GPS, anotaciones en foto con círculo ajustable, navegación con alertas de proximidad, capas WMS (Ortofoto, Topográfico), ghosting comparativo, capas KML, informes PDF, exportación CSV y modo offline.">
+    <meta name="description" content="FotoGPS.app - Plataforma SaaS de inspecciones en campo. Fotos geolocalizadas con watermark UTM y brújula, ghosting comparativo, waypoints GPX, navegación con alertas de proximidad, capas WMS y KML, anotaciones en foto, informes PDF, exportación CSV, importación Excel y modo offline con precarga.">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -802,6 +802,7 @@
             <div class="nav-links" id="nav-links">
                 <a href="#funciones-campo" class="nav-link">Operador</a>
                 <a href="#funciones-admin" class="nav-link">Admin</a>
+                <a href="#plataforma" class="nav-link">Plataforma</a>
                 <a href="#proceso" class="nav-link">Proceso</a>
                 <a href="#acceso" class="nav-link nav-link--cta">
                     <i class="bi bi-box-arrow-in-right"></i> Acceder
@@ -824,9 +825,9 @@
                         <span class="gradient-text">inteligentes y geolocalizadas</span>
                     </h1>
                     <p class="hero-desc">
-                        Captura fotos con coordenadas ETRS89, navega a infraestructuras con alertas de proximidad,
-                        compara con ghosting visual, visualiza capas WMS y KML, genera informes PDF y exporta a CSV.
-                        App instalable con modo offline avanzado.
+                        Captura fotos con watermark UTM y brújula, compara evolución con ghosting visual,
+                        descarga rutas GPX, navega con alertas de proximidad, visualiza capas WMS y KML,
+                        anota incidencias en foto, genera informes PDF y trabaja sin cobertura con modo offline.
                     </p>
                     <div class="hero-actions">
                         <a href="#acceso" class="btn btn--primary">
@@ -898,23 +899,53 @@
                 con soporte offline completo.
             </p>
 
+            <div class="subsection-header"><span class="subsection-title">Captura y Watermark</span></div>
+
             <div class="features-grid">
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--blue"><i class="bi bi-camera-fill"></i></div>
-                    <h3>Fotos con Watermark GPS</h3>
-                    <p>Cada captura incluye coordenadas ETRS89, fecha/hora de Madrid, mini-mapa y nombre de infraestructura grabados directamente en la imagen.</p>
+                    <h3>Watermark UTM + Brújula</h3>
+                    <p>Cada foto lleva grabado: coordenadas UTM (ETRS89), fecha/hora de Madrid, rosa de los vientos con orientación real del dispositivo y dirección postal por geocoding inverso.</p>
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--purple"><i class="bi bi-layers-fill"></i></div>
-                    <h3>Ghosting Comparativo</h3>
-                    <p>Superpón la foto de la visita anterior al 50% de opacidad para capturar exactamente la misma perspectiva y comparar la evolución temporal.</p>
+                    <div class="feature-icon feature-icon--purple"><i class="bi bi-camera2"></i></div>
+                    <h3>Fotos Aleatorias y Comparativas</h3>
+                    <p>Dos modos de captura: <strong>Aleatorio</strong> para fotos libres y <strong>Comparativo</strong> con secuencia W1, W2, W3... para seguimiento temporal de la misma infraestructura.</p>
                 </div>
 
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--green"><i class="bi bi-layers-fill"></i></div>
+                    <h3>Ghosting en Comparativas</h3>
+                    <p>Solo en modo comparativo: superpón la foto anterior con slider de opacidad (0-100%) para capturar exactamente la misma perspectiva y evaluar la evolución.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--red"><i class="bi bi-bullseye"></i></div>
+                    <h3>Anotaciones en Foto</h3>
+                    <p>Señala incidencias directamente en la foto con un círculo rojo de tamaño ajustable. Añade una descripción que se superpone como advertencia visual en la imagen final.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--amber"><i class="bi bi-eye-fill"></i></div>
+                    <h3>Vista Previa antes de Enviar</h3>
+                    <p>Revisa cada foto con su watermark antes de subirla. Opciones para anotar incidencias, repetir la captura o aceptar y enviar. Control total sobre la calidad.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-toggles"></i></div>
+                    <h3>Situación: Antes / Durante / Después</h3>
+                    <p>Clasifica cada foto según la fase de obra con un solo toque. El estado se refleja en el watermark, los informes PDF y los filtros del panel de administración.</p>
+                </div>
+            </div>
+
+            <div class="subsection-header"><span class="subsection-title">Navegación y Mapa</span></div>
+
+            <div class="features-grid">
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--green"><i class="bi bi-map-fill"></i></div>
-                    <h3>Mapa de Visitas</h3>
-                    <p>Mapa interactivo con todas las infraestructuras geolocalizadas. Selector de capas base: OpenStreetMap, Ortofoto de Andalucía y Topográfico 1:10.000.</p>
+                    <h3>Mapa de Visitas con Waypoints</h3>
+                    <p>Mapa interactivo con todas las infraestructuras geolocalizadas. Waypoints W1, W2, W3... conectados con ruta. Capas base: OpenStreetMap, Ortofoto y Topográfico.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -924,9 +955,37 @@
                 </div>
 
                 <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--cyan"><i class="bi bi-signpost-split-fill"></i></div>
+                    <h3>Distancia en Tiempo Real</h3>
+                    <p>Indicador visual de distancia con código de colores: rojo (lejos), amarillo (cerca), verde (destino). Cálculo Haversine preciso desde la posición GPS continua.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--teal"><i class="bi bi-filetype-xml"></i></div>
+                    <h3>Descarga de Waypoints GPX</h3>
+                    <p>Exporta la ruta de waypoints comparativos en formato GPX 1.1 estándar. Cada punto lleva nombre W1, W2..., coordenadas y fecha. Compatible con cualquier GPS.</p>
+                </div>
+            </div>
+
+            <div class="subsection-header"><span class="subsection-title">Offline y Sincronización</span></div>
+
+            <div class="features-grid">
+                <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--amber"><i class="bi bi-cloud-slash-fill"></i></div>
                     <h3>Modo Offline Avanzado</h3>
                     <p>Captura fotos sin cobertura: se almacenan en IndexedDB y se sincronizan automáticamente al recuperar conexión, con barra de progreso en tiempo real.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--purple"><i class="bi bi-cloud-arrow-down-fill"></i></div>
+                    <h3>Precarga Offline de Ghosting</h3>
+                    <p>Descarga las fotos previas de cada infraestructura antes de ir al campo. Así el ghosting comparativo funciona incluso sin cobertura móvil.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--rose"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                    <h3>Alertas de Subida Fallida</h3>
+                    <p>Si falla la subida a la nube, el operador recibe alerta visual. Los fallos quedan registrados y el administrador puede supervisar las incidencias pendientes.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -934,35 +993,27 @@
                     <h3>App Instalable (PWA)</h3>
                     <p>Instala FotoGPS.app como aplicación nativa en Android e iOS. Acceso directo desde la pantalla de inicio sin necesidad de tiendas de aplicaciones.</p>
                 </div>
+            </div>
 
+            <div class="subsection-header"><span class="subsection-title">Ficha y Formularios</span></div>
+
+            <div class="features-grid">
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--cyan"><i class="bi bi-signpost-split-fill"></i></div>
-                    <h3>Distancia en Tiempo Real</h3>
-                    <p>Indicador visual de distancia a la infraestructura con código de colores: rojo (lejos), amarillo (cerca) y verde (destino alcanzado).</p>
+                    <div class="feature-icon feature-icon--blue"><i class="bi bi-card-checklist"></i></div>
+                    <h3>Ficha de Infraestructura</h3>
+                    <p>Selecciona provincia, municipio, infraestructura, unidad de obra y tipo de trabajo. Buscador rápido con filtro dinámico y creación en campo.</p>
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--rose"><i class="bi bi-exclamation-triangle-fill"></i></div>
-                    <h3>Alertas de Subida</h3>
-                    <p>Si falla la subida a la NUBE, el operador recibe alerta visual. El administrador es notificado automáticamente para resolver el problema.</p>
+                    <div class="feature-icon feature-icon--orange"><i class="bi bi-input-cursor-text"></i></div>
+                    <h3>Campos Dinámicos por Empresa</h3>
+                    <p>Cada empresa configura sus propios campos: textos, números, selectores, checkboxes, fechas. El operador solo ve los campos de su compañía.</p>
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-toggles"></i></div>
-                    <h3>Estados de Inspección</h3>
-                    <p>Clasifica cada foto como Antes, Durante o Después con un solo toque. El estado se refleja automáticamente en el watermark y en los informes.</p>
-                </div>
-
-                <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--red"><i class="bi bi-bullseye"></i></div>
-                    <h3>Anotaciones en Foto</h3>
-                    <p>Señala puntos de interés directamente en la foto con un círculo rojo de tamaño ajustable. Añade una descripción y se muestra como advertencia en la imagen final.</p>
-                </div>
-
-                <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--orange"><i class="bi bi-eye-fill"></i></div>
-                    <h3>Vista Previa antes de Enviar</h3>
-                    <p>Revisa cada foto antes de subirla con opciones para anotar, repetir o aceptar. Control total sobre la calidad y el contenido de cada captura.</p>
+                    <div class="feature-icon feature-icon--lime"><i class="bi bi-pencil-square"></i></div>
+                    <h3>Editar Visitas Anteriores</h3>
+                    <p>Consulta y edita tus visitas pasadas: cambia observaciones, estado de incidencia o unidad de obra sin necesidad de volver al campo.</p>
                 </div>
             </div>
         </div>
@@ -978,71 +1029,115 @@
                 de gestión, análisis visual y generación de informes.
             </p>
 
+            <div class="subsection-header"><span class="subsection-title">Dashboard y Visualización</span></div>
+
             <div class="features-grid">
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--purple"><i class="bi bi-grid-1x2-fill"></i></div>
                     <h3>Dashboard con Métricas</h3>
-                    <p>Vista general con contadores de infraestructuras, operadores activos, inspecciones, incidencias críticas, gráficos de actividad y alertas de subidas fallidas.</p>
+                    <p>Contadores de infraestructuras, operadores activos, fotos en 24h/7d/30d, gráfico de actividad diaria, incidencias críticas en curso y alertas de subidas fallidas.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--blue"><i class="bi bi-clock-history"></i></div>
                     <h3>Timeline de Inspecciones</h3>
-                    <p>Historial cronológico de todas las inspecciones con filtros por operador, infraestructura, severidad y rango de fechas. Galería de fotos con lightbox.</p>
+                    <p>Historial cronológico con filtros por operador, infraestructura, tipo de foto, severidad y rango de fechas. Galería de fotos expandible con lightbox.</p>
                 </div>
 
                 <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--green"><i class="bi bi-images"></i></div>
+                    <h3>Galería de Fotos</h3>
+                    <p>Navegador visual de todas las fotos con filtros avanzados por infraestructura, operador, tipo (aleatorio/comparativo), fecha y estado de incidencia.</p>
+                </div>
+            </div>
+
+            <div class="subsection-header"><span class="subsection-title">Mapas y Capas</span></div>
+
+            <div class="features-grid">
+                <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--green"><i class="bi bi-pin-map-fill"></i></div>
-                    <h3>Mapa Interactivo Avanzado</h3>
-                    <p>Mapa con clustering, filtros dinámicos, capas KML guardadas en base de datos, drag & drop para reubicar infraestructuras y marcadores por estado.</p>
+                    <h3>Mapa Interactivo con Waypoints</h3>
+                    <p>Mapa con clustering, filtros dinámicos, capa de waypoints W1-W2-W3 conectados con ruta, escala configurable (1:50.000 a 1:500.000) y exportación GPX.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--teal"><i class="bi bi-globe-americas"></i></div>
                     <h3>Capas WMS: Ortofoto y Topográfico</h3>
-                    <p>Cambia entre OpenStreetMap, Ortofoto Digital de Andalucía 2020 y Mapa Topográfico 1:10.000. Visualiza las infraestructuras sobre imágenes reales del terreno.</p>
+                    <p>Cambia entre OpenStreetMap, Ortofoto Digital de Andalucía y Mapa Topográfico 1:10.000. Visualiza infraestructuras sobre imágenes aéreas reales del terreno.</p>
                 </div>
 
                 <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-geo-fill"></i></div>
+                    <h3>Capas KML / KMZ / SHP</h3>
+                    <p>Importa capas geoespaciales con puntos, líneas y polígonos. Se guardan en base de datos para visualizarlas siempre en el mapa sin volver a cargarlas.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--rose"><i class="bi bi-arrows-move"></i></div>
+                    <h3>Reubicación Drag & Drop</h3>
+                    <p>Arrastra los marcadores directamente en el mapa para corregir la ubicación GPS de cualquier infraestructura. Los cambios se guardan automáticamente.</p>
+                </div>
+            </div>
+
+            <div class="subsection-header"><span class="subsection-title">Informes y Exportación</span></div>
+
+            <div class="features-grid">
+                <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--cyan"><i class="bi bi-arrows-fullscreen"></i></div>
                     <h3>Comparador de Fotos</h3>
-                    <p>Compara visitas en modo slider (arrastrar para revelar) o side-by-side. Ideal para evaluar la evolución de infraestructuras entre diferentes fechas.</p>
+                    <p>Compara visitas en modo slider (arrastrar para revelar) o side-by-side. Agrupa fotos comparativas por fecha y operador para evaluar la evolución temporal.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--red"><i class="bi bi-file-earmark-pdf-fill"></i></div>
-                    <h3>Informes PDF</h3>
-                    <p>Genera informes profesionales con fotos comparativas lado a lado, tablas de incidencias, datos técnicos y coordenadas de cada infraestructura.</p>
+                    <h3>Informes PDF Profesionales</h3>
+                    <p>Genera informes con fotos comparativas 2 por fila, aleatorias 3 por fila, tablas de incidencias, datos técnicos, coordenadas y observaciones de cada registro.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--lime"><i class="bi bi-file-earmark-spreadsheet"></i></div>
-                    <h3>Exportar a CSV / Excel</h3>
-                    <p>Descarga todos los registros filtrados en formato CSV compatible con Excel. Incluye datos GPS, operador, severidad, observaciones y enlaces a fotos.</p>
+                    <h3>Exportar CSV / Excel</h3>
+                    <p>Descarga todos los registros filtrados en formato CSV compatible con Excel. Incluye datos GPS, operador, tipo de foto, severidad, observaciones y enlaces.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--amber"><i class="bi bi-file-zip-fill"></i></div>
                     <h3>Descarga Masiva ZIP</h3>
-                    <p>Descarga todas las fotos de una infraestructura en un archivo ZIP organizado con nombres descriptivos: código, fecha, estado y número de secuencia.</p>
+                    <p>Descarga todas las fotos de una infraestructura en un archivo ZIP con nombres descriptivos según el formato configurado: código, tipo de trabajo y secuencia.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--teal"><i class="bi bi-filetype-xml"></i></div>
+                    <h3>Exportar Waypoints GPX</h3>
+                    <p>Descarga las rutas de waypoints comparativos en formato GPX 1.1 estándar directamente desde el mapa. Compatible con receptores GPS y aplicaciones de navegación.</p>
+                </div>
+            </div>
+
+            <div class="subsection-header"><span class="subsection-title">Gestión de Datos</span></div>
+
+            <div class="features-grid">
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--orange"><i class="bi bi-file-earmark-excel"></i></div>
+                    <h3>Importación Excel de Infraestructuras</h3>
+                    <p>Carga masiva de infraestructuras desde archivo Excel. Mapea columnas de código, nombre, coordenadas GPS, provincia y municipio automáticamente.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--blue"><i class="bi bi-tools"></i></div>
+                    <h3>Unidades de Obra y Tipos de Trabajo</h3>
+                    <p>Gestiona catálogos personalizados de unidades de obra y tipos de trabajo por empresa. Código, nombre y descripción con activación/desactivación.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--orange"><i class="bi bi-search"></i></div>
-                    <h3>Búsqueda Global</h3>
-                    <p>Buscador instantáneo con Ctrl+K que busca en infraestructuras, registros y operadores simultáneamente. Filtros combinados por tipo de resultado.</p>
+                    <h3>Búsqueda Global Ctrl+K</h3>
+                    <p>Buscador instantáneo que busca en infraestructuras, registros y operadores simultáneamente. Filtros combinados por tipo de resultado con navegación rápida.</p>
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-geo-fill"></i></div>
-                    <h3>Importación KML / KMZ</h3>
-                    <p>Importa capas KML con puntos, líneas y polígonos. Guárdalas en la base de datos para visualizarlas siempre que abras el mapa sin volver a cargarlas.</p>
-                </div>
-
-                <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--rose"><i class="bi bi-arrows-move"></i></div>
-                    <h3>Reubicación de Infraestructuras</h3>
-                    <p>Arrastra los marcadores directamente en el mapa para corregir la ubicación GPS de cualquier infraestructura. Los cambios se guardan automáticamente.</p>
+                    <div class="feature-icon feature-icon--sky"><i class="bi bi-gear-fill"></i></div>
+                    <h3>Ajustes Configurables</h3>
+                    <p>Formato de nombre de foto (3 opciones), campos visibles para el operador, escala del mapa y opciones de visualización. Todo personalizable por empresa.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -1068,25 +1163,25 @@
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--amber"><i class="bi bi-buildings"></i></div>
                     <h3>Multi-Tenant (SaaS)</h3>
-                    <p>Cada empresa opera en su propio espacio aislado. Operadores, infraestructuras, fotos y reportes son completamente independientes entre compañías.</p>
-                </div>
-
-                <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--rose"><i class="bi bi-ui-checks-grid"></i></div>
-                    <h3>Formularios Dinámicos</h3>
-                    <p>Configura campos personalizados por empresa: textos, selectores, checkboxes, fechas y más. Cada operador ve solo los campos de su compañía.</p>
+                    <p>Cada empresa opera en su propio espacio aislado. Operadores, infraestructuras, fotos, formularios y reportes son completamente independientes entre compañías.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--teal"><i class="bi bi-shield-check"></i></div>
                     <h3>Seguridad y Roles</h3>
-                    <p>Cuatro niveles de acceso (superadmin, admin, supervisor, operador) con protección CSRF, contraseñas cifradas con bcrypt y aislamiento total de datos.</p>
+                    <p>Cuatro niveles de acceso (superadmin, admin, supervisor, operador) con protección CSRF, contraseñas bcrypt (cost 12), prepared statements y aislamiento total.</p>
                 </div>
 
                 <div class="feature-card reveal">
                     <div class="feature-icon feature-icon--blue"><i class="bi bi-key-fill"></i></div>
                     <h3>Gestión de Licencias</h3>
-                    <p>Control de suscripciones por empresa con planes (free, pro, enterprise), límites de usuarios e infraestructuras y fechas de vigencia de licencia.</p>
+                    <p>Control de suscripciones por empresa con planes (free, basic, professional, enterprise), límites de usuarios e infraestructuras y fechas de vigencia.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--rose"><i class="bi bi-ui-checks-grid"></i></div>
+                    <h3>Formularios Dinámicos</h3>
+                    <p>Configura campos personalizados por empresa: textos, números, selectores, checkboxes, áreas de texto y fechas. El operador ve solo los de su compañía.</p>
                 </div>
 
                 <div class="feature-card reveal">
@@ -1096,9 +1191,27 @@
                 </div>
 
                 <div class="feature-card reveal">
-                    <div class="feature-icon feature-icon--green"><i class="bi bi-database-fill-gear"></i></div>
-                    <h3>Migraciones Automáticas</h3>
-                    <p>Sistema de migraciones incrementales con SQL idempotente. Actualiza el esquema de base de datos sin perder datos existentes ni interrumpir el servicio.</p>
+                    <div class="feature-icon feature-icon--green"><i class="bi bi-cloud-fill"></i></div>
+                    <h3>Almacenamiento Multi-Backend</h3>
+                    <p>Fotos almacenadas en ImageKit (primario), Cloudinary (alternativo) o filesystem local. Fallback automático entre backends para máxima disponibilidad.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--orange"><i class="bi bi-sliders"></i></div>
+                    <h3>Configuración por Empresa</h3>
+                    <p>Formato de nombre de foto (3 opciones), campos visibles del operador, escala del mapa, zoom por defecto y más. Cada empresa se configura de forma independiente.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--cyan"><i class="bi bi-phone-fill"></i></div>
+                    <h3>Mobile-First + PWA</h3>
+                    <p>Operador diseñado para móvil con acceso a cámara nativa. Instalable como PWA con Service Worker, caché offline e IndexedDB para sincronización diferida.</p>
+                </div>
+
+                <div class="feature-card reveal">
+                    <div class="feature-icon feature-icon--indigo"><i class="bi bi-database-fill-gear"></i></div>
+                    <h3>Migraciones Incrementales</h3>
+                    <p>Sistema de migraciones SQL idempotentes (v1 a v10+). Actualiza el esquema de base de datos sin perder datos existentes ni interrumpir el servicio.</p>
                 </div>
             </div>
         </div>
@@ -1117,22 +1230,22 @@
                 <div class="step-card reveal">
                     <div class="step-number">1</div>
                     <h4>Selecciona Infraestructura</h4>
-                    <p>Filtra por provincia y municipio, busca o crea la infraestructura y selecciona la unidad de obra a inspeccionar.</p>
+                    <p>Filtra por provincia y municipio, busca o crea la infraestructura, selecciona unidad de obra, tipo de trabajo y rellena campos dinámicos.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">2</div>
                     <h4>Captura Fotos</h4>
-                    <p>Toma fotos con ghosting comparativo, anota puntos de interés con círculo ajustable y revisa antes de enviar. Watermark GPS automático.</p>
+                    <p>Elige modo aleatorio o comparativo (con ghosting W1, W2...), anota incidencias en la foto y revisa con watermark UTM + brújula antes de enviar.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">3</div>
                     <h4>Sincronización</h4>
-                    <p>Las fotos se suben a la NUBE automáticamente. Sin red, se guardan en IndexedDB y se sincronizan al recuperar conexión.</p>
+                    <p>Las fotos se suben a la nube automáticamente. Sin cobertura, se almacenan en IndexedDB y se sincronizan al recuperar conexión con progreso visual.</p>
                 </div>
                 <div class="step-card reveal">
                     <div class="step-number">4</div>
                     <h4>Análisis e Informes</h4>
-                    <p>El admin accede al timeline, mapas interactivos, comparador de fotos, exporta CSV o genera informes PDF profesionales.</p>
+                    <p>El admin accede al dashboard, mapas con waypoints, comparador de fotos, galería, exporta CSV/GPX o genera informes PDF profesionales.</p>
                 </div>
             </div>
         </div>
@@ -1142,28 +1255,28 @@
     <div class="container">
         <div class="stats-bar">
             <div class="stat reveal">
-                <div class="stat-value">ETRS89</div>
-                <div class="stat-label">Sistema de coordenadas</div>
+                <div class="stat-value">UTM</div>
+                <div class="stat-label">Coordenadas ETRS89</div>
             </div>
             <div class="stat reveal">
                 <div class="stat-value">100%</div>
                 <div class="stat-label">Funcional offline</div>
             </div>
             <div class="stat reveal">
+                <div class="stat-value">GPX</div>
+                <div class="stat-label">Waypoints exportables</div>
+            </div>
+            <div class="stat reveal">
+                <div class="stat-value">PDF</div>
+                <div class="stat-label">Informes profesionales</div>
+            </div>
+            <div class="stat reveal">
                 <div class="stat-value">WMS</div>
                 <div class="stat-label">Ortofoto y Topográfico</div>
             </div>
             <div class="stat reveal">
-                <div class="stat-value">PDF</div>
-                <div class="stat-label">Informes automáticos</div>
-            </div>
-            <div class="stat reveal">
-                <div class="stat-value">KML</div>
-                <div class="stat-label">Capas geolocalizadas</div>
-            </div>
-            <div class="stat reveal">
-                <div class="stat-value">ZIP</div>
-                <div class="stat-label">Descarga masiva</div>
+                <div class="stat-value">PWA</div>
+                <div class="stat-label">App instalable</div>
             </div>
         </div>
     </div>
