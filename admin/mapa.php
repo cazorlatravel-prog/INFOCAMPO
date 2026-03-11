@@ -1173,7 +1173,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             return data;
         }
 
-        function matchKmlToInfra(nombre, extData) {
+        function matchKmlToInfra(nombre, extData, center) {
             var best = null;
             // Try matching by name
             var cleanNombre = nombre.toLowerCase().trim();
@@ -1183,12 +1183,30 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 else if (inf.codigo.toLowerCase().trim() === cleanNombre) best = inf;
             });
             if (best) return best;
-            // Try partial match
+            // Try partial match by name
             infraData.forEach(function(inf) {
                 if (best) return;
                 if (cleanNombre && inf.nombre.toLowerCase().indexOf(cleanNombre) >= 0) best = inf;
                 else if (cleanNombre && cleanNombre.indexOf(inf.nombre.toLowerCase()) >= 0) best = inf;
             });
+            if (best) return best;
+            // Try matching by coordinate proximity (< 50 meters)
+            if (center) {
+                var bestDist = Infinity;
+                infraData.forEach(function(inf) {
+                    if (!inf.lat || !inf.lon) return;
+                    var dLat = Math.abs(inf.lat - center[0]);
+                    var dLon = Math.abs(inf.lon - center[1]);
+                    // ~0.00045 degrees ≈ 50 meters
+                    if (dLat < 0.00045 && dLon < 0.00045) {
+                        var dist = dLat * dLat + dLon * dLon;
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            best = inf;
+                        }
+                    }
+                });
+            }
             return best;
         }
 
@@ -1369,8 +1387,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 var extData = extractKmlExtendedData(pm);
                 var center = getKmlPlacemarkCenter(pm);
 
-                // Try to match with DB infrastructure
-                var matchedInfra = matchKmlToInfra(nombre, extData);
+                // Try to match with DB infrastructure (by name, then by coordinates)
+                var matchedInfra = matchKmlToInfra(nombre, extData, center);
 
                 // Determine municipio/monte from extData or matched infra
                 var municipio = extData['municipio'] || extData['municipality'] || (matchedInfra ? matchedInfra.municipio : '') || '';
