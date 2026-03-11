@@ -77,6 +77,7 @@ $jsInfras = [];
 if ($empresaId > 0) {
     $stmtInfra = $pdo->prepare(
         "SELECT i.id, i.nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica, i.tipo,
+                i.provincia, i.municipio, i.monte,
                 COUNT(r.id) AS num_fotos,
                 (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
          FROM infraestructuras i
@@ -93,6 +94,9 @@ if ($empresaId > 0) {
             'lat' => (float) $inf['lat_teorica'],
             'lon' => (float) $inf['lon_teorica'],
             'tipo' => $inf['tipo'] ?? '',
+            'provincia' => $inf['provincia'] ?? '',
+            'municipio' => $inf['municipio'] ?? '',
+            'monte' => $inf['monte'] ?? '',
             'num_fotos' => (int) $inf['num_fotos'],
             'ultimo_estado' => $inf['ultimo_estado'] ?? '',
         ];
@@ -299,6 +303,30 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         .popup-badge.aleatorio { background: #dbeafe; color: #1d4ed8; }
         .popup-badge.comparativo { background: #ede9fe; color: #6d28d9; }
 
+        /* KML Nav Panel */
+        .kml-nav-panel {
+            background: #fff; border-bottom: 1px solid #e5e7eb;
+            padding: 8px 20px; display: none;
+        }
+        .kml-nav-panel.active { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .kml-nav-panel .filter-group { display: flex; flex-direction: column; gap: 2px; }
+        .kml-nav-panel .filter-group label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; margin-bottom: 0; }
+        .kml-nav-panel .form-select { font-size: 0.8rem; height: 34px; }
+        .kml-nav-count { font-size: 0.75rem; color: #6b7280; align-self: center; }
+
+        /* Photo gallery in popup */
+        .kml-photo-gallery { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; max-height: 200px; overflow-y: auto; }
+        .kml-photo-gallery img { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+        .kml-photo-gallery img:hover { border-color: #3b82f6; }
+        .kml-photo-lightbox {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10000;
+            background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .kml-photo-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+        .kml-photo-lightbox .lb-close { position: absolute; top: 20px; right: 20px; color: #fff; font-size: 2rem; cursor: pointer; }
+        .kml-photo-lightbox .lb-info { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 0.85rem; text-align: center; background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 8px; }
+
         /* Drag toast */
         .drag-toast {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -450,6 +478,35 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div class="stat-pill"><strong id="stat-infras"><?= $totalInfras ?></strong> infraestructuras</div>
         <div class="stat-pill" style="color:#7c3aed;"><strong id="stat-comp"><?= $totalComp ?></strong> comparativas</div>
         <div class="stat-pill" style="color:#f59e0b;"><strong id="stat-durante"><?= $totalDurante ?></strong> durante</div>
+    </div>
+
+    <!-- KML Navigation Panel -->
+    <div class="kml-nav-panel" id="kml-nav-panel">
+        <div class="filter-group">
+            <label>Municipio</label>
+            <select id="kml-nav-municipio" class="form-select" style="width:180px;">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Monte</label>
+            <select id="kml-nav-monte" class="form-select" style="width:180px;">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Infraestructura</label>
+            <select id="kml-nav-infra" class="form-select" style="width:260px;">
+                <option value="">Seleccionar...</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-sm btn-outline-primary" onclick="kmlNavFlyTo()" title="Ir a infraestructura seleccionada">
+                <i class="bi bi-geo-alt-fill"></i> Ir
+            </button>
+        </div>
+        <div class="kml-nav-count" id="kml-nav-count"></div>
     </div>
 
     <!-- Map -->
@@ -1042,6 +1099,193 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             }
         });
 
+        // KML placemark data extracted for navigation
+        var kmlPlacemarkData = [];
+        var kmlPlacemarkLayers = {}; // index -> leaflet layer
+
+        function extractKmlExtendedData(pm) {
+            var data = {};
+            // ExtendedData/Data
+            pm.querySelectorAll('ExtendedData Data').forEach(function(d) {
+                var key = (d.getAttribute('name') || '').toLowerCase().trim();
+                var valEl = d.querySelector('value');
+                var val = valEl ? valEl.textContent.trim() : '';
+                if (key && val) data[key] = val;
+            });
+            // ExtendedData/SchemaData/SimpleData
+            pm.querySelectorAll('ExtendedData SchemaData SimpleData').forEach(function(sd) {
+                var key = (sd.getAttribute('name') || '').toLowerCase().trim();
+                var val = sd.textContent.trim();
+                if (key && val) data[key] = val;
+            });
+            return data;
+        }
+
+        function matchKmlToInfra(nombre, extData) {
+            var best = null;
+            // Try matching by name
+            var cleanNombre = nombre.toLowerCase().trim();
+            infraData.forEach(function(inf) {
+                if (best) return;
+                if (inf.nombre.toLowerCase().trim() === cleanNombre) best = inf;
+                else if (inf.codigo.toLowerCase().trim() === cleanNombre) best = inf;
+            });
+            if (best) return best;
+            // Try partial match
+            infraData.forEach(function(inf) {
+                if (best) return;
+                if (cleanNombre && inf.nombre.toLowerCase().indexOf(cleanNombre) >= 0) best = inf;
+                else if (cleanNombre && cleanNombre.indexOf(inf.nombre.toLowerCase()) >= 0) best = inf;
+            });
+            return best;
+        }
+
+        function getKmlPlacemarkCenter(pm) {
+            var lat = null, lon = null;
+            // Point
+            var pointEl = pm.querySelector('Point coordinates');
+            if (pointEl) {
+                var parts = pointEl.textContent.trim().split(',');
+                if (parts.length >= 2) { lon = parseFloat(parts[0]); lat = parseFloat(parts[1]); }
+            }
+            // LineString centroid
+            if (lat === null) {
+                var lineEl = pm.querySelector('LineString coordinates');
+                if (lineEl) {
+                    var coords = parseKmlCoordinates(lineEl.textContent);
+                    if (coords.length > 0) {
+                        var sLat = 0, sLon = 0;
+                        coords.forEach(function(c) { sLat += c[0]; sLon += c[1]; });
+                        lat = sLat / coords.length;
+                        lon = sLon / coords.length;
+                    }
+                }
+            }
+            // Polygon centroid
+            if (lat === null) {
+                var polyEl = pm.querySelector('Polygon outerBoundaryIs LinearRing coordinates');
+                if (!polyEl) polyEl = pm.querySelector('Polygon coordinates');
+                if (polyEl) {
+                    var coords = parseKmlCoordinates(polyEl.textContent);
+                    if (coords.length > 0) {
+                        var sLat = 0, sLon = 0;
+                        coords.forEach(function(c) { sLat += c[0]; sLon += c[1]; });
+                        lat = sLat / coords.length;
+                        lon = sLon / coords.length;
+                    }
+                }
+            }
+            return (lat !== null && !isNaN(lat)) ? [lat, lon] : null;
+        }
+
+        function buildKmlPopupContent(nombre, desc, extData, color, matchedInfra, center) {
+            var html = '<div style="max-width:300px;">';
+            if (nombre) html += '<strong style="color:' + color + ';">' + escapeXml(nombre) + '</strong><br>';
+
+            // Show extended data fields
+            var extKeys = Object.keys(extData);
+            if (extKeys.length > 0) {
+                var shown = 0;
+                extKeys.forEach(function(k) {
+                    if (shown >= 6) return;
+                    html += '<small><b>' + escapeXml(k) + ':</b> ' + escapeXml(String(extData[k]).substring(0, 80)) + '</small><br>';
+                    shown++;
+                });
+            } else if (desc) {
+                html += '<small>' + desc.substring(0, 150) + '</small><br>';
+            }
+
+            if (center) {
+                html += '<small class="text-muted"><i class="bi bi-geo-alt"></i> ' + center[0].toFixed(6) + ', ' + center[1].toFixed(6) + '</small><br>';
+            }
+
+            html += '<span class="badge" style="background:' + color + ';font-size:0.6rem;">KML</span>';
+
+            // If matched to DB infrastructure, show rich info
+            if (matchedInfra) {
+                html += '<hr style="margin:6px 0;">';
+                html += '<small style="color:#059669;"><i class="bi bi-link-45deg"></i> <b>' + escapeXml(matchedInfra.nombre) + '</b></small>';
+                html += ' <code style="font-size:0.7rem;color:#2d6a9f;">' + escapeXml(matchedInfra.codigo) + '</code><br>';
+                if (matchedInfra.tipo) html += '<span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + escapeXml(matchedInfra.tipo) + '</span> ';
+                if (matchedInfra.municipio) html += '<small><i class="bi bi-building"></i> ' + escapeXml(matchedInfra.municipio) + '</small> ';
+                if (matchedInfra.monte) html += '<small><i class="bi bi-tree"></i> ' + escapeXml(matchedInfra.monte) + '</small>';
+                html += '<br><small><i class="bi bi-camera"></i> ' + matchedInfra.num_fotos + ' foto' + (matchedInfra.num_fotos !== 1 ? 's' : '') + '</small>';
+
+                // Actions
+                html += '<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">';
+                html += '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + matchedInfra.id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.65rem;"><i class="bi bi-clock-history"></i> Timeline</a>';
+                html += '<a href="generar_pdf.php?infra_id=' + matchedInfra.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.65rem;"><i class="bi bi-file-pdf"></i> PDF</a>';
+                if (matchedInfra.num_fotos > 0) {
+                    html += '<button class="btn btn-sm btn-outline-success" style="font-size:0.65rem;" onclick="loadKmlInfraPhotos(' + matchedInfra.id + ', this)"><i class="bi bi-images"></i> Ver fotos</button>';
+                }
+                html += '</div>';
+
+                // Photo gallery container
+                if (matchedInfra.num_fotos > 0) {
+                    html += '<div id="kml-photos-' + matchedInfra.id + '" class="kml-photo-gallery" style="display:none;"></div>';
+                }
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        // Load photos for an infrastructure inside a KML popup
+        window.loadKmlInfraPhotos = function(infraId, btn) {
+            var gallery = document.getElementById('kml-photos-' + infraId);
+            if (!gallery) return;
+            if (gallery.style.display !== 'none') {
+                gallery.style.display = 'none';
+                btn.innerHTML = '<i class="bi bi-images"></i> Ver fotos';
+                return;
+            }
+            gallery.style.display = 'flex';
+            btn.innerHTML = '<i class="bi bi-images"></i> Ocultar';
+
+            if (gallery.dataset.loaded) return;
+            gallery.innerHTML = '<small class="text-muted">Cargando fotos...</small>';
+
+            fetch('/public/api/registros_mapa.php?infra_id=' + infraId)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.ok || !data.registros || data.registros.length === 0) {
+                        gallery.innerHTML = '<small class="text-muted">Sin fotos</small>';
+                        return;
+                    }
+                    gallery.dataset.loaded = '1';
+                    gallery.innerHTML = '';
+                    data.registros.forEach(function(foto) {
+                        var img = document.createElement('img');
+                        img.src = foto.url_cloudinary || foto.url;
+                        img.alt = foto.estado_incidencia || '';
+                        img.title = (foto.estado_incidencia || '').toUpperCase() + ' - ' + (foto.fecha || '');
+                        img.addEventListener('click', function() {
+                            showKmlLightbox(img.src, foto);
+                        });
+                        gallery.appendChild(img);
+                    });
+                })
+                .catch(function() {
+                    gallery.innerHTML = '<small class="text-danger">Error al cargar</small>';
+                });
+        };
+
+        function showKmlLightbox(url, foto) {
+            var lb = document.createElement('div');
+            lb.className = 'kml-photo-lightbox';
+            lb.innerHTML =
+                '<span class="lb-close"><i class="bi bi-x-lg"></i></span>' +
+                '<img src="' + url + '" alt="">' +
+                '<div class="lb-info">' +
+                (foto.estado_incidencia ? '<span class="popup-badge ' + foto.estado_incidencia + '">' + foto.estado_incidencia.toUpperCase() + '</span> ' : '') +
+                (foto.fecha || '') + ' | ' + (foto.operador || foto.usuario_nombre || '') +
+                '</div>';
+            lb.addEventListener('click', function(e) {
+                if (e.target === lb || e.target.closest('.lb-close')) lb.remove();
+            });
+            document.body.appendChild(lb);
+        }
+
         function renderKmlOnMap(kmlText, layerId, color, weight, opacity) {
             weight = weight || 3;
             opacity = opacity || 0.8;
@@ -1058,17 +1302,31 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             var bounds = [];
             var totalElements = 0;
 
-            placemarks.forEach(function(pm) {
+            // Reset placemark data when loading any KML layer
+            if (layerId === 'temp') {
+                kmlPlacemarkData = [];
+                kmlPlacemarkLayers = {};
+            }
+            var trackNav = (layerId === 'temp' || !kmlPlacemarkData.length);
+
+            placemarks.forEach(function(pm, idx) {
                 var nameEl = pm.querySelector('name');
                 var nombre = nameEl ? nameEl.textContent.trim() : '';
                 var descEl = pm.querySelector('description');
                 var desc = descEl ? descEl.textContent.trim() : '';
+                var extData = extractKmlExtendedData(pm);
+                var center = getKmlPlacemarkCenter(pm);
 
-                var popupContent = '<div style="max-width:250px;">';
-                if (nombre) popupContent += '<strong style="color:' + color + ';">' + nombre + '</strong><br>';
-                if (desc) popupContent += '<small>' + desc.substring(0, 150) + '</small><br>';
-                popupContent += '<span class="badge" style="background:' + color + ';font-size:0.6rem;">KML</span>';
-                popupContent += '</div>';
+                // Try to match with DB infrastructure
+                var matchedInfra = matchKmlToInfra(nombre, extData);
+
+                // Determine municipio/monte from extData or matched infra
+                var municipio = extData['municipio'] || extData['municipality'] || (matchedInfra ? matchedInfra.municipio : '') || '';
+                var monte = extData['monte'] || extData['forest'] || extData['zona_forestal'] || (matchedInfra ? matchedInfra.monte : '') || '';
+
+                var popupContent = buildKmlPopupContent(nombre, desc, extData, color, matchedInfra, center);
+
+                var leafletLayer = null;
 
                 // Points
                 var pointEl = pm.querySelector('Point coordinates');
@@ -1078,15 +1336,18 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                         var lat = parseFloat(coords[1]);
                         var lon = parseFloat(coords[0]);
                         if (!isNaN(lat) && !isNaN(lon)) {
+                            var hasMatch = !!matchedInfra;
+                            var iconSize = hasMatch ? 18 : 14;
                             var icon = L.divIcon({
                                 className: 'kml-marker',
-                                html: '<div style="width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>',
-                                iconSize: [14, 14],
-                                iconAnchor: [7, 7],
+                                html: '<div style="width:' + iconSize + 'px;height:' + iconSize + 'px;border-radius:50%;background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3);' + (hasMatch ? 'outline:2px solid #059669;' : '') + '"></div>',
+                                iconSize: [iconSize, iconSize],
+                                iconAnchor: [iconSize/2, iconSize/2],
                             });
-                            L.marker([lat, lon], { icon: icon })
-                                .bindPopup(popupContent)
+                            leafletLayer = L.marker([lat, lon], { icon: icon })
+                                .bindPopup(popupContent, { maxWidth: 320 })
                                 .addTo(group);
+                            if (nombre) leafletLayer.bindTooltip(nombre, { direction: 'top', offset: [0, -10] });
                             bounds.push([lat, lon]);
                             totalElements++;
                         }
@@ -1098,9 +1359,10 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 if (lineEl) {
                     var lineCoords = parseKmlCoordinates(lineEl.textContent);
                     if (lineCoords.length > 0) {
-                        L.polyline(lineCoords, { color: color, weight: weight, opacity: opacity })
-                            .bindPopup(popupContent)
+                        leafletLayer = L.polyline(lineCoords, { color: color, weight: weight, opacity: opacity })
+                            .bindPopup(popupContent, { maxWidth: 320 })
                             .addTo(group);
+                        if (nombre) leafletLayer.bindTooltip(nombre, { sticky: true });
                         lineCoords.forEach(function(c) { bounds.push(c); });
                         totalElements++;
                     }
@@ -1111,22 +1373,158 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 if (polyEl) {
                     var polyCoords = parseKmlCoordinates(polyEl.textContent);
                     if (polyCoords.length > 0) {
-                        L.polygon(polyCoords, { color: color, fillColor: color, fillOpacity: opacity * 0.2, weight: weight, opacity: opacity })
-                            .bindPopup(popupContent)
+                        leafletLayer = L.polygon(polyCoords, { color: color, fillColor: color, fillOpacity: opacity * 0.2, weight: weight, opacity: opacity })
+                            .bindPopup(popupContent, { maxWidth: 320 })
                             .addTo(group);
+                        if (nombre) leafletLayer.bindTooltip(nombre, { sticky: true });
                         polyCoords.forEach(function(c) { bounds.push(c); });
                         totalElements++;
                     }
+                }
+
+                // Store placemark data for navigation
+                if (trackNav && center && leafletLayer) {
+                    var pmIdx = kmlPlacemarkData.length;
+                    kmlPlacemarkData.push({
+                        idx: pmIdx,
+                        nombre: nombre,
+                        municipio: municipio,
+                        monte: monte,
+                        center: center,
+                        matchedInfra: matchedInfra,
+                        extData: extData,
+                    });
+                    kmlPlacemarkLayers[pmIdx] = leafletLayer;
                 }
             });
 
             if (bounds.length > 0 && layerId === 'temp') {
                 map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
             }
+            // Build navigation panel if we tracked placemarks
+            if (trackNav && kmlPlacemarkData.length > 0) {
+                buildKmlNavPanel();
+            }
 
             updateKmlStats();
             return totalElements;
         }
+
+        // ---------------------------------------------------------------
+        // KML Navigation Panel (municipio > monte > infraestructura)
+        // ---------------------------------------------------------------
+        function buildKmlNavPanel() {
+            var panel = document.getElementById('kml-nav-panel');
+            if (kmlPlacemarkData.length === 0) {
+                panel.classList.remove('active');
+                return;
+            }
+            panel.classList.add('active');
+
+            // Extract unique municipios and montes
+            var municipios = {};
+            var montes = {};
+            kmlPlacemarkData.forEach(function(pm) {
+                if (pm.municipio) municipios[pm.municipio] = true;
+                if (pm.monte) montes[pm.monte] = true;
+            });
+
+            var munSelect = document.getElementById('kml-nav-municipio');
+            munSelect.innerHTML = '<option value="">Todos (' + Object.keys(municipios).length + ')</option>';
+            Object.keys(municipios).sort().forEach(function(m) {
+                munSelect.innerHTML += '<option value="' + escapeXml(m) + '">' + escapeXml(m) + '</option>';
+            });
+
+            var monteSelect = document.getElementById('kml-nav-monte');
+            monteSelect.innerHTML = '<option value="">Todos (' + Object.keys(montes).length + ')</option>';
+            Object.keys(montes).sort().forEach(function(m) {
+                monteSelect.innerHTML += '<option value="' + escapeXml(m) + '">' + escapeXml(m) + '</option>';
+            });
+
+            updateKmlNavInfraList();
+            document.getElementById('kml-nav-count').textContent = kmlPlacemarkData.length + ' elementos KML';
+
+            // Bind events
+            munSelect.onchange = function() { updateKmlNavMonteList(); updateKmlNavInfraList(); };
+            monteSelect.onchange = updateKmlNavInfraList;
+        }
+
+        function updateKmlNavMonteList() {
+            var munVal = document.getElementById('kml-nav-municipio').value;
+            var montes = {};
+            kmlPlacemarkData.forEach(function(pm) {
+                if (munVal && pm.municipio !== munVal) return;
+                if (pm.monte) montes[pm.monte] = true;
+            });
+            var monteSelect = document.getElementById('kml-nav-monte');
+            var currentMonte = monteSelect.value;
+            monteSelect.innerHTML = '<option value="">Todos (' + Object.keys(montes).length + ')</option>';
+            Object.keys(montes).sort().forEach(function(m) {
+                monteSelect.innerHTML += '<option value="' + escapeXml(m) + '"' + (m === currentMonte ? ' selected' : '') + '>' + escapeXml(m) + '</option>';
+            });
+        }
+
+        function getFilteredKmlPlacemarks() {
+            var munVal = document.getElementById('kml-nav-municipio').value;
+            var monteVal = document.getElementById('kml-nav-monte').value;
+            return kmlPlacemarkData.filter(function(pm) {
+                if (munVal && pm.municipio !== munVal) return false;
+                if (monteVal && pm.monte !== monteVal) return false;
+                return true;
+            });
+        }
+
+        function updateKmlNavInfraList() {
+            var filtered = getFilteredKmlPlacemarks();
+            var infraSelect = document.getElementById('kml-nav-infra');
+            infraSelect.innerHTML = '<option value="">Seleccionar... (' + filtered.length + ')</option>';
+            filtered.sort(function(a, b) { return a.nombre.localeCompare(b.nombre); }).forEach(function(pm) {
+                var label = pm.nombre || ('Punto ' + (pm.idx + 1));
+                var suffix = pm.matchedInfra ? ' [' + pm.matchedInfra.num_fotos + ' fotos]' : '';
+                infraSelect.innerHTML += '<option value="' + pm.idx + '">' + escapeXml(label) + suffix + '</option>';
+            });
+            document.getElementById('kml-nav-count').textContent = filtered.length + ' de ' + kmlPlacemarkData.length + ' elementos';
+        }
+
+        window.kmlNavFlyTo = function() {
+            var infraSelect = document.getElementById('kml-nav-infra');
+            var selectedIdx = infraSelect.value;
+            if (selectedIdx === '') {
+                // Fly to all filtered placemarks bounds
+                var filtered = getFilteredKmlPlacemarks();
+                if (filtered.length === 0) return;
+                var bounds = filtered.map(function(pm) { return pm.center; });
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                return;
+            }
+            var idx = parseInt(selectedIdx);
+            var pm = kmlPlacemarkData[idx];
+            if (!pm) return;
+
+            map.setView(pm.center, 17);
+
+            // Open popup of the layer
+            var layer = kmlPlacemarkLayers[idx];
+            if (layer) {
+                setTimeout(function() {
+                    if (layer.openPopup) layer.openPopup();
+                }, 300);
+            }
+        };
+
+        // Also fly on select change
+        document.getElementById('kml-nav-infra').addEventListener('change', function() {
+            if (this.value !== '') kmlNavFlyTo();
+        });
+
+        // Hide KML nav panel when temp layer is removed
+        var origRemoveKml = window.removeKmlLayer;
+        window.removeKmlLayer = function() {
+            origRemoveKml();
+            kmlPlacemarkData = [];
+            kmlPlacemarkLayers = {};
+            document.getElementById('kml-nav-panel').classList.remove('active');
+        };
 
         function parseKmlCoordinates(text) {
             var coords = [];
