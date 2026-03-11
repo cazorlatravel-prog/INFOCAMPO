@@ -946,6 +946,62 @@ select.input-field {
 .cam-ghost.active { display: block; }
 .cam-ghost.off { opacity: 0; }
 
+/* Ghost opacity slider bar */
+.ghost-opacity-bar {
+    position: absolute;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    border-radius: 20px;
+    padding: 6px 14px;
+    color: #fff;
+}
+.ghost-opacity-bar.hidden { display: none; }
+
+.ghost-opacity-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+.ghost-opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.ghost-opacity-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid #fff;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.ghost-opacity-value {
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: center;
+}
+
 .cam-topbar {
     position: absolute;
     top: 0;

@@ -91,6 +91,9 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
+    const ghostOpacityBar    = $('#ghost-opacity-bar');
+    const ghostOpacitySlider = $('#ghost-opacity-slider');
+    const ghostOpacityValue  = $('#ghost-opacity-value');
 
     // Preview
     const previewCanvas  = $('#preview-canvas');
@@ -804,6 +807,8 @@
             btnGhostToggle.classList.add('hidden');
             btnLoadPrev.classList.add('hidden');
             camGhost.classList.remove('active');
+            camGhost.style.opacity = '';
+            if (ghostOpacityBar) ghostOpacityBar.classList.add('hidden');
         }
 
         // Start camera
@@ -832,6 +837,8 @@
     function closeCamera() {
         stopCameraStream();
         camGhost.classList.remove('active');
+        camGhost.style.opacity = '';
+        if (ghostOpacityBar) ghostOpacityBar.classList.add('hidden');
         showScreen('ficha');
     }
 
@@ -928,6 +935,11 @@
         camGhost.classList.add('active');
         camGhost.classList.remove('off');
         btnGhostToggle.classList.add('active');
+        // Apply current slider opacity and show bar
+        if (ghostOpacitySlider) {
+            camGhost.style.opacity = parseInt(ghostOpacitySlider.value, 10) / 100;
+        }
+        if (ghostOpacityBar) ghostOpacityBar.classList.remove('hidden');
     }
 
     // ===================================================================
@@ -1497,9 +1509,30 @@
         btnGhostToggle.addEventListener('click', () => {
             if (!state.ghostUrl) return;
             state.ghostActive = !state.ghostActive;
-            camGhost.classList.toggle('off', !state.ghostActive);
             btnGhostToggle.classList.toggle('active', state.ghostActive);
+            if (state.ghostActive) {
+                const val = ghostOpacitySlider ? parseInt(ghostOpacitySlider.value, 10) / 100 : 0.5;
+                camGhost.style.opacity = val;
+                camGhost.classList.remove('off');
+            } else {
+                camGhost.style.opacity = '0';
+            }
+            if (ghostOpacityBar) {
+                ghostOpacityBar.classList.toggle('hidden', !state.ghostActive);
+            }
         });
+
+        // Ghost opacity slider
+        if (ghostOpacitySlider) {
+            ghostOpacitySlider.addEventListener('input', () => {
+                const val = parseInt(ghostOpacitySlider.value, 10);
+                const opacity = val / 100;
+                camGhost.style.opacity = opacity;
+                if (ghostOpacityValue) ghostOpacityValue.textContent = val + '%';
+                // If slider is at 0, visually treat as off but keep ghost active state
+                // so the user can slide back up without re-toggling
+            });
+        }
 
         // Load previous photos
         btnLoadPrev.addEventListener('click', () => checkPreviousPhotos());

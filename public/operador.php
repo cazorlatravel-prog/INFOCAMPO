@@ -338,6 +338,15 @@ if ($initials === '') $initials = 'OP';
             <span id="cam-seq-label">W1</span>
         </div>
 
+        <!-- Ghost opacity slider -->
+        <div id="ghost-opacity-bar" class="ghost-opacity-bar hidden">
+            <i class="bi bi-eye-slash" style="font-size:12px;opacity:0.7;"></i>
+            <input type="range" id="ghost-opacity-slider" min="0" max="100" value="50" step="5"
+                   class="ghost-opacity-slider" title="Transparencia ghost">
+            <i class="bi bi-eye" style="font-size:12px;opacity:0.7;"></i>
+            <span id="ghost-opacity-value" class="ghost-opacity-value">50%</span>
+        </div>
+
         <div class="cam-controls">
             <div class="cam-controls-left">
                 <button type="button" id="btn-ghost-toggle" class="cam-ctrl hidden" title="Toggle Ghost">
