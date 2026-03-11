@@ -221,6 +221,11 @@ if ($_navEmpresaId > 0) {
         <li role="none"><a href="/admin/informes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'informes' ? 'active' : '' ?>" role="menuitem">
             <i class="bi bi-file-earmark-text"></i> <span>Informes</span>
         </a></li>
+        <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
+        <li role="none"><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>" role="menuitem">
+            <i class="bi bi-sliders2"></i> <span>Ajustes</span>
+        </a></li>
+        <?php endif; ?>
         <?php if ($_navUserRol === 'superadmin'): ?>
         <li class="nav-item" style="position:relative;" role="none">
             <a href="#" class="nav-link <?= in_array($currentPage, ['empresas', 'usuarios_global', 'campos_global', 'impersonate'], true) ? 'active' : '' ?>" onclick="document.getElementById('submenu-plataforma').classList.toggle('d-none');return false;" role="menuitem" aria-haspopup="true">

@@ -37,11 +37,15 @@ if ($usuarioId > 0) {
     $row = $stmt->fetch();
     if ($row) $userName = $row['nombre'];
 }
+$formatoNombreFoto = 1;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
-    if ($row) $empresaName = $row['nombre'];
+    if ($row) {
+        $empresaName = $row['nombre'];
+        $formatoNombreFoto = (int) ($row['formato_nombre_foto'] ?? 1);
+    }
 }
 
 // Iniciales del usuario para el avatar
@@ -635,7 +639,8 @@ if ($initials === '') $initials = 'OP';
                 visitas: 'api/visitas.php',
                 waypoints: 'api/waypoints.php',
                 campos: 'api/campos.php',
-            }
+            },
+            formatoNombreFoto: <?= $formatoNombreFoto ?>,
         };
     </script>
     <script>

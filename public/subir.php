@@ -109,7 +109,94 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 }
 
 // ---------------------------------------------------------------
-// 2. Subir imagen a ImageKit (o Cloudinary legacy, o local)
+// 2. Generar nombre de archivo según formato configurado por la empresa
+// ---------------------------------------------------------------
+try {
+    $pdo = getDB();
+
+    // Obtener código de infraestructura y empresa_id
+    $stmtInfra = $pdo->prepare(
+        "SELECT i.codigo, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
+    );
+    $stmtInfra->execute([':id' => $infraId]);
+    $infraRow = $stmtInfra->fetch();
+
+    if (!$infraRow) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Infraestructura no encontrada']);
+        exit;
+    }
+
+    $infraCodigo = $infraRow['codigo'] ?: $infraRow['nombre'];
+    $infraEmpresaId = (int) $infraRow['empresa_id'];
+
+    // Obtener formato de nombre configurado para la empresa
+    $stmtFmt = $pdo->prepare("SELECT formato_nombre_foto FROM empresas WHERE id = :id");
+    $stmtFmt->execute([':id' => $infraEmpresaId]);
+    $fmtRow = $stmtFmt->fetch();
+    $formatoNombre = (int) ($fmtRow['formato_nombre_foto'] ?? 1);
+
+    // Contar fotos existentes para esta infraestructura (para numeración secuencial)
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM registros WHERE infra_id = :infra_id");
+    $stmtCount->execute([':infra_id' => $infraId]);
+    $numFoto = (int) $stmtCount->fetchColumn() + 1;
+    $numFotoStr = str_pad((string) $numFoto, 3, '0', STR_PAD_LEFT);
+
+    // Sanitizar código de infraestructura para nombre de archivo
+    $codigoSafe = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $infraCodigo);
+    $codigoSafe = substr($codigoSafe, 0, 60);
+
+    // Construir nombre según formato
+    switch ($formatoNombre) {
+        case 2:
+            // CODIGO_INFRA_TIPO_TRABAJO_NºFOTO
+            $tipoTrabajoNombre = '';
+            if ($tipoTrabajoId) {
+                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
+                $stmtTT->execute([':id' => $tipoTrabajoId]);
+                $ttRow = $stmtTT->fetch();
+                if ($ttRow) {
+                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
+                }
+            }
+            $nombreArchivo = $tipoTrabajoNombre
+                ? "{$codigoSafe}_{$tipoTrabajoNombre}_{$numFotoStr}"
+                : "{$codigoSafe}_{$numFotoStr}";
+            break;
+
+        case 3:
+            // CODIGO_INFRA_TIPO_TRABAJO_TIPO_FOTO_NºFOTO
+            $tipoTrabajoNombre = '';
+            if ($tipoTrabajoId) {
+                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
+                $stmtTT->execute([':id' => $tipoTrabajoId]);
+                $ttRow = $stmtTT->fetch();
+                if ($ttRow) {
+                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
+                }
+            }
+            $tipoFotoLabel = $tipoFoto === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+            if ($tipoTrabajoNombre) {
+                $nombreArchivo = "{$codigoSafe}_{$tipoTrabajoNombre}_{$tipoFotoLabel}_{$numFotoStr}";
+            } else {
+                $nombreArchivo = "{$codigoSafe}_{$tipoFotoLabel}_{$numFotoStr}";
+            }
+            break;
+
+        default: // case 1
+            // CODIGO_INFRA_NºFOTO
+            $nombreArchivo = "{$codigoSafe}_{$numFotoStr}";
+            break;
+    }
+} catch (\Exception $e) {
+    // Si falla la generación de nombre, usar el nombre original del frontend
+    if (!$nombreArchivo) {
+        $nombreArchivo = 'foto_' . time();
+    }
+}
+
+// ---------------------------------------------------------------
+// 3. Subir imagen a ImageKit (o Cloudinary legacy, o local)
 // ---------------------------------------------------------------
 $cloudinaryUrl = '';
 
@@ -208,10 +295,10 @@ try {
 }
 
 // ---------------------------------------------------------------
-// 3. Guardar en base de datos (prepared statement)
+// 4. Guardar en base de datos (prepared statement)
 // ---------------------------------------------------------------
 try {
-    $pdo = getDB();
+    if (!isset($pdo)) $pdo = getDB();
 
     $sql = "INSERT INTO registros
                 (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
@@ -242,7 +329,7 @@ try {
     $registroId = (int) $pdo->lastInsertId();
 
     // ---------------------------------------------------------------
-    // 4. Guardar campos dinámicos (si existen)
+    // 5. Guardar campos dinámicos (si existen)
     // ---------------------------------------------------------------
     $camposDinamicos = $_POST['campos'] ?? [];
     if (is_array($camposDinamicos) && !empty($camposDinamicos)) {

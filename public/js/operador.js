@@ -1150,11 +1150,7 @@
         state.capturedGps.lat = state.gps.lat;
         state.capturedGps.lon = state.gps.lon;
 
-        // Generate filename: NombreInfra_ALE_ANT_20260301_001
-        const sitCodes = { antes: 'ANT', durante: 'DUR', despues: 'DES' };
-        const sitCode = sitCodes[SITUACIONES[state.situacionIdx]] || 'ANT';
-        const modeCode = state.currentMode === 'comparativo' ? 'COMP' : 'ALE';
-
+        // Update counters
         state.countTotal++;
         if (state.currentMode === 'comparativo') {
             state.seqComparativa++;
@@ -1166,11 +1162,31 @@
         // Persist counter for this infrastructure
         if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
 
-        // Date stamp (YYYYMMDD Madrid timezone) to avoid filename collisions across visits
-        const nowMadrid = new Date().toLocaleString('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/-/g, '');
-
+        // Generate filename based on company config (formatoNombreFoto)
         const seqNum = String(state.countTotal).padStart(3, '0');
-        const filename = `${sanitizeFilename(state.infraName)}_${modeCode}_${sitCode}_${nowMadrid}_${seqNum}`;
+        const codInfra = sanitizeFilename(state.infraCode || state.infraName);
+        const formato = CFG.formatoNombreFoto || 1;
+
+        let filename;
+        if (formato === 2) {
+            // CODIGO_INFRA_TIPO_TRABAJO_NºFOTO
+            const ttName = getSelectedTipoTrabajoName();
+            filename = ttName
+                ? `${codInfra}_${sanitizeFilename(ttName)}_${seqNum}`
+                : `${codInfra}_${seqNum}`;
+        } else if (formato === 3) {
+            // CODIGO_INFRA_TIPO_TRABAJO_TIPO_FOTO_NºFOTO
+            const ttName = getSelectedTipoTrabajoName();
+            const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+            if (ttName) {
+                filename = `${codInfra}_${sanitizeFilename(ttName)}_${tipoFotoLabel}_${seqNum}`;
+            } else {
+                filename = `${codInfra}_${tipoFotoLabel}_${seqNum}`;
+            }
+        } else {
+            // Default (1): CODIGO_INFRA_NºFOTO
+            filename = `${codInfra}_${seqNum}`;
+        }
 
         // Freeze bearing at capture moment
         const capturedBearing = state.bearing;
@@ -2790,6 +2806,16 @@
 
     function sanitizeFilename(name) {
         return name.replace(/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/g, '_').substring(0, 60);
+    }
+
+    function getSelectedTipoTrabajoName() {
+        if (!tipoTrabajo || !tipoTrabajo.value) return '';
+        const opt = tipoTrabajo.options[tipoTrabajo.selectedIndex];
+        if (!opt || !opt.value) return '';
+        // Remove codigo prefix if present (e.g. "INSP - Inspección" → "Inspección")
+        const text = opt.textContent.trim();
+        const dashIdx = text.indexOf(' - ');
+        return dashIdx >= 0 ? text.substring(dashIdx + 3) : text;
     }
 
     function canvasToBlob(canvas, type, quality) {
