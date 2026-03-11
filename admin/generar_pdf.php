@@ -180,6 +180,35 @@ $totalAlea       = count($aleatorias);
         border-radius: 4px;
     }
 
+    /* Banner logo personalizado */
+    .report-logo-banner {
+        width: 100%;
+        background: #fff;
+        text-align: center;
+        display: none; /* oculto hasta que se suba logo */
+    }
+
+    .report-logo-banner img {
+        width: 100%;
+        display: block;
+        object-fit: contain;
+    }
+
+    .report-logo-banner.has-logo { display: block; }
+
+    /* Titulo personalizado */
+    .report-custom-title {
+        background: #1e3a5f;
+        color: #fff;
+        text-align: center;
+        padding: 14px 36px;
+        font-size: 20px;
+        font-weight: 800;
+        display: none; /* oculto hasta que se escriba título */
+    }
+
+    .report-custom-title.has-title { display: block; }
+
     /* Cabecera del informe */
     .report-header {
         background: #1e3a5f;
@@ -196,6 +225,91 @@ $totalAlea       = count($aleatorias);
     .report-header p {
         opacity: 0.7;
         font-size: 11px;
+    }
+
+    /* Controles personalización cabecera (solo pantalla) */
+    .header-controls {
+        background: #eef2ff;
+        border: 1px dashed #6b7fbd;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 0 36px 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 12px;
+    }
+
+    .header-controls .ctrl-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .header-controls .ctrl-label {
+        font-weight: 700;
+        color: #1e3a5f;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+
+    .header-controls input[type="text"] {
+        border: 1px solid #c5cee0;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12px;
+        width: 260px;
+        outline: none;
+    }
+
+    .header-controls input[type="text"]:focus {
+        border-color: #1e3a5f;
+        box-shadow: 0 0 0 2px rgba(30,58,95,0.15);
+    }
+
+    .header-controls .btn-upload-logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 14px;
+        background: #1e3a5f;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .header-controls .btn-upload-logo:hover { background: #2a4f7f; }
+
+    .header-controls .btn-remove-logo {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 10px;
+        background: #dc3545;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 11px;
+        cursor: pointer;
+    }
+
+    .header-controls .btn-remove-logo.visible { display: inline-flex; }
+
+    .header-controls .logo-filename {
+        font-size: 10px;
+        color: #666;
+        font-style: italic;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* Secciones */
@@ -426,11 +540,26 @@ $totalAlea       = count($aleatorias);
         .section { padding: 14px 24px; }
         .report-header { padding: 20px 24px; }
 
-        /* Ocultar controles de info en impresión */
+        /* Ocultar controles en impresión */
         .info-controls { display: none !important; }
+        .header-controls { display: none !important; }
 
         /* Ocultar elementos marcados como hidden antes de imprimir */
         .meta-hidden { display: none !important; }
+
+        /* Logo y título personalizado en impresión */
+        .report-logo-banner.has-logo {
+            display: block !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .report-custom-title.has-title {
+            display: block !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
+        }
 
         /* Footer */
         .report-footer { position: fixed; bottom: 0; left: 0; right: 0; }
@@ -486,6 +615,8 @@ $totalAlea       = count($aleatorias);
         .comp-pair { flex-direction: column; }
         .alea-row { flex-direction: column; }
         .toolbar-title span { display: none; }
+        .header-controls { margin: 0 16px; flex-direction: column; align-items: flex-start; }
+        .header-controls input[type="text"] { width: 100%; }
     }
 </style>
 </head>
@@ -510,10 +641,38 @@ $totalAlea       = count($aleatorias);
 <!-- Contenido del informe -->
 <div class="page-container">
 
+    <!-- Logo personalizado (oculto por defecto) -->
+    <div class="report-logo-banner" id="logoBanner">
+        <img id="logoImg" src="" alt="Logo">
+    </div>
+
+    <!-- Título personalizado (oculto por defecto) -->
+    <div class="report-custom-title" id="customTitle"></div>
+
     <!-- Cabecera -->
     <div class="report-header">
         <h1>FotoGPS.app &mdash; Informe de Inspección</h1>
         <p>Generado el <?= $fechaGeneracion ?> &mdash; <?= $empresaNombre ?></p>
+    </div>
+
+    <!-- Controles de personalización (solo pantalla) -->
+    <div class="header-controls">
+        <span class="ctrl-label"><i class="bi bi-palette"></i> Personalizar cabecera:</span>
+        <div class="ctrl-group">
+            <label class="ctrl-label" style="font-size:10px;">Logo:</label>
+            <button type="button" class="btn-upload-logo" id="btnUploadLogo">
+                <i class="bi bi-image"></i> Subir logo
+            </button>
+            <span class="logo-filename" id="logoFilename"></span>
+            <button type="button" class="btn-remove-logo" id="btnRemoveLogo">
+                <i class="bi bi-x"></i> Quitar
+            </button>
+            <input type="file" id="inputLogo" accept="image/*" style="display:none;">
+        </div>
+        <div class="ctrl-group">
+            <label class="ctrl-label" style="font-size:10px;">Título:</label>
+            <input type="text" id="inputTitulo" placeholder="Título personalizado del informe...">
+        </div>
     </div>
 
     <!-- Datos de la infraestructura -->
@@ -785,6 +944,61 @@ $totalAlea       = count($aleatorias);
         if (!cb) return;
         cb.addEventListener('change', () => toggleMeta(metaName, cb.checked));
     });
+
+    // --- Logo personalizado ---
+    const btnUpload = document.getElementById('btnUploadLogo');
+    const btnRemove = document.getElementById('btnRemoveLogo');
+    const inputLogo = document.getElementById('inputLogo');
+    const logoBanner = document.getElementById('logoBanner');
+    const logoImg = document.getElementById('logoImg');
+    const logoFilename = document.getElementById('logoFilename');
+
+    if (btnUpload) {
+        btnUpload.addEventListener('click', () => inputLogo.click());
+    }
+
+    if (inputLogo) {
+        inputLogo.addEventListener('change', () => {
+            const file = inputLogo.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                logoImg.src = e.target.result;
+                logoBanner.classList.add('has-logo');
+                logoFilename.textContent = file.name;
+                btnRemove.classList.add('visible');
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (btnRemove) {
+        btnRemove.addEventListener('click', () => {
+            logoImg.src = '';
+            logoBanner.classList.remove('has-logo');
+            logoFilename.textContent = '';
+            btnRemove.classList.remove('visible');
+            inputLogo.value = '';
+        });
+    }
+
+    // --- Título personalizado ---
+    const inputTitulo = document.getElementById('inputTitulo');
+    const customTitle = document.getElementById('customTitle');
+
+    if (inputTitulo) {
+        inputTitulo.addEventListener('input', () => {
+            const val = inputTitulo.value.trim();
+            if (val) {
+                customTitle.textContent = val;
+                customTitle.classList.add('has-title');
+            } else {
+                customTitle.textContent = '';
+                customTitle.classList.remove('has-title');
+            }
+        });
+    }
 })();
 </script>
 
