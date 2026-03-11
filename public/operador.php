@@ -49,8 +49,9 @@ $wmTipoFoto = 0;
 $wmMapa = 0;
 $wmMapaZoom = 15;
 $wmMapaTamano = 2;
+$wmTextoTamano = 2;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) {
@@ -67,6 +68,7 @@ if ($empresaId > 0) {
         $wmMapa = (int) ($row['wm_mostrar_mapa'] ?? 0);
         $wmMapaZoom = (int) ($row['wm_mapa_zoom'] ?? 15);
         $wmMapaTamano = (int) ($row['wm_mapa_tamano'] ?? 2);
+        $wmTextoTamano = (int) ($row['wm_texto_tamano'] ?? 2);
     }
 }
 
@@ -687,6 +689,7 @@ if ($initials === '') $initials = 'OP';
                 mapa: <?= $wmMapa ?>,
                 mapaZoom: <?= $wmMapaZoom ?>,
                 mapaTamano: <?= $wmMapaTamano ?>,
+                textoTamano: <?= $wmTextoTamano ?>,
             },
         };
     </script>

@@ -1509,8 +1509,11 @@
         // 1. Draw original photo
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 2. Text info — bottom-right, white with shadow, 50% larger than before
-        const fontSize = Math.max(22, Math.round(h * 0.033));
+        // 2. Text info — bottom-right, white with shadow
+        // Text size: 1=small(0.020), 2=medium(0.028), 3=large(0.036), 4=xlarge(0.044)
+        const textSizeFactors = { 1: 0.020, 2: 0.028, 3: 0.036, 4: 0.044 };
+        const sizeFactor = textSizeFactors[wmCfg.textoTamano] || 0.028;
+        const fontSize = Math.max(16, Math.round(h * sizeFactor));
         const lineHeight = fontSize * 1.4;
         const margin = Math.round(w * 0.025);
 

@@ -50,16 +50,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $wmMapa        = isset($_POST['wm_mostrar_mapa']) ? 1 : 0;
             $wmMapaZoom    = (int) ($_POST['wm_mapa_zoom'] ?? 15);
             $wmMapaTamano  = (int) ($_POST['wm_mapa_tamano'] ?? 2);
+            $wmTextoTamano = (int) ($_POST['wm_texto_tamano'] ?? 2);
 
             $allowedZooms = [13, 14, 15, 16, 17];
             if (!in_array($wmMapaZoom, $allowedZooms, true)) $wmMapaZoom = 15;
             $allowedSizes = [1, 2, 3];
             if (!in_array($wmMapaTamano, $allowedSizes, true)) $wmMapaTamano = 2;
+            $allowedTextSizes = [1, 2, 3, 4];
+            if (!in_array($wmTextoTamano, $allowedTextSizes, true)) $wmTextoTamano = 2;
 
             $stmt = $pdo->prepare(
                 "UPDATE empresas SET wm_mostrar_codigo_infra = :ci, wm_mostrar_situacion = :sit,
                  wm_mostrar_tipo_foto = :tf, wm_mostrar_mapa = :mapa,
-                 wm_mapa_zoom = :zoom, wm_mapa_tamano = :tam WHERE id = :id"
+                 wm_mapa_zoom = :zoom, wm_mapa_tamano = :tam, wm_texto_tamano = :txt WHERE id = :id"
             );
             $stmt->execute([
                 ':ci'   => $wmCodigoInfra,
@@ -68,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                 ':mapa' => $wmMapa,
                 ':zoom' => $wmMapaZoom,
                 ':tam'  => $wmMapaTamano,
+                ':txt'  => $wmTextoTamano,
                 ':id'   => $targetEmpId,
             ]);
             $msg = 'Configuración de marca de agua actualizada correctamente.';
@@ -144,6 +148,7 @@ $wmTipoFoto    = (int) ($empresa['wm_mostrar_tipo_foto'] ?? 0);
 $wmMapa        = (int) ($empresa['wm_mostrar_mapa'] ?? 0);
 $wmMapaZoom    = (int) ($empresa['wm_mapa_zoom'] ?? 15);
 $wmMapaTamano  = (int) ($empresa['wm_mapa_tamano'] ?? 2);
+$wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -332,6 +337,30 @@ $wmMapaTamano  = (int) ($empresa['wm_mapa_tamano'] ?? 2);
                         <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
 
                         <div class="mb-4">
+                            <div class="mb-3 p-3 rounded border">
+                                <label class="fw-semibold d-block mb-2">
+                                    <i class="bi bi-fonts me-1"></i> Tamaño del texto
+                                </label>
+                                <div class="text-muted small mb-2">Ajusta el tamaño de la información sobreimpresa en las fotos.</div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <?php
+                                    $textSizes = [
+                                        1 => ['label' => 'Pequeño', 'desc' => 'Discreto'],
+                                        2 => ['label' => 'Mediano', 'desc' => 'Por defecto'],
+                                        3 => ['label' => 'Grande', 'desc' => '50% más grande'],
+                                        4 => ['label' => 'Muy grande', 'desc' => 'Doble tamaño'],
+                                    ];
+                                    foreach ($textSizes as $val => $info):
+                                    ?>
+                                    <label class="btn btn-outline-primary btn-sm <?= $wmTextoTamano === $val ? 'active' : '' ?>" style="min-width:100px;">
+                                        <input type="radio" name="wm_texto_tamano" value="<?= $val ?>" class="btn-check" <?= $wmTextoTamano === $val ? 'checked' : '' ?>>
+                                        <strong><?= $info['label'] ?></strong><br>
+                                        <span class="small" style="font-size:0.7rem;"><?= $info['desc'] ?></span>
+                                    </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
                             <div class="form-check form-switch mb-3 p-3 rounded border">
                                 <input class="form-check-input" type="checkbox" id="wm_codigo_infra" name="wm_mostrar_codigo_infra" value="1" <?= $wmCodigoInfra ? 'checked' : '' ?>>
                                 <label class="form-check-label fw-semibold" for="wm_codigo_infra">
