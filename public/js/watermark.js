@@ -1,17 +1,90 @@
 /**
  * INFOCAMPO - Módulo Watermark
- * Procesa la imagen capturada: añade franja de datos + mini-mapa OSM.
+ * Procesa la imagen capturada: texto GPS Camera style + brújula gráfica.
+ * Formato de referencia: fecha, UTM, rumbo, ubicación geocodificada, brújula.
  */
 const Watermark = (() => {
     const previewCanvas = document.getElementById('preview-canvas');
     let processedBlob = null;
 
+    // ===================================================================
+    // UTM CONVERSION (lat/lon WGS84 → UTM)
+    // ===================================================================
+    function latLonToUTM(lat, lon) {
+        const a = 6378137;
+        const f = 1 / 298.257223563;
+        const e2 = 2 * f - f * f;
+        const e_prime2 = e2 / (1 - e2);
+        const k0 = 0.9996;
+
+        const latRad = lat * Math.PI / 180;
+        const zone = Math.floor((lon + 180) / 6) + 1;
+        const lonOrigin = (zone - 1) * 6 - 180 + 3;
+        const lonOriginRad = lonOrigin * Math.PI / 180;
+
+        const N = a / Math.sqrt(1 - e2 * Math.sin(latRad) * Math.sin(latRad));
+        const T = Math.tan(latRad) * Math.tan(latRad);
+        const C = e_prime2 * Math.cos(latRad) * Math.cos(latRad);
+        const A = Math.cos(latRad) * (lon * Math.PI / 180 - lonOriginRad);
+
+        const M = a * (
+            (1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 * e2 * e2 / 256) * latRad
+            - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 * e2 * e2 / 1024) * Math.sin(2 * latRad)
+            + (15 * e2 * e2 / 256 + 45 * e2 * e2 * e2 / 1024) * Math.sin(4 * latRad)
+            - (35 * e2 * e2 * e2 / 3072) * Math.sin(6 * latRad)
+        );
+
+        let easting = k0 * N * (A + (1 - T + C) * A * A * A / 6
+            + (5 - 18 * T + T * T + 72 * C - 58 * e_prime2) * A * A * A * A * A / 120) + 500000;
+
+        let northing = k0 * (M + N * Math.tan(latRad) * (
+            A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24
+            + (61 - 58 * T + T * T + 600 * C - 330 * e_prime2) * A * A * A * A * A * A / 720
+        ));
+
+        if (lat < 0) northing += 10000000;
+
+        const band = 'CDEFGHJKLMNPQRSTUVWX'.charAt(Math.floor((lat + 80) / 8));
+
+        return {
+            zone: zone,
+            band: band,
+            easting: Math.round(easting),
+            northing: Math.round(northing),
+            str: `${zone}${band} ${Math.round(easting)} ${Math.round(northing)}`
+        };
+    }
+
+    function formatDateGPS(fecha) {
+        const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        const parts = new Intl.DateTimeFormat('es-ES', {
+            timeZone: 'Europe/Madrid',
+            day: 'numeric', month: 'numeric', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+        }).formatToParts(fecha);
+        const get = (type) => (parts.find(p => p.type === type) || {}).value || '';
+        const day = get('day');
+        const month = parseInt(get('month'), 10);
+        const year = get('year');
+        const hour = get('hour');
+        const minute = get('minute');
+        const second = get('second');
+        return `${day} ${meses[month - 1]} ${year} ${hour}:${minute}:${second}`;
+    }
+
+    function bearingToCardinal(deg) {
+        if (deg == null) return '';
+        const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+        return dirs[Math.round(deg / 45) % 8];
+    }
+
     /**
      * Procesa la imagen del canvas de captura y la dibuja
-     * en el canvas de preview con marca de agua.
+     * en el canvas de preview con marca de agua estilo GPS Camera.
      *
      * @param {HTMLCanvasElement} sourceCanvas  Canvas con la foto original
-     * @param {Object} meta  { lat, lon, code, fecha, empresaName, infraName, situacion }
+     * @param {Object} meta  { lat, lon, code, fecha, empresaName, infraName, situacion, bearing, geoLocation }
      */
     async function process(sourceCanvas, meta) {
         const w = sourceCanvas.width;
@@ -25,166 +98,157 @@ const Watermark = (() => {
         // 1. Dibujar la foto original
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 2. Bloque de info abajo-derecha
-        const fontSize = Math.max(14, Math.round(h * 0.02));
-        const lineHeight = fontSize * 1.5;
-        const numLines = 5;
-        const padding = 16;
-        const blockHeight = lineHeight * numLines + padding * 2;
+        // 2. Texto info — abajo-derecha, sin fondo, blanco con sombra
+        const fontSize = Math.max(16, Math.round(h * 0.022));
+        const lineHeight = fontSize * 1.4;
+        const margin = Math.round(w * 0.02);
 
-        // Prepare text lines to measure widths
-        const empresaStr = meta.empresaName || '';
-        const infraStr = meta.infraName || meta.code || '';
-        const situacionStr = meta.situacion ? `Situación: ${meta.situacion}` : '';
-        const dateStr = meta.fecha.toLocaleString('es-ES', {
-            timeZone: 'Europe/Madrid',
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-            hour12: false,
-        });
-        const latStr = meta.lat != null ? meta.lat.toFixed(7) : '--';
-        const lonStr = meta.lon != null ? meta.lon.toFixed(7) : '--';
-        const coordStr = `ETRS89: ${latStr}, ${lonStr}`;
+        const lines = [];
+        const geo = meta.geoLocation || {};
 
-        // Measure max text width to auto-size block
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        const boldWidths = [ctx.measureText(empresaStr).width, ctx.measureText(situacionStr).width];
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        const normalWidths = [
-            ctx.measureText(infraStr).width,
-            ctx.measureText(dateStr).width,
-            ctx.measureText(coordStr).width,
-        ];
-        const maxTextWidth = Math.max(...boldWidths, ...normalWidths);
-        const blockWidth = Math.min(w - 24, maxTextWidth + padding * 2);
+        // Bottom line first: Country
+        if (geo.country) lines.push(geo.country);
 
-        const bx = w - blockWidth - 12;
-        const by = h - blockHeight - 12;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-        ctx.beginPath();
-        const r = 8;
-        ctx.moveTo(bx + r, by);
-        ctx.lineTo(bx + blockWidth - r, by);
-        ctx.quadraticCurveTo(bx + blockWidth, by, bx + blockWidth, by + r);
-        ctx.lineTo(bx + blockWidth, by + blockHeight - r);
-        ctx.quadraticCurveTo(bx + blockWidth, by + blockHeight, bx + blockWidth - r, by + blockHeight);
-        ctx.lineTo(bx + r, by + blockHeight);
-        ctx.quadraticCurveTo(bx, by + blockHeight, bx, by + blockHeight - r);
-        ctx.lineTo(bx, by + r);
-        ctx.quadraticCurveTo(bx, by, bx + r, by);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.textBaseline = 'top';
-        ctx.textAlign = 'left';
-
-        const textX = bx + padding;
-        let textY = by + padding;
-
-        // Line 1: Empresa
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(empresaStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 2: Infraestructura
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(infraStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 3: Situación
-        ctx.font = `bold ${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(situacionStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 4: Fecha
-        ctx.font = `${fontSize}px -apple-system, sans-serif`;
-        ctx.fillText(dateStr, textX, textY);
-        textY += lineHeight;
-
-        // Line 5: Coordenadas
-        ctx.fillText(coordStr, textX, textY);
-
-        ctx.textAlign = 'start';
-
-        // 3. Mini-mapa OSM (arriba-izquierda, 1/8 de imagen)
-        await drawMiniMap(ctx, w, h, meta.lat, meta.lon);
-
-        // 4. Convertir a JPEG blob (calidad 0.8)
-        processedBlob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.8);
-    }
-
-    /**
-     * Dibuja un tile estático de OpenStreetMap en la esquina superior izquierda (1/6 de imagen).
-     */
-    async function drawMiniMap(ctx, canvasWidth, canvasHeight, lat, lon) {
-        if (lat == null || lon == null) return;
-
-        const mapSize = Math.round(Math.min(canvasWidth, canvasHeight) / 6);
-        const x = 0;
-        const y = 0;
-
-        // Fondo mientras carga
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(x, y, mapSize, mapSize);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, mapSize, mapSize);
-
-        try {
-            const zoom = 17;
-            const tileUrl = buildOsmTileUrl(lat, lon, zoom);
-
-            const img = await loadImage(tileUrl);
-
-            // Dibujar tile recortado al cuadrado
-            ctx.drawImage(img, x, y, mapSize, mapSize);
-
-            // Borde
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, mapSize, mapSize);
-
-            // Pin central
-            ctx.fillStyle = '#ef4444';
-            ctx.beginPath();
-            ctx.arc(x + mapSize / 2, y + mapSize / 2, 4, 0, Math.PI * 2);
-            ctx.fill();
-        } catch {
-            // Si falla el mapa, dejar el placeholder
-            ctx.font = 'bold 11px sans-serif';
-            ctx.fillStyle = '#fff';
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
-            ctx.fillText('MAPA', x + mapSize / 2, y + mapSize / 2);
-            ctx.textAlign = 'start';
+        // City, Province PostalCode
+        const locationParts = [];
+        if (geo.city) locationParts.push(geo.city);
+        if (geo.province || geo.postcode) {
+            locationParts.push((geo.province || '') + (geo.postcode ? ' ' + geo.postcode : ''));
         }
+        if (locationParts.length) lines.push(locationParts.join(', '));
+
+        // Bearing
+        if (meta.bearing != null) {
+            lines.push(`${meta.bearing}° ${bearingToCardinal(meta.bearing)}`);
+        }
+
+        // UTM coordinates
+        if (meta.lat != null && meta.lon != null) {
+            const utm = latLonToUTM(meta.lat, meta.lon);
+            lines.push(utm.str);
+        }
+
+        // Date and time
+        lines.push(formatDateGPS(meta.fecha || new Date()));
+
+        // Empresa / Infraestructura / Situación
+        if (meta.situacion) lines.push(`Situación: ${meta.situacion}`);
+        if (meta.infraName || meta.code) lines.push(meta.infraName || meta.code);
+        if (meta.empresaName) lines.push(meta.empresaName);
+
+        // Draw lines from bottom to top, right-aligned
+        ctx.textBaseline = 'bottom';
+        ctx.textAlign = 'right';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = Math.max(4, Math.round(fontSize * 0.25));
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = '#ffffff';
+
+        const textX = w - margin;
+        let textY = h - margin;
+
+        for (let i = 0; i < lines.length; i++) {
+            if (i >= lines.length - 3) {
+                ctx.font = `bold ${fontSize}px Arial, Helvetica, sans-serif`;
+            } else {
+                ctx.font = `${fontSize}px Arial, Helvetica, sans-serif`;
+            }
+            ctx.fillText(lines[i], textX, textY);
+            textY -= lineHeight;
+        }
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
+
+        // 3. Brújula (arriba-izquierda)
+        drawCompassRose(ctx, w, h, meta.bearing);
+
+        // 4. Convertir a JPEG blob
+        processedBlob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.85);
     }
 
     /**
-     * Construye la URL de un tile OSM para lat/lon/zoom.
+     * Dibuja una rosa de los vientos en la esquina superior izquierda.
      */
-    function buildOsmTileUrl(lat, lon, zoom) {
-        const n = Math.pow(2, zoom);
-        const xTile = Math.floor((lon + 180) / 360 * n);
-        const yTile = Math.floor(
-            (1 - Math.log(Math.tan(lat * Math.PI / 180) +
-            1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n
-        );
-        return `https://tile.openstreetmap.org/${zoom}/${xTile}/${yTile}.png`;
-    }
+    function drawCompassRose(ctx, canvasWidth, canvasHeight, bearing) {
+        const size = Math.round(Math.min(canvasWidth, canvasHeight) / 7);
+        const cx = Math.round(size * 0.6);
+        const cy = Math.round(size * 0.6);
+        const outerR = Math.round(size * 0.42);
+        const innerR = Math.round(size * 0.32);
+        const fontSize = Math.max(10, Math.round(size * 0.12));
 
-    /**
-     * Carga una imagen como promesa.
-     */
-    function loadImage(src) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = src;
-        });
+        ctx.save();
+
+        // Semi-transparent circle background
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Inner ring
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Cardinal labels
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 3;
+
+        const labelR = outerR - fontSize * 0.7;
+        ctx.fillText('N', cx, cy - labelR);
+        ctx.fillText('S', cx, cy + labelR);
+        ctx.fillText('E', cx + labelR, cy);
+        ctx.fillText('O', cx - labelR, cy);
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // Bearing arrow
+        if (bearing != null) {
+            const arrowR = innerR - 4;
+            const bearingRad = (bearing - 90) * Math.PI / 180;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(bearingRad);
+
+            ctx.beginPath();
+            ctx.moveTo(arrowR, 0);
+            ctx.lineTo(-arrowR * 0.3, -arrowR * 0.2);
+            ctx.lineTo(-arrowR * 0.15, 0);
+            ctx.lineTo(-arrowR * 0.3, arrowR * 0.2);
+            ctx.closePath();
+            ctx.fillStyle = '#00bcd4';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
+
+        ctx.restore();
     }
 
     /**

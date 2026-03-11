@@ -1,5 +1,5 @@
 /**
- * INFOCAMPO - Módulo Cámara + Ghosting + GPS
+ * INFOCAMPO - Módulo Cámara + Ghosting + GPS + Brújula
  */
 const Camera = (() => {
     // ---- Elementos del DOM ----
@@ -23,21 +23,23 @@ const Camera = (() => {
     let nivelIdx = 0;
     let ghostActive = false;
     let currentPosition = { lat: null, lon: null };
+    let currentBearing = null;
+    let geoLocation = null;
     let stream = null;
     let capturedBlob = null;
 
     const cfg = window.INFOCAMPO_CONFIG;
 
     // =========================================================
-    // Iniciar cámara trasera
+    // Iniciar cámara trasera — máxima resolución
     // =========================================================
     async function initCamera() {
         try {
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: { ideal: 'environment' },
-                    width:  { ideal: 1920 },
-                    height: { ideal: 1080 }
+                    width:  { ideal: 3264 },
+                    height: { ideal: 2448 }
                 },
                 audio: false
             });
@@ -69,12 +71,72 @@ const Camera = (() => {
                 const color = Haversine.colorForDistance(d);
                 gpsCircle.className = color;
                 gpsDistance.textContent = Haversine.formatDistance(d);
+
+                // Reverse geocode in background
+                reverseGeocode(currentPosition.lat, currentPosition.lon);
             },
             (err) => {
                 gpsDistance.textContent = 'GPS error';
             },
             { enableHighAccuracy: true, maximumAge: 3000 }
         );
+    }
+
+    // =========================================================
+    // Compass bearing (Device Orientation)
+    // =========================================================
+    function initCompass() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS — request on user gesture (capture button)
+            return;
+        }
+        _startCompassListener();
+    }
+
+    function _startCompassListener() {
+        window.addEventListener('deviceorientationabsolute', (e) => {
+            if (e.absolute && e.alpha != null) {
+                currentBearing = Math.round(360 - e.alpha) % 360;
+            }
+        }, true);
+        window.addEventListener('deviceorientation', (e) => {
+            if (currentBearing != null) return;
+            if (e.webkitCompassHeading != null) {
+                currentBearing = Math.round(e.webkitCompassHeading);
+            } else if (e.alpha != null) {
+                currentBearing = Math.round(360 - e.alpha) % 360;
+            }
+        }, true);
+    }
+
+    // =========================================================
+    // Reverse geocoding (throttled, Nominatim)
+    // =========================================================
+    let _lastGeoLat = null;
+    let _lastGeoLon = null;
+
+    async function reverseGeocode(lat, lon) {
+        if (_lastGeoLat != null && _lastGeoLon != null) {
+            const dist = Haversine.distance(lat, lon, _lastGeoLat, _lastGeoLon);
+            if (dist < 200 && geoLocation) return;
+        }
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`,
+                { headers: { 'Accept-Language': 'es' } }
+            );
+            const data = await res.json();
+            const addr = data.address || {};
+            geoLocation = {
+                city: addr.city || addr.town || addr.village || addr.municipality || '',
+                province: addr.state || addr.province || addr.county || '',
+                postcode: addr.postcode || '',
+                country: addr.country || '',
+            };
+            _lastGeoLat = lat;
+            _lastGeoLon = lon;
+        } catch { /* silencioso */ }
     }
 
     // =========================================================
@@ -100,7 +162,16 @@ const Camera = (() => {
     // =========================================================
     // Captura de frame
     // =========================================================
-    function captureFrame() {
+    async function captureFrame() {
+        // iOS compass permission (needs user gesture)
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                const perm = await DeviceOrientationEvent.requestPermission();
+                if (perm === 'granted') _startCompassListener();
+            } catch { /* denied */ }
+        }
+
         const vw = video.videoWidth;
         const vh = video.videoHeight;
         captureCanvas.width = vw;
@@ -112,12 +183,19 @@ const Camera = (() => {
         // Detener el video
         video.pause();
 
-        // Pasar al módulo de watermark
+        // Ensure geocoding for current position
+        if (currentPosition.lat != null && currentPosition.lon != null) {
+            await reverseGeocode(currentPosition.lat, currentPosition.lon);
+        }
+
+        // Pasar al módulo de watermark con datos completos
         Watermark.process(captureCanvas, {
-            lat:    currentPosition.lat,
-            lon:    currentPosition.lon,
-            code:   cfg.infraCode,
-            fecha:  new Date()
+            lat:         currentPosition.lat,
+            lon:         currentPosition.lon,
+            code:        cfg.infraCode,
+            fecha:       new Date(),
+            bearing:     currentBearing,
+            geoLocation: geoLocation,
         });
 
         // Mostrar preview
@@ -193,6 +271,7 @@ const Camera = (() => {
 
         initCamera();
         initGPS();
+        initCompass();
         loadGhostImage();
         bindEvents();
     }
