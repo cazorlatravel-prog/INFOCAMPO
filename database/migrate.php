@@ -160,8 +160,25 @@ try {
             }
             $success++;
         } catch (PDOException $e) {
-            echo "<span class='error'>[ERROR]</span> Sentencia #" . ($i + 1) . ": " . $e->getMessage() . "\n";
-            $errors++;
+            // Errores conocidos e inofensivos al re-ejecutar migraciones (idempotencia)
+            $harmless = [
+                '1061', // Duplicate key name (índice ya existe)
+                '1060', // Duplicate column name (columna ya existe)
+                '1050', // Table already exists
+                '1062', // Duplicate entry (dato ya insertado)
+            ];
+            $sqlState = $e->getCode();
+            $errorCode = '';
+            if (preg_match('/(\d{4})/', $e->getMessage(), $ec)) {
+                $errorCode = $ec[1];
+            }
+            if (in_array($errorCode, $harmless)) {
+                echo "<span class='warn'>[AVISO]</span> Sentencia #" . ($i + 1) . ": ya aplicada, se omite (" . trim($e->getMessage()) . ")\n";
+                $success++;
+            } else {
+                echo "<span class='error'>[ERROR]</span> Sentencia #" . ($i + 1) . ": " . $e->getMessage() . "\n";
+                $errors++;
+            }
         }
     }
 

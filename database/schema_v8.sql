@@ -15,12 +15,4 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(20) DEFAULT NULL 
 ALTER TABLE usuarios MODIFY email VARCHAR(255) DEFAULT NULL;
 
 -- Índice único para teléfono (permite múltiples NULL)
--- Usar procedimiento para evitar error si el índice ya existe
-SET @existe_idx = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND INDEX_NAME = 'uq_usuarios_telefono');
-SET @sql_idx = IF(@existe_idx = 0,
-    'ALTER TABLE usuarios ADD UNIQUE INDEX uq_usuarios_telefono (telefono)',
-    'SELECT 1');
-PREPARE stmt_idx FROM @sql_idx;
-EXECUTE stmt_idx;
-DEALLOCATE PREPARE stmt_idx;
+ALTER TABLE usuarios ADD UNIQUE INDEX uq_usuarios_telefono (telefono);
