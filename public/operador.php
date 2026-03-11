@@ -38,13 +38,21 @@ if ($usuarioId > 0) {
     if ($row) $userName = $row['nombre'];
 }
 $formatoNombreFoto = 1;
+$opMostrarEmpresa = 0;
+$opMostrarInfra = 0;
+$opMostrarSituacion = 0;
+$opMostrarMapa = 0;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) {
         $empresaName = $row['nombre'];
         $formatoNombreFoto = (int) ($row['formato_nombre_foto'] ?? 1);
+        $opMostrarEmpresa = (int) ($row['op_mostrar_empresa'] ?? 0);
+        $opMostrarInfra = (int) ($row['op_mostrar_infraestructura'] ?? 0);
+        $opMostrarSituacion = (int) ($row['op_mostrar_situacion'] ?? 0);
+        $opMostrarMapa = (int) ($row['op_mostrar_mapa'] ?? 0);
     }
 }
 
@@ -85,7 +93,9 @@ if ($initials === '') $initials = 'OP';
                 </div>
                 <div class="brand-text">
                     <strong>FotoGPS</strong>
+                    <?php if ($opMostrarEmpresa): ?>
                     <span><?= htmlspecialchars($empresaName) ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="ficha-header-right">
@@ -218,7 +228,7 @@ if ($initials === '') $initials = 'OP';
             </div>
 
             <!-- Card: Situación de la obra -->
-            <div class="card">
+            <div class="card" id="card-situacion" <?= !$opMostrarSituacion ? 'style="display:none;"' : '' ?>>
                 <div class="card-label"><i class="bi bi-flag-fill"></i> Situación de la obra</div>
                 <div class="situacion-selector" id="situacion-selector">
                     <button type="button" class="situacion-option active" data-sit="0">
@@ -263,7 +273,7 @@ if ($initials === '') $initials = 'OP';
                     <span class="foto-count" id="count-comparativas">0</span>
                 </button>
 
-                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa">
+                <button type="button" id="btn-ver-mapa" class="foto-btn foto-btn--mapa" <?= !$opMostrarMapa ? 'style="display:none;"' : '' ?>>
                     <div class="foto-btn-icon">
                         <i class="bi bi-map-fill"></i>
                     </div>
@@ -636,11 +646,16 @@ if ($initials === '') $initials = 'OP';
                 fotosComparativas: 'api/fotos_comparativas.php',
                 registrosMapa: 'api/registros_mapa.php',
                 capasKml: 'api/capas_kml.php',
+                capasInfra: 'api/capas_infra.php',
                 visitas: 'api/visitas.php',
                 waypoints: 'api/waypoints.php',
                 campos: 'api/campos.php',
             },
             formatoNombreFoto: <?= $formatoNombreFoto ?>,
+            opMostrarEmpresa: <?= $opMostrarEmpresa ?>,
+            opMostrarInfra: <?= $opMostrarInfra ?>,
+            opMostrarSituacion: <?= $opMostrarSituacion ?>,
+            opMostrarMapa: <?= $opMostrarMapa ?>,
         };
     </script>
     <script>

@@ -2173,9 +2173,9 @@
                 bounds.push([state.gps.lat, state.gps.lon]);
             }
 
-            // Fit bounds
+            // Fit bounds (maxZoom ~9 ≈ escala 1:500.000)
             if (bounds.length > 0) {
-                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+                leafletMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 9 });
             }
 
             // Update subtitle
@@ -2189,6 +2189,8 @@
 
             // Load KML layers from DB
             loadMapKmlLayers();
+            // Load infrastructure GeoJSON layers
+            loadMapInfraLayers();
 
         } catch (err) {
             console.warn('Error loading map data:', err);
@@ -2293,6 +2295,68 @@
             }
         });
         return coords;
+    }
+
+    // ---------------------------------------------------------------
+    // Infrastructure GeoJSON Layers (from capas_infraestructuras)
+    // ---------------------------------------------------------------
+    let mapInfraLayers = [];
+
+    async function loadMapInfraLayers() {
+        if (!CFG.endpoints.capasInfra) return;
+        try {
+            mapInfraLayers.forEach(lg => leafletMap.removeLayer(lg));
+            mapInfraLayers = [];
+
+            const res = await fetch(`${CFG.endpoints.capasInfra}?empresa_id=${CFG.empresaId}`);
+            const data = await res.json();
+            if (!data.ok || !data.capas || data.capas.length === 0) return;
+
+            data.capas.forEach(capa => {
+                try {
+                    const geojson = typeof capa.geojson === 'string' ? JSON.parse(capa.geojson) : capa.geojson;
+                    const color = capa.color || '#e74c3c';
+                    const weight = parseInt(capa.grosor) || 2;
+                    const opacity = parseFloat(capa.opacidad) || 0.8;
+                    const campoLink = capa.campo_capa || '';
+
+                    const layer = L.geoJSON(geojson, {
+                        style: () => ({
+                            color, weight, opacity,
+                            fillColor: color, fillOpacity: opacity * 0.2
+                        }),
+                        pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+                            radius: 6, fillColor: color, color: '#fff',
+                            weight: 2, opacity: 1, fillOpacity: opacity
+                        }),
+                        onEachFeature: (feature, featureLayer) => {
+                            const props = feature.properties || {};
+                            const linkValue = campoLink ? (props[campoLink] || '') : '';
+
+                            let html = `<div style="max-width:240px;">`;
+                            html += `<strong style="color:${color};">${capa.nombre}</strong>`;
+                            if (linkValue) html += `<br><code style="font-size:0.75rem;">${campoLink}: ${linkValue}</code>`;
+
+                            let shown = 0;
+                            Object.keys(props).forEach(k => {
+                                if (shown >= 4 || k === campoLink) return;
+                                html += `<br><small><b>${k}:</b> ${String(props[k]).substring(0, 60)}</small>`;
+                                shown++;
+                            });
+                            html += '</div>';
+
+                            featureLayer.bindPopup(html, { maxWidth: 260 });
+                        }
+                    }).addTo(leafletMap);
+
+                    mapInfraLayers.push(layer);
+                } catch (err) {
+                    console.warn('Error rendering capa infra:', err);
+                }
+            });
+        } catch (err) {
+            console.warn('Error loading infra layers:', err);
+        }
     }
 
     function showInfraDetail(infra) {

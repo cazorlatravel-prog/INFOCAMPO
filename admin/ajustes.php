@@ -40,6 +40,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msgType = 'success';
         }
     }
+
+    if ($action === 'guardar_campos_operador') {
+        $targetEmpId = (int) ($_POST['empresa_id'] ?? $empresaId);
+        if ($targetEmpId > 0) {
+            $opEmpresa   = isset($_POST['op_mostrar_empresa']) ? 1 : 0;
+            $opInfra     = isset($_POST['op_mostrar_infraestructura']) ? 1 : 0;
+            $opSituacion = isset($_POST['op_mostrar_situacion']) ? 1 : 0;
+            $opMapa      = isset($_POST['op_mostrar_mapa']) ? 1 : 0;
+
+            $stmt = $pdo->prepare(
+                "UPDATE empresas SET op_mostrar_empresa = :emp, op_mostrar_infraestructura = :inf,
+                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa WHERE id = :id"
+            );
+            $stmt->execute([
+                ':emp'  => $opEmpresa,
+                ':inf'  => $opInfra,
+                ':sit'  => $opSituacion,
+                ':mapa' => $opMapa,
+                ':id'   => $targetEmpId,
+            ]);
+            $msg = 'Campos del operador actualizados correctamente.';
+            $msgType = 'success';
+
+            // Refresh empresa data
+            $stmtR = $pdo->prepare("SELECT * FROM empresas WHERE id = :id");
+            $stmtR->execute([':id' => $targetEmpId]);
+            $empresa = $stmtR->fetch();
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -60,6 +89,10 @@ if ($empresaId > 0) {
 }
 
 $formatoActual = (int) ($empresa['formato_nombre_foto'] ?? 1);
+$opEmpresa   = (int) ($empresa['op_mostrar_empresa'] ?? 0);
+$opInfra     = (int) ($empresa['op_mostrar_infraestructura'] ?? 0);
+$opSituacion = (int) ($empresa['op_mostrar_situacion'] ?? 0);
+$opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -157,6 +190,62 @@ $formatoActual = (int) ($empresa['formato_nombre_foto'] ?? 1);
 
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i> Guardar formato
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Campos visibles para el operador -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-phone me-2"></i>Campos visibles para el operador</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Selecciona qué campos e información adicional se muestran al operador en la ficha de toma de datos.
+                        Por defecto, estos campos están ocultos.
+                    </p>
+                    <form method="post">
+                        <?= csrfField() ?>
+                        <input type="hidden" name="action" value="guardar_campos_operador">
+                        <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+
+                        <div class="mb-4">
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="op_empresa" name="op_mostrar_empresa" value="1" <?= $opEmpresa ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="op_empresa">
+                                    <i class="bi bi-building me-1"></i> Empresa
+                                </label>
+                                <div class="text-muted small mt-1">Muestra el nombre de la empresa en la ficha del operador.</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="op_infra" name="op_mostrar_infraestructura" value="1" <?= $opInfra ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="op_infra">
+                                    <i class="bi bi-geo-alt me-1"></i> Infraestructura (info detalle)
+                                </label>
+                                <div class="text-muted small mt-1">Muestra información adicional de la infraestructura seleccionada (tipo, coordenadas).</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="op_situacion" name="op_mostrar_situacion" value="1" <?= $opSituacion ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="op_situacion">
+                                    <i class="bi bi-flag me-1"></i> Situación de la obra
+                                </label>
+                                <div class="text-muted small mt-1">Muestra el selector de situación (Antes / Durante / Después).</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="op_mapa" name="op_mostrar_mapa" value="1" <?= $opMapa ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="op_mapa">
+                                    <i class="bi bi-map me-1"></i> Mapa de localización
+                                </label>
+                                <div class="text-muted small mt-1">Muestra el botón de mapa de visitas. El mapa usa escala 1:500.000.</div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Guardar campos operador
                         </button>
                     </form>
                 </div>

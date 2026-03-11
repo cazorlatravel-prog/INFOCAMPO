@@ -222,6 +222,9 @@ if ($_navEmpresaId > 0) {
             <i class="bi bi-file-earmark-text"></i> <span>Informes</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
+        <li role="none"><a href="/admin/capas_infra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'capas_infra' ? 'active' : '' ?>" role="menuitem">
+            <i class="bi bi-layers"></i> <span>Capas</span>
+        </a></li>
         <li role="none"><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>" role="menuitem">
             <i class="bi bi-sliders2"></i> <span>Ajustes</span>
         </a></li>

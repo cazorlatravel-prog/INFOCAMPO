@@ -109,6 +109,19 @@ if ($empresaId > 0) {
     $jsCapasKml = $stmtKml->fetchAll();
 }
 
+// Cargar capas de infraestructuras (SHP/KML/KMZ subidos como GeoJSON)
+$jsCapasInfra = [];
+if ($empresaId > 0) {
+    $stmtCI = $pdo->prepare(
+        "SELECT id, nombre, geojson, campo_capa, campo_tabla, color, grosor, opacidad
+         FROM capas_infraestructuras
+         WHERE empresa_id = :emp AND activa = 1
+         ORDER BY created_at DESC"
+    );
+    $stmtCI->execute([':emp' => $empresaId]);
+    $jsCapasInfra = $stmtCI->fetchAll();
+}
+
 // Preparar datos para JS
 $jsRegistros = [];
 foreach ($registros as $r) {
@@ -1378,6 +1391,90 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             renderKmlOnMap(capa.contenido_kml, 'kml-' + capa.id, capa.color, parseInt(capa.grosor) || 3, parseFloat(capa.opacidad) || 0.8);
         });
         updateKmlStats();
+
+        // ---------------------------------------------------------------
+        // Capas de Infraestructuras (SHP/KML/KMZ → GeoJSON)
+        // ---------------------------------------------------------------
+        var capasInfraData = <?= json_encode($jsCapasInfra, JSON_UNESCAPED_UNICODE) ?>;
+        var capasInfraLayers = {};
+
+        function renderCapasInfra() {
+            // Remove old layers
+            Object.keys(capasInfraLayers).forEach(function(k) {
+                map.removeLayer(capasInfraLayers[k]);
+                delete capasInfraLayers[k];
+            });
+
+            capasInfraData.forEach(function(capa) {
+                try {
+                    var geojson = typeof capa.geojson === 'string' ? JSON.parse(capa.geojson) : capa.geojson;
+                    var color = capa.color || '#e74c3c';
+                    var weight = parseInt(capa.grosor) || 2;
+                    var opacity = parseFloat(capa.opacidad) || 0.8;
+                    var campoLink = capa.campo_capa || '';
+                    var campoTabla = capa.campo_tabla || 'codigo_unico';
+
+                    var layer = L.geoJSON(geojson, {
+                        style: function() {
+                            return { color: color, weight: weight, opacity: opacity, fillColor: color, fillOpacity: opacity * 0.2 };
+                        },
+                        pointToLayer: function(feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 6, fillColor: color, color: '#fff',
+                                weight: 2, opacity: 1, fillOpacity: opacity
+                            });
+                        },
+                        onEachFeature: function(feature, featureLayer) {
+                            var props = feature.properties || {};
+                            var linkValue = campoLink ? (props[campoLink] || '') : '';
+
+                            // Find linked infrastructure
+                            var linkedInfra = null;
+                            if (linkValue) {
+                                infraData.forEach(function(inf) {
+                                    if (campoTabla === 'codigo_unico' && inf.codigo === linkValue) linkedInfra = inf;
+                                    else if (campoTabla === 'nombre' && inf.nombre === linkValue) linkedInfra = inf;
+                                    else if (campoTabla === 'id' && inf.id === parseInt(linkValue)) linkedInfra = inf;
+                                });
+                            }
+
+                            var html = '<div style="max-width:280px;">';
+                            html += '<strong style="color:' + color + ';">' + capa.nombre + '</strong>';
+                            if (linkValue) html += '<br><code style="font-size:0.75rem;">' + campoLink + ': ' + linkValue + '</code>';
+
+                            // Show key attributes
+                            var shown = 0;
+                            Object.keys(props).forEach(function(k) {
+                                if (shown >= 5 || k === campoLink) return;
+                                html += '<br><small><b>' + k + ':</b> ' + String(props[k]).substring(0, 80) + '</small>';
+                                shown++;
+                            });
+
+                            if (linkedInfra) {
+                                html += '<hr style="margin:4px 0;">';
+                                html += '<small style="color:#059669;"><i class="bi bi-link-45deg"></i> Vinculado a: <b>' + linkedInfra.nombre + '</b></small>';
+                                html += '<br><small><i class="bi bi-camera"></i> ' + linkedInfra.num_fotos + ' fotos</small>';
+                                html += '<div style="margin-top:4px;">';
+                                html += '<a href="index.php?empresa_id=' + empresaId + '&infra_id=' + linkedInfra.id + '" class="btn btn-sm btn-outline-primary" style="font-size:0.65rem;"><i class="bi bi-clock-history"></i> Timeline</a> ';
+                                html += '<a href="generar_pdf.php?infra_id=' + linkedInfra.id + '" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:0.65rem;"><i class="bi bi-file-pdf"></i> PDF</a>';
+                                html += '</div>';
+                            }
+
+                            html += '</div>';
+                            featureLayer.bindPopup(html, { maxWidth: 300 });
+                        }
+                    }).addTo(map);
+
+                    capasInfraLayers['ci-' + capa.id] = layer;
+                } catch (err) {
+                    console.warn('Error rendering capa infra "' + capa.nombre + '":', err);
+                }
+            });
+        }
+
+        if (capasInfraData.length > 0) {
+            renderCapasInfra();
+        }
 
         // ---------------------------------------------------------------
         // GPX Export / Import
