@@ -738,16 +738,46 @@ if (isset($_GET['edit'])) {
             let pointCount = 0;
 
             placemarks.forEach(pm => {
-                const coordEl = pm.querySelector('Point coordinates');
-                if (!coordEl) return;
+                let lat = null, lon = null;
 
-                const coordStr = coordEl.textContent.trim();
-                const parts = coordStr.split(',');
-                if (parts.length < 2) return;
+                // 1) Intentar Point
+                const pointCoord = pm.querySelector('Point coordinates');
+                if (pointCoord) {
+                    const parts = pointCoord.textContent.trim().split(',');
+                    if (parts.length >= 2) {
+                        lon = parseFloat(parts[0]);
+                        lat = parseFloat(parts[1]);
+                    }
+                }
 
-                const lon = parseFloat(parts[0]);
-                const lat = parseFloat(parts[1]);
-                if (isNaN(lat) || isNaN(lon)) return;
+                // 2) Si no hay Point, intentar LineString o Polygon (centroide)
+                if (lat === null || isNaN(lat)) {
+                    let coordEl = pm.querySelector('LineString coordinates');
+                    if (!coordEl) coordEl = pm.querySelector('Polygon coordinates');
+
+                    if (coordEl) {
+                        const allPoints = coordEl.textContent.trim().split(/\s+/);
+                        let sumLat = 0, sumLon = 0, count = 0;
+                        allPoints.forEach(pt => {
+                            const parts = pt.split(',');
+                            if (parts.length >= 2) {
+                                const pLon = parseFloat(parts[0]);
+                                const pLat = parseFloat(parts[1]);
+                                if (!isNaN(pLat) && !isNaN(pLon)) {
+                                    sumLon += pLon;
+                                    sumLat += pLat;
+                                    count++;
+                                }
+                            }
+                        });
+                        if (count > 0) {
+                            lon = sumLon / count;
+                            lat = sumLat / count;
+                        }
+                    }
+                }
+
+                if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) return;
 
                 const nameEl = pm.querySelector('name');
                 const nombre = nameEl ? nameEl.textContent.trim() : 'Sin nombre';
