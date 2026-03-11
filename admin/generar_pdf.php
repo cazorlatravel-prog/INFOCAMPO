@@ -269,10 +269,10 @@ $totalAlea       = count($aleatorias);
     .badge-comp    { color: #6d28d9; font-weight: bold; }
     .badge-alea    { color: #1d4ed8; font-weight: bold; }
 
-    /* Fotos aleatorias — grid de 3 por fila */
+    /* Fotos aleatorias — grid de 3 por fila, ancho completo */
     .alea-row {
         display: flex;
-        gap: 10px;
+        gap: 4px;
         margin-bottom: 12px;
         page-break-inside: avoid;
     }
@@ -281,16 +281,15 @@ $totalAlea       = count($aleatorias);
         flex: 1;
         border: 1px solid #dee2e6;
         border-radius: 6px;
-        padding: 8px;
+        padding: 6px;
         min-width: 0;
     }
 
     .alea-col img {
         width: 100%;
-        max-height: 180px;
         object-fit: contain;
         display: block;
-        margin: 6px auto;
+        margin: 4px auto;
         border-radius: 4px;
     }
 
@@ -302,21 +301,24 @@ $totalAlea       = count($aleatorias);
 
     .alea-col .foto-meta strong { color: #333; }
 
-    /* Comparativas lado a lado */
+    /* Comparativas lado a lado — 2 fotos = ancho completo */
     .comp-pair {
         display: flex;
-        gap: 12px;
+        gap: 4px;
         margin-bottom: 16px;
         page-break-inside: avoid;
     }
 
     .comp-col {
         flex: 1;
+        min-width: 0;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px;
     }
 
     .comp-col img {
         width: 100%;
-        max-height: 240px;
         object-fit: contain;
         display: block;
         margin: 0 auto;
@@ -336,6 +338,14 @@ $totalAlea       = count($aleatorias);
         font-size: 9px;
         color: #888;
         margin-top: 4px;
+    }
+
+    .comp-meta {
+        text-align: center;
+        font-size: 9px;
+        color: #666;
+        margin-top: 3px;
+        line-height: 1.4;
     }
 
     /* Separador de sección */
@@ -416,13 +426,56 @@ $totalAlea       = count($aleatorias);
         .section { padding: 14px 24px; }
         .report-header { padding: 20px 24px; }
 
-        /* Imágenes a tamaño razonable */
-        .alea-col img { max-height: 160px; }
-        .comp-col img { max-height: 220px; }
+        /* Ocultar controles de info en impresión */
+        .info-controls { display: none !important; }
+
+        /* Ocultar elementos marcados como hidden antes de imprimir */
+        .meta-hidden { display: none !important; }
 
         /* Footer */
         .report-footer { position: fixed; bottom: 0; left: 0; right: 0; }
     }
+
+    /* Panel de controles de info en fotos (solo pantalla) */
+    .info-controls {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-size: 12px;
+    }
+
+    .info-controls label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        user-select: none;
+        font-weight: 500;
+        color: #333;
+    }
+
+    .info-controls input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+        accent-color: #1e3a5f;
+    }
+
+    .info-controls .controls-title {
+        font-weight: 700;
+        color: #1e3a5f;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .meta-hidden { display: none !important; }
 
     /* Responsive para vista en pantalla */
     @media (max-width: 600px) {
@@ -571,6 +624,15 @@ $totalAlea       = count($aleatorias);
         <?php endif; ?>
     </div>
 
+    <?php if (!empty($visitasComp) || !empty($aleatorias)): ?>
+    <div class="section info-controls">
+        <span class="controls-title"><i class="bi bi-gear"></i> Info visible en fotos:</span>
+        <label><input type="checkbox" id="chkOperador" checked> Operador</label>
+        <label><input type="checkbox" id="chkSituacion" checked> Situación</label>
+        <label><input type="checkbox" id="chkTrabajo" checked> Tipo de trabajo</label>
+    </div>
+    <?php endif; ?>
+
     <?php
     // ---------------------------------------------------------------
     // Fotos comparativas (agrupadas por visita)
@@ -615,9 +677,15 @@ $totalAlea       = count($aleatorias);
                     $badgeF  = "badge-{$f['estado_incidencia']}";
                 ?>
                 <div class="comp-col">
-                    <div class="comp-label">W<?= $seq ?> &mdash; <span class="<?= $badgeF ?>"><?= $estadoF ?></span></div>
+                    <div class="comp-label">W<?= $seq ?> &mdash; <span class="<?= $badgeF ?>" data-meta="situacion"><?= $estadoF ?></span></div>
                     <img src="<?= $url ?>" alt="W<?= $seq ?>">
                     <div class="comp-gps">GPS: <?= $f['lat_real'] ?>, <?= $f['lon_real'] ?></div>
+                    <div class="comp-meta">
+                        <span data-meta="operador"><?= htmlspecialchars($f['usuario_nombre']) ?></span>
+                        <?php if (!empty($f['unidad_obra_nombre'])): ?>
+                        <span data-meta="trabajo"> | <?= htmlspecialchars($f['unidad_obra_nombre']) ?></span>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <?php endforeach; ?>
                 <?php if (count($par) === 1): ?>
@@ -668,7 +736,9 @@ $totalAlea       = count($aleatorias);
                     <img src="<?= $url ?>" alt="Inspección">
                     <div class="foto-meta">
                         <strong><?= $fecha ?></strong><br>
-                        <?= $operador ?> &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span><?= $uo ?><br>
+                        <span data-meta="operador"><?= $operador ?></span>
+                        <span data-meta="situacion"> &mdash; <span class="<?= $badgeClass ?>"><?= $estado ?></span></span>
+                        <span data-meta="trabajo"><?= $uo ?></span><br>
                         <span style="font-size:8px;">GPS: <?= $reg['lat_real'] ?>, <?= $reg['lon_real'] ?></span>
                     </div>
                 </div>
@@ -691,6 +761,32 @@ $totalAlea       = count($aleatorias);
     </div>
 
 </div><!-- /page-container -->
+
+<script>
+(() => {
+    const map = {
+        chkOperador:  'operador',
+        chkSituacion: 'situacion',
+        chkTrabajo:   'trabajo'
+    };
+
+    function toggleMeta(metaName, visible) {
+        document.querySelectorAll(`[data-meta="${metaName}"]`).forEach(el => {
+            if (visible) {
+                el.classList.remove('meta-hidden');
+            } else {
+                el.classList.add('meta-hidden');
+            }
+        });
+    }
+
+    Object.entries(map).forEach(([checkboxId, metaName]) => {
+        const cb = document.getElementById(checkboxId);
+        if (!cb) return;
+        cb.addEventListener('change', () => toggleMeta(metaName, cb.checked));
+    });
+})();
+</script>
 
 </body>
 </html>
