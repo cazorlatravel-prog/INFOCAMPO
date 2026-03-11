@@ -43,15 +43,11 @@ $opMostrarInfra = 0;
 $opMostrarSituacion = 0;
 $opMostrarMapa = 0;
 $opMapaZoom = 9;
-$wmCodigoInfra = 0;
-$wmSituacion = 0;
-$wmTipoFoto = 0;
-$wmMapa = 0;
-$wmMapaZoom = 15;
-$wmMapaTamano = 2;
-$wmTextoTamano = 2;
+$wmFecha = 1; $wmCoordenadas = 1; $wmOrientacion = 1; $wmUbicacion = 1; $wmPais = 1; $wmBrujula = 1;
+$wmCodigoInfra = 0; $wmSituacion = 0; $wmTipoFoto = 0;
+$wmMapa = 0; $wmMapaZoom = 15; $wmMapaTamano = 2; $wmTextoTamano = 2;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_fecha, wm_mostrar_coordenadas, wm_mostrar_orientacion, wm_mostrar_ubicacion, wm_mostrar_pais, wm_mostrar_brujula, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) {
@@ -62,6 +58,12 @@ if ($empresaId > 0) {
         $opMostrarSituacion = (int) ($row['op_mostrar_situacion'] ?? 0);
         $opMostrarMapa = (int) ($row['op_mostrar_mapa'] ?? 0);
         $opMapaZoom = (int) ($row['op_mapa_zoom'] ?? 9);
+        $wmFecha = (int) ($row['wm_mostrar_fecha'] ?? 1);
+        $wmCoordenadas = (int) ($row['wm_mostrar_coordenadas'] ?? 1);
+        $wmOrientacion = (int) ($row['wm_mostrar_orientacion'] ?? 1);
+        $wmUbicacion = (int) ($row['wm_mostrar_ubicacion'] ?? 1);
+        $wmPais = (int) ($row['wm_mostrar_pais'] ?? 1);
+        $wmBrujula = (int) ($row['wm_mostrar_brujula'] ?? 1);
         $wmCodigoInfra = (int) ($row['wm_mostrar_codigo_infra'] ?? 0);
         $wmSituacion = (int) ($row['wm_mostrar_situacion'] ?? 0);
         $wmTipoFoto = (int) ($row['wm_mostrar_tipo_foto'] ?? 0);
@@ -683,6 +685,12 @@ if ($initials === '') $initials = 'OP';
             opMostrarMapa: <?= $opMostrarMapa ?>,
             opMapaZoom: <?= $opMapaZoom ?>,
             watermark: {
+                fecha: <?= $wmFecha ?>,
+                coordenadas: <?= $wmCoordenadas ?>,
+                orientacion: <?= $wmOrientacion ?>,
+                ubicacion: <?= $wmUbicacion ?>,
+                pais: <?= $wmPais ?>,
+                brujula: <?= $wmBrujula ?>,
                 codigoInfra: <?= $wmCodigoInfra ?>,
                 situacion: <?= $wmSituacion ?>,
                 tipoFoto: <?= $wmTipoFoto ?>,

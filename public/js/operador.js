@@ -1518,33 +1518,36 @@
         const margin = Math.round(w * 0.025);
 
         // Build text lines (bottom-up, right-aligned like GPS Camera app)
-        // Default lines always shown: fecha, coordenadas, orientación, municipio/provincia, país
+        // All fields are configurable by the admin (default: all ON for base fields)
         const lines = [];
-
-        // Line 1 (bottom): Country
         const geo = meta.geoLocation || {};
-        if (geo.country) lines.push(geo.country);
 
-        // Line 2: City, Province PostalCode
-        const locationParts = [];
-        if (geo.city) locationParts.push(geo.city);
-        if (geo.province || geo.postcode) {
-            locationParts.push((geo.province || '') + (geo.postcode ? ' ' + geo.postcode : ''));
+        // País (bottom)
+        if (wmCfg.pais !== 0 && geo.country) lines.push(geo.country);
+
+        // Municipio, provincia CP
+        if (wmCfg.ubicacion !== 0) {
+            const locationParts = [];
+            if (geo.city) locationParts.push(geo.city);
+            if (geo.province || geo.postcode) {
+                locationParts.push((geo.province || '') + (geo.postcode ? ' ' + geo.postcode : ''));
+            }
+            if (locationParts.length) lines.push(locationParts.join(', '));
         }
-        if (locationParts.length) lines.push(locationParts.join(', '));
 
-        // Line 3: Bearing (e.g. "99° E")
-        if (meta.bearing != null) {
+        // Orientación (e.g. "99° E")
+        if (wmCfg.orientacion !== 0 && meta.bearing != null) {
             lines.push(`${meta.bearing}° ${bearingToCardinal(meta.bearing)}`);
         }
 
-        // Line 4: UTM coordinates
-        if (meta.lat != null && meta.lon != null) {
+        // Coordenadas UTM
+        if (wmCfg.coordenadas !== 0 && meta.lat != null && meta.lon != null) {
             const utm = latLonToUTM(meta.lat, meta.lon);
             lines.push(utm.str);
         }
 
-        // Optional fields (configurable by admin) — inserted between coordinates and date
+        // --- Campos adicionales (admin opt-in) ---
+
         // Tipo de foto: FOT ALE / FOT COM
         if (wmCfg.tipoFoto && meta.mode) {
             lines.push(meta.mode === 'comparativo' ? 'FOT COM' : 'FOT ALE');
@@ -1560,8 +1563,10 @@
             lines.push(meta.infraCode);
         }
 
-        // Line (top): Date and time — always last (drawn at the top)
-        lines.push(formatDateMadrid());
+        // Fecha y hora (top line)
+        if (wmCfg.fecha !== 0) {
+            lines.push(formatDateMadrid());
+        }
 
         // Draw lines from bottom to top, right-aligned with text shadow
         ctx.textBaseline = 'bottom';
@@ -1591,8 +1596,10 @@
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
 
-        // 3. Compass rose (top-left)
-        drawCompassRose(ctx, w, h, meta.bearing);
+        // 3. Compass rose (top-left) — configurable
+        if (wmCfg.brujula !== 0) {
+            drawCompassRose(ctx, w, h, meta.bearing);
+        }
 
         // 4. Mini-map (bottom-left, optional)
         if (wmCfg.mapa && meta.lat != null && meta.lon != null) {

@@ -44,6 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     if ($action === 'guardar_watermark') {
         $targetEmpId = (int) ($_POST['empresa_id'] ?? $empresaId);
         if ($targetEmpId > 0) {
+            // Base fields
+            $wmFecha       = isset($_POST['wm_mostrar_fecha']) ? 1 : 0;
+            $wmCoordenadas = isset($_POST['wm_mostrar_coordenadas']) ? 1 : 0;
+            $wmOrientacion = isset($_POST['wm_mostrar_orientacion']) ? 1 : 0;
+            $wmUbicacion   = isset($_POST['wm_mostrar_ubicacion']) ? 1 : 0;
+            $wmPais        = isset($_POST['wm_mostrar_pais']) ? 1 : 0;
+            $wmBrujula     = isset($_POST['wm_mostrar_brujula']) ? 1 : 0;
+            // Optional fields
             $wmCodigoInfra = isset($_POST['wm_mostrar_codigo_infra']) ? 1 : 0;
             $wmSituacion   = isset($_POST['wm_mostrar_situacion']) ? 1 : 0;
             $wmTipoFoto    = isset($_POST['wm_mostrar_tipo_foto']) ? 1 : 0;
@@ -60,19 +68,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             if (!in_array($wmTextoTamano, $allowedTextSizes, true)) $wmTextoTamano = 2;
 
             $stmt = $pdo->prepare(
-                "UPDATE empresas SET wm_mostrar_codigo_infra = :ci, wm_mostrar_situacion = :sit,
+                "UPDATE empresas SET
+                 wm_mostrar_fecha = :fecha, wm_mostrar_coordenadas = :coord,
+                 wm_mostrar_orientacion = :orient, wm_mostrar_ubicacion = :ubic,
+                 wm_mostrar_pais = :pais, wm_mostrar_brujula = :bruj,
+                 wm_mostrar_codigo_infra = :ci, wm_mostrar_situacion = :sit,
                  wm_mostrar_tipo_foto = :tf, wm_mostrar_mapa = :mapa,
-                 wm_mapa_zoom = :zoom, wm_mapa_tamano = :tam, wm_texto_tamano = :txt WHERE id = :id"
+                 wm_mapa_zoom = :zoom, wm_mapa_tamano = :tam, wm_texto_tamano = :txt
+                 WHERE id = :id"
             );
             $stmt->execute([
-                ':ci'   => $wmCodigoInfra,
-                ':sit'  => $wmSituacion,
-                ':tf'   => $wmTipoFoto,
-                ':mapa' => $wmMapa,
-                ':zoom' => $wmMapaZoom,
-                ':tam'  => $wmMapaTamano,
-                ':txt'  => $wmTextoTamano,
-                ':id'   => $targetEmpId,
+                ':fecha'  => $wmFecha,
+                ':coord'  => $wmCoordenadas,
+                ':orient' => $wmOrientacion,
+                ':ubic'   => $wmUbicacion,
+                ':pais'   => $wmPais,
+                ':bruj'   => $wmBrujula,
+                ':ci'     => $wmCodigoInfra,
+                ':sit'    => $wmSituacion,
+                ':tf'     => $wmTipoFoto,
+                ':mapa'   => $wmMapa,
+                ':zoom'   => $wmMapaZoom,
+                ':tam'    => $wmMapaTamano,
+                ':txt'    => $wmTextoTamano,
+                ':id'     => $targetEmpId,
             ]);
             $msg = 'Configuración de marca de agua actualizada correctamente.';
             $msgType = 'success';
@@ -141,7 +160,14 @@ $opSituacion = (int) ($empresa['op_mostrar_situacion'] ?? 0);
 $opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
 $opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
 
-// Watermark settings
+// Watermark settings — base fields (default ON)
+$wmFecha       = (int) ($empresa['wm_mostrar_fecha'] ?? 1);
+$wmCoordenadas = (int) ($empresa['wm_mostrar_coordenadas'] ?? 1);
+$wmOrientacion = (int) ($empresa['wm_mostrar_orientacion'] ?? 1);
+$wmUbicacion   = (int) ($empresa['wm_mostrar_ubicacion'] ?? 1);
+$wmPais        = (int) ($empresa['wm_mostrar_pais'] ?? 1);
+$wmBrujula     = (int) ($empresa['wm_mostrar_brujula'] ?? 1);
+// Watermark settings — optional fields (default OFF)
 $wmCodigoInfra = (int) ($empresa['wm_mostrar_codigo_infra'] ?? 0);
 $wmSituacion   = (int) ($empresa['wm_mostrar_situacion'] ?? 0);
 $wmTipoFoto    = (int) ($empresa['wm_mostrar_tipo_foto'] ?? 0);
@@ -325,18 +351,13 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                     <p class="text-muted mb-2">
                         Configura qué información adicional aparece sobre las fotos del operador.
                     </p>
-                    <div class="alert alert-light border mb-3 py-2 px-3" style="font-size:0.82rem;">
-                        <strong>Siempre visible:</strong> Fecha/hora, coordenadas UTM, orientación (brújula), municipio/provincia, país.
-                        <br>
-                        <strong>Opcional:</strong> Marca las casillas para añadir más datos sobre la foto.
-                    </div>
-
                     <form method="post">
                         <?= csrfField() ?>
                         <input type="hidden" name="action" value="guardar_watermark">
                         <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
 
                         <div class="mb-4">
+                            <!-- Tamaño del texto -->
                             <div class="mb-3 p-3 rounded border">
                                 <label class="fw-semibold d-block mb-2">
                                     <i class="bi bi-fonts me-1"></i> Tamaño del texto
@@ -361,7 +382,65 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                 </div>
                             </div>
 
-                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                            <!-- Información base -->
+                            <h6 class="text-muted fw-bold small text-uppercase mt-4 mb-3">
+                                <i class="bi bi-eye me-1"></i> Información base
+                            </h6>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_fecha" name="wm_mostrar_fecha" value="1" <?= $wmFecha ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_fecha">
+                                    <i class="bi bi-clock me-1"></i> Fecha y hora
+                                </label>
+                                <div class="text-muted small mt-1">Ej: <code>24 feb 2026 18:46:04</code> (zona horaria Madrid)</div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_coordenadas" name="wm_mostrar_coordenadas" value="1" <?= $wmCoordenadas ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_coordenadas">
+                                    <i class="bi bi-crosshair me-1"></i> Coordenadas UTM
+                                </label>
+                                <div class="text-muted small mt-1">Ej: <code>30S 445357 4117173</code></div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_orientacion" name="wm_mostrar_orientacion" value="1" <?= $wmOrientacion ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_orientacion">
+                                    <i class="bi bi-compass me-1"></i> Orientación
+                                </label>
+                                <div class="text-muted small mt-1">Ej: <code>99° E</code></div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_ubicacion" name="wm_mostrar_ubicacion" value="1" <?= $wmUbicacion ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_ubicacion">
+                                    <i class="bi bi-geo me-1"></i> Municipio, provincia y CP
+                                </label>
+                                <div class="text-muted small mt-1">Ej: <code>Granada, Granada 18014</code></div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_pais" name="wm_mostrar_pais" value="1" <?= $wmPais ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_pais">
+                                    <i class="bi bi-globe me-1"></i> País
+                                </label>
+                                <div class="text-muted small mt-1">Ej: <code>España</code></div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="wm_brujula" name="wm_mostrar_brujula" value="1" <?= $wmBrujula ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="wm_brujula">
+                                    <i class="bi bi-compass me-1"></i> Brújula gráfica
+                                </label>
+                                <div class="text-muted small mt-1">Rosa de los vientos en la esquina superior izquierda.</div>
+                            </div>
+
+                            <!-- Información adicional -->
+                            <h6 class="text-muted fw-bold small text-uppercase mt-4 mb-3">
+                                <i class="bi bi-plus-circle me-1"></i> Información adicional
+                            </h6>
+
+                            <div class="form-check form-switch mb-2 p-3 rounded border">
                                 <input class="form-check-input" type="checkbox" id="wm_codigo_infra" name="wm_mostrar_codigo_infra" value="1" <?= $wmCodigoInfra ? 'checked' : '' ?>>
                                 <label class="form-check-label fw-semibold" for="wm_codigo_infra">
                                     <i class="bi bi-hash me-1"></i> Código de infraestructura
