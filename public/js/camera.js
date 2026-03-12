@@ -136,7 +136,7 @@ const Camera = (() => {
             };
             _lastGeoLat = lat;
             _lastGeoLon = lon;
-        } catch { /* silencioso */ }
+        } catch (_e) { /* silencioso */ }
     }
 
     // =========================================================
@@ -154,7 +154,7 @@ const Camera = (() => {
                 ghostActive = true;
                 btnGhost.classList.add('active');
             }
-        } catch {
+        } catch (_e) {
             // Sin imagen ghost disponible – silencioso
         }
     }
@@ -169,7 +169,7 @@ const Camera = (() => {
             try {
                 const perm = await DeviceOrientationEvent.requestPermission();
                 if (perm === 'granted') _startCompassListener();
-            } catch { /* denied */ }
+            } catch (_e) { /* denied */ }
         }
 
         const vw = video.videoWidth;

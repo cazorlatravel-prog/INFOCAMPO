@@ -385,11 +385,11 @@
         try {
             const val = localStorage.getItem('infocampo_seq_' + infraId);
             return val ? parseInt(val, 10) : 0;
-        } catch { return 0; }
+        } catch (_e) { return 0; }
     }
 
     function saveInfraSeq(infraId, seq) {
-        try { localStorage.setItem('infocampo_seq_' + infraId, String(seq)); } catch {}
+        try { localStorage.setItem('infocampo_seq_' + infraId, String(seq)); } catch (_e) {}
     }
 
     function formatDateMadrid(date) {
@@ -495,7 +495,8 @@
             _lastGeocodeLat = lat;
             _lastGeocodeLon = lon;
             return state.geoLocation;
-        } catch {
+        } catch (e) {
+            console.warn('reverseGeocode failed:', e);
             return state.geoLocation || { city: '', province: '', postcode: '', country: '' };
         }
     }
@@ -520,7 +521,7 @@
             try {
                 const perm = await DeviceOrientationEvent.requestPermission();
                 if (perm === 'granted') _startCompassListener();
-            } catch { /* permission denied */ }
+            } catch (_e) { /* permission denied */ }
         }
     }
 
@@ -1291,10 +1292,19 @@
             resetAnnotationUI();
 
         } catch (err) {
-            console.error('Error en captureFrame:', err);
+            console.error('Error en captureFrame:', err, err.stack);
             // Resume camera so the user can retry
             try { camVideo.play(); } catch (_) {}
-            alert('Error al capturar la foto. Inténtalo de nuevo.');
+            // Mostrar mensaje más descriptivo según el tipo de error
+            let userMsg = 'Error al capturar la foto. Inténtalo de nuevo.';
+            if (err.message && err.message.includes('taint')) {
+                userMsg = 'Error de seguridad con el mapa. Se reintentará sin mapa.';
+            } else if (err.message && err.message.includes('timeout')) {
+                userMsg = 'La captura tardó demasiado. Inténtalo de nuevo.';
+            } else if (err.message && err.message.includes('toBlob')) {
+                userMsg = 'Error al generar la imagen. Inténtalo de nuevo.';
+            }
+            alert(userMsg);
         } finally {
             _capturing = false;
             // Restore shutter button
@@ -1790,6 +1800,12 @@
             }
             const tiles = await Promise.all(tilePromises);
 
+            // Si no se cargó ningún tile, no dibujar nada
+            if (tiles.every(t => t === null)) {
+                console.warn('Mini-map: no tiles loaded');
+                return;
+            }
+
             // Create off-screen canvas for the composite tile area (768x768)
             const tileCanvas = document.createElement('canvas');
             tileCanvas.width = 768;
@@ -1806,67 +1822,93 @@
                 }
             }
 
+            // Verificar que el tileCanvas no esté tainted (CORS)
+            // antes de dibujarlo en el canvas principal de la foto
+            try {
+                tileCanvas.toDataURL();
+            } catch (taintErr) {
+                console.warn('Mini-map: canvas tainted by tiles, skipping', taintErr);
+                return;
+            }
+
+            // Canvas intermedio con el mapa completo (tiles + pin + borde)
+            // para no contaminar el canvas principal si algo falla
+            const mapCanvas = document.createElement('canvas');
+            mapCanvas.width = mapSize;
+            mapCanvas.height = mapSize;
+            const mapCtx = mapCanvas.getContext('2d');
+
             // Center point in the composite canvas
             const centerX = 256 + pixelX;
             const centerY = 256 + pixelY;
 
-            // Draw rounded rectangle clip path
-            ctx.save();
-            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
-            ctx.clip();
+            // Draw rounded rectangle clip path on mapCanvas
+            roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
+            mapCtx.clip();
 
             // Draw the tile composite, cropped and scaled to mapSize
-            const half = mapSize / 2;
-            const srcSize = mapSize * (256 / mapSize); // Keep 1:1 scale ratio
-            ctx.drawImage(tileCanvas,
+            const srcSize = mapSize * (256 / mapSize);
+            mapCtx.drawImage(tileCanvas,
                 centerX - srcSize / 2, centerY - srcSize / 2, srcSize, srcSize,
-                mapX, mapY, mapSize, mapSize
+                0, 0, mapSize, mapSize
             );
 
-            ctx.restore();
+            // Reset clip
+            mapCtx.restore();
+            mapCtx.save();
 
             // Draw border
-            ctx.save();
-            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.lineWidth = borderWidth;
-            ctx.stroke();
-            ctx.restore();
+            roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
+            mapCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            mapCtx.lineWidth = borderWidth;
+            mapCtx.stroke();
 
             // Draw red location pin in center
-            const pinX = mapX + mapSize / 2;
-            const pinY = mapY + mapSize / 2;
+            const pinCx = mapSize / 2;
+            const pinCy = mapSize / 2;
             const pinSize = Math.max(6, Math.round(mapSize * 0.06));
 
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetY = 2;
+            mapCtx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            mapCtx.shadowBlur = 4;
+            mapCtx.shadowOffsetY = 2;
 
             // Pin circle
-            ctx.beginPath();
-            ctx.arc(pinX, pinY - pinSize, pinSize, 0, Math.PI * 2);
-            ctx.fillStyle = '#e74c3c';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = Math.max(1, Math.round(pinSize * 0.3));
-            ctx.stroke();
+            mapCtx.beginPath();
+            mapCtx.arc(pinCx, pinCy - pinSize, pinSize, 0, Math.PI * 2);
+            mapCtx.fillStyle = '#e74c3c';
+            mapCtx.fill();
+            mapCtx.strokeStyle = '#fff';
+            mapCtx.lineWidth = Math.max(1, Math.round(pinSize * 0.3));
+            mapCtx.stroke();
 
             // Pin point (triangle)
-            ctx.beginPath();
-            ctx.moveTo(pinX - pinSize * 0.5, pinY - pinSize * 0.3);
-            ctx.lineTo(pinX, pinY + pinSize * 0.5);
-            ctx.lineTo(pinX + pinSize * 0.5, pinY - pinSize * 0.3);
-            ctx.fillStyle = '#e74c3c';
-            ctx.fill();
+            mapCtx.beginPath();
+            mapCtx.moveTo(pinCx - pinSize * 0.5, pinCy - pinSize * 0.3);
+            mapCtx.lineTo(pinCx, pinCy + pinSize * 0.5);
+            mapCtx.lineTo(pinCx + pinSize * 0.5, pinCy - pinSize * 0.3);
+            mapCtx.fillStyle = '#e74c3c';
+            mapCtx.fill();
 
             // Inner dot
-            ctx.beginPath();
-            ctx.arc(pinX, pinY - pinSize, pinSize * 0.35, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
+            mapCtx.shadowColor = 'transparent';
+            mapCtx.shadowBlur = 0;
+            mapCtx.beginPath();
+            mapCtx.arc(pinCx, pinCy - pinSize, pinSize * 0.35, 0, Math.PI * 2);
+            mapCtx.fillStyle = '#fff';
+            mapCtx.fill();
 
-            ctx.restore();
+            mapCtx.restore();
+
+            // Verificación final: el mapCanvas no debe estar tainted
+            try {
+                mapCanvas.toDataURL();
+            } catch (taintErr2) {
+                console.warn('Mini-map: final canvas tainted, skipping', taintErr2);
+                return;
+            }
+
+            // Todo OK — dibujar el mini-mapa en el canvas principal de la foto
+            ctx.drawImage(mapCanvas, mapX, mapY);
 
         } catch (err) {
             console.warn('Error drawing mini-map:', err);
@@ -3388,10 +3430,19 @@
             const timer = setTimeout(() => {
                 reject(new Error('Canvas toBlob timeout'));
             }, 10000);
-            canvas.toBlob((blob) => {
+            try {
+                canvas.toBlob((blob) => {
+                    clearTimeout(timer);
+                    if (!blob) {
+                        reject(new Error('Canvas toBlob returned null'));
+                        return;
+                    }
+                    resolve(blob);
+                }, type, quality);
+            } catch (err) {
                 clearTimeout(timer);
-                resolve(blob);
-            }, type, quality);
+                reject(new Error('Canvas toBlob error: ' + err.message));
+            }
         });
     }
 
