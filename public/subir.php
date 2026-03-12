@@ -170,41 +170,21 @@ try {
     $codigoSafe = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $infraCodigo);
     $codigoSafe = substr($codigoSafe, 0, 60);
 
+    // Mapeo de situación a etiqueta legible
+    $situacionLabels = ['antes' => 'Antes', 'durante' => 'Durante', 'despues' => 'Despues'];
+    $situacionLabel = $situacionLabels[$incidencia] ?? 'Antes';
+
     // Construir nombre según formato
     switch ($formatoNombre) {
         case 2:
-            // CODIGO_INFRA_TIPO_TRABAJO_NºFOTO
-            $tipoTrabajoNombre = '';
-            if ($tipoTrabajoId) {
-                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
-                $stmtTT->execute([':id' => $tipoTrabajoId]);
-                $ttRow = $stmtTT->fetch();
-                if ($ttRow) {
-                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
-                }
-            }
-            $nombreArchivo = $tipoTrabajoNombre
-                ? "{$codigoSafe}_{$tipoTrabajoNombre}_{$numFotoStr}"
-                : "{$codigoSafe}_{$numFotoStr}";
+            // CODIGO_INFRA_SITUACION_NºFOTO
+            $nombreArchivo = "{$codigoSafe}_{$situacionLabel}_{$numFotoStr}";
             break;
 
         case 3:
-            // CODIGO_INFRA_TIPO_TRABAJO_TIPO_FOTO_NºFOTO
-            $tipoTrabajoNombre = '';
-            if ($tipoTrabajoId) {
-                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
-                $stmtTT->execute([':id' => $tipoTrabajoId]);
-                $ttRow = $stmtTT->fetch();
-                if ($ttRow) {
-                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
-                }
-            }
+            // CODIGO_INFRA_SITUACION_TIPO_FOTO_NºFOTO
             $tipoFotoLabel = $tipoFoto === 'comparativo' ? 'Comparativa' : 'Aleatoria';
-            if ($tipoTrabajoNombre) {
-                $nombreArchivo = "{$codigoSafe}_{$tipoTrabajoNombre}_{$tipoFotoLabel}_{$numFotoStr}";
-            } else {
-                $nombreArchivo = "{$codigoSafe}_{$tipoFotoLabel}_{$numFotoStr}";
-            }
+            $nombreArchivo = "{$codigoSafe}_{$situacionLabel}_{$tipoFotoLabel}_{$numFotoStr}";
             break;
 
         default: // case 1

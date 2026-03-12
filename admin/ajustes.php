@@ -256,10 +256,10 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                 <input class="form-check-input" type="radio" name="formato_nombre_foto" id="formato2"
                                        value="2" <?= $formatoActual === 2 ? 'checked' : '' ?> onchange="updatePreview()">
                                 <label class="form-check-label fw-semibold" for="formato2">
-                                    Opción 2: Código Infraestructura + Tipo Trabajo + N° Foto
+                                    Opción 2: Código Infraestructura + Situación de Obra + N° Foto
                                 </label>
                                 <div class="text-muted small mt-1">
-                                    Ejemplo: <code>INF-001_Inspección_001</code>, <code>INF-001_Mantenimiento_001</code>
+                                    Ejemplo: <code>INF-001_Antes_001</code>, <code>INF-001_Durante_002</code>, <code>INF-001_Despues_003</code>
                                 </div>
                             </div>
 
@@ -267,10 +267,10 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                 <input class="form-check-input" type="radio" name="formato_nombre_foto" id="formato3"
                                        value="3" <?= $formatoActual === 3 ? 'checked' : '' ?> onchange="updatePreview()">
                                 <label class="form-check-label fw-semibold" for="formato3">
-                                    Opción 3: Código Infraestructura + Tipo Trabajo + Tipo Foto + N° Foto
+                                    Opción 3: Código Infraestructura + Situación de Obra + Tipo Foto + N° Foto
                                 </label>
                                 <div class="text-muted small mt-1">
-                                    Ejemplo: <code>INF-001_Inspección_Aleatoria_001</code>, <code>INF-001_Inspección_Comparativa_002</code>
+                                    Ejemplo: <code>INF-001_Antes_Aleatoria_001</code>, <code>INF-001_Durante_Comparativa_002</code>
                                 </div>
                             </div>
                         </div>
@@ -534,8 +534,8 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
         const el = document.getElementById('preview-format');
         const examples = {
             '1': '<code>TORRE-A42_001.jpg</code> &nbsp; <code>TORRE-A42_002.jpg</code> &nbsp; <code>TORRE-A42_003.jpg</code>',
-            '2': '<code>TORRE-A42_Inspección_001.jpg</code> &nbsp; <code>TORRE-A42_Mantenimiento_001.jpg</code>',
-            '3': '<code>TORRE-A42_Inspección_Aleatoria_001.jpg</code> &nbsp; <code>TORRE-A42_Inspección_Comparativa_001.jpg</code>',
+            '2': '<code>TORRE-A42_Antes_001.jpg</code> &nbsp; <code>TORRE-A42_Durante_002.jpg</code> &nbsp; <code>TORRE-A42_Despues_003.jpg</code>',
+            '3': '<code>TORRE-A42_Antes_Aleatoria_001.jpg</code> &nbsp; <code>TORRE-A42_Durante_Comparativa_002.jpg</code>',
         };
         el.innerHTML = examples[val] || '';
 

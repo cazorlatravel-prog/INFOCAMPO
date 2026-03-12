@@ -1245,21 +1245,20 @@
             const codInfra = sanitizeFilename(state.infraCode || state.infraName);
             const formato = CFG.formatoNombreFoto || 1;
 
+            // Etiquetas para nombre de archivo
+            const situacionLabels = { 0: 'Antes', 1: 'Durante', 2: 'Despues' };
+            const situacionLabel = situacionLabels[state.situacionIdx] || 'Antes';
+            const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+
             let filename;
             if (formato === 2) {
-                const ttName = getSelectedTipoTrabajoName();
-                filename = ttName
-                    ? `${codInfra}_${sanitizeFilename(ttName)}_${seqNum}`
-                    : `${codInfra}_${seqNum}`;
+                // Código + Situación + N°
+                filename = `${codInfra}_${situacionLabel}_${seqNum}`;
             } else if (formato === 3) {
-                const ttName = getSelectedTipoTrabajoName();
-                const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
-                if (ttName) {
-                    filename = `${codInfra}_${sanitizeFilename(ttName)}_${tipoFotoLabel}_${seqNum}`;
-                } else {
-                    filename = `${codInfra}_${tipoFotoLabel}_${seqNum}`;
-                }
+                // Código + Situación + Tipo Foto + N°
+                filename = `${codInfra}_${situacionLabel}_${tipoFotoLabel}_${seqNum}`;
             } else {
+                // Código + N°
                 filename = `${codInfra}_${seqNum}`;
             }
 
