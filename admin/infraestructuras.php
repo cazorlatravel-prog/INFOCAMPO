@@ -133,9 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 // ---------------------------------------------------------------
 // Cargar datos
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 $infraestructuras = [];
 $empresaNombre = '';
@@ -208,6 +213,7 @@ if (isset($_GET['edit'])) {
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h4 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Infraestructuras</h4>
             <div class="d-flex gap-2 align-items-center">
+                <?php if ($isSuperadmin): ?>
                 <form method="get" class="d-flex gap-2 align-items-center">
                     <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
                         <option value="">-- Empresa --</option>
@@ -218,6 +224,7 @@ if (isset($_GET['edit'])) {
                         <?php endforeach; ?>
                     </select>
                 </form>
+                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <a href="exportar_csv.php?tipo=infraestructuras&empresa_id=<?= $empresaId ?>" class="btn btn-outline-secondary btn-sm" title="Exportar a CSV/Excel">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV

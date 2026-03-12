@@ -137,11 +137,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 }
 
 // ---------------------------------------------------------------
-// Cargar empresas (para selector si es superadmin)
+// Cargar empresas (solo superadmin)
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 // ---------------------------------------------------------------
 // Cargar datos de la empresa seleccionada
@@ -193,6 +198,7 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h4 class="mb-0"><i class="bi bi-gear me-2"></i>Ajustes de Empresa</h4>
 
+            <?php if ($isSuperadmin): ?>
             <form method="get" class="d-flex gap-2 align-items-center">
                 <label class="fw-semibold small text-nowrap">Empresa:</label>
                 <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
@@ -204,6 +210,7 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                     <?php endforeach; ?>
                 </select>
             </form>
+            <?php endif; ?>
         </div>
 
         <?php if ($msg): ?>

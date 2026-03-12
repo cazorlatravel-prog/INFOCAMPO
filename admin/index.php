@@ -32,11 +32,16 @@ if ($impersonating && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
 }
 
 // ---------------------------------------------------------------
-// Cargar empresas para filtro
+// Cargar empresas para filtro (solo superadmin)
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 // ---------------------------------------------------------------
 // Cargar infraestructuras + contadores de incidencias
@@ -137,7 +142,8 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
 
             <!-- COLUMNA IZQUIERDA: Filtros -->
             <div class="col-lg-3">
-                <!-- Selector de empresa -->
+                <?php if ($isSuperadmin): ?>
+                <!-- Selector de empresa (solo superadmin) -->
                 <div class="card mb-3">
                     <div class="card-body">
                         <h6 class="card-title text-muted mb-3"><i class="bi bi-building me-1"></i>Empresa</h6>
@@ -153,6 +159,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                         </form>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Lista de infraestructuras -->
                 <?php if ($infraestructuras): ?>

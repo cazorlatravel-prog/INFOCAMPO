@@ -29,10 +29,15 @@ $currentPage = 'dashboard';
 // Obtener empresa_id
 $empresaId = getEmpresaIdSeguro();
 
-// Cargar empresas para el selector
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-)->fetchAll();
+// Solo superadmin puede ver/seleccionar otras empresas
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 // Si estamos suplantando y no se ha seleccionado empresa
 if (isImpersonating() && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
@@ -226,8 +231,8 @@ for ($i = 13; $i >= 0; $i--) {
     <?php include __DIR__ . '/includes/header.php'; ?>
 
     <div class="container-fluid py-4">
-        <?php if ($empresaId <= 0): ?>
-            <!-- Selector de empresa -->
+        <?php if ($empresaId <= 0 && $isSuperadmin): ?>
+            <!-- Selector de empresa (solo superadmin) -->
             <div class="text-center py-5">
                 <i class="bi bi-speedometer2" style="font-size:3rem;color:#adb5bd;"></i>
                 <h5 class="mt-3 text-muted">Selecciona una empresa</h5>
@@ -240,6 +245,11 @@ for ($i = 13; $i >= 0; $i--) {
                     </select>
                     <button class="btn btn-primary">Ir</button>
                 </form>
+            </div>
+        <?php elseif ($empresaId <= 0): ?>
+            <div class="text-center py-5">
+                <i class="bi bi-speedometer2" style="font-size:3rem;color:#adb5bd;"></i>
+                <h5 class="mt-3 text-muted">No tienes empresa asignada</h5>
             </div>
         <?php else: ?>
 
