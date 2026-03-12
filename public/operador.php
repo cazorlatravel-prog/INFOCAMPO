@@ -343,15 +343,9 @@ if ($initials === '') $initials = 'OP';
 
         <!-- Botón Finalizar Visita (fijo abajo, con fotos) -->
         <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
-            <div style="display:flex;gap:8px;width:100%;">
-                <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita" style="flex:1;">
-                    <i class="bi bi-check-circle-fill"></i> Finalizar visita
-                </button>
-                <button type="button" id="btn-waypoints-ficha" class="btn-finalizar-visita hidden"
-                    style="flex:none;background:#22c55e;padding:0 16px;" title="Descargar waypoints GPX">
-                    <i class="bi bi-geo-alt"></i>
-                </button>
-            </div>
+            <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita" style="width:100%;">
+                <i class="bi bi-check-circle-fill"></i> Finalizar visita
+            </button>
         </div>
     </div>
 

@@ -1556,16 +1556,6 @@
         // Counters are already incremented in captureFrame for filename generation
         countAleatorias.textContent = state.countAleatorias;
         countComparativas.textContent = state.countComparativas;
-
-        // Show/hide waypoints download button
-        const btnWp = $('#btn-waypoints-ficha');
-        if (btnWp) {
-            if (state.countComparativas > 0) {
-                btnWp.classList.remove('hidden');
-            } else {
-                btnWp.classList.add('hidden');
-            }
-        }
     }
 
     // ===================================================================
@@ -2170,14 +2160,6 @@
         if (btnGuardarVisitaSinFoto) btnGuardarVisitaSinFoto.addEventListener('click', guardarVisitaSinFoto);
 
         // Waypoints download from ficha
-        const btnWaypointsFicha = $('#btn-waypoints-ficha');
-        if (btnWaypointsFicha) {
-            btnWaypointsFicha.addEventListener('click', () => {
-                if (state.infraId) downloadWaypoints(state.infraId);
-                else downloadMyWaypoints();
-            });
-        }
-
         // Selector de situación en Ficha
         const situacionSelector = $('#situacion-selector');
         if (situacionSelector) {
