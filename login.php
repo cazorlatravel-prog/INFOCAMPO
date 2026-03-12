@@ -393,7 +393,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
         <div class="login-footer">
-            FotoGPS.app &mdash; Tu APP de recogida de datos en Campo
+            <a href="/manual.php" style="color:var(--login-accent);text-decoration:none;font-weight:500;"><i class="bi bi-book"></i> Manual de usuario</a>
+            <div style="margin-top:6px;">FotoGPS.app &mdash; Tu APP de recogida de datos en Campo</div>
         </div>
     </div>
 
