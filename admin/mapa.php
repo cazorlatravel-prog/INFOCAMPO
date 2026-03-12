@@ -164,7 +164,10 @@ foreach ($registros as $r) {
 // Stats
 $totalFotos = count($registros);
 $totalComp = count(array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') === 'comparativo'));
+$totalAlea = count(array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') !== 'comparativo'));
+$totalAntes = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'antes'));
 $totalDurante = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'durante'));
+$totalDespues = count(array_filter($registros, fn($r) => $r['estado_incidencia'] === 'despues'));
 $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 ?>
 <!DOCTYPE html>
@@ -490,7 +493,10 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div class="stat-pill"><strong id="stat-fotos"><?= $totalFotos ?></strong> fotos</div>
         <div class="stat-pill"><strong id="stat-infras"><?= $totalInfras ?></strong> infraestructuras</div>
         <div class="stat-pill" style="color:#7c3aed;"><strong id="stat-comp"><?= $totalComp ?></strong> comparativas</div>
+        <div class="stat-pill" style="color:#6366f1;"><strong id="stat-alea"><?= $totalAlea ?></strong> aleatorias</div>
+        <div class="stat-pill" style="color:#3b82f6;"><strong id="stat-antes"><?= $totalAntes ?></strong> antes</div>
         <div class="stat-pill" style="color:#f59e0b;"><strong id="stat-durante"><?= $totalDurante ?></strong> durante</div>
+        <div class="stat-pill" style="color:#22c55e;"><strong id="stat-despues"><?= $totalDespues ?></strong> despues</div>
     </div>
 
     <!-- KML Navigation Panel -->
@@ -774,7 +780,10 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             document.getElementById('stat-fotos').textContent = data.length;
             document.getElementById('stat-infras').textContent = Object.keys(infras).length;
             document.getElementById('stat-comp').textContent = data.filter(function(r) { return r.tipo === 'comparativo'; }).length;
+            document.getElementById('stat-alea').textContent = data.filter(function(r) { return r.tipo !== 'comparativo'; }).length;
+            document.getElementById('stat-antes').textContent = data.filter(function(r) { return r.estado === 'antes'; }).length;
             document.getElementById('stat-durante').textContent = data.filter(function(r) { return r.estado === 'durante'; }).length;
+            document.getElementById('stat-despues').textContent = data.filter(function(r) { return r.estado === 'despues'; }).length;
         }
 
         function applyFilters() {
