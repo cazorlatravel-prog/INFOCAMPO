@@ -801,6 +801,12 @@
         state.countComparativas = 0;
         state.countTotal = 0;
         state.seqComparativa = 0;
+        // Revocar blob URLs de fotos de galería para liberar memoria
+        state.photos.forEach(function(p) {
+            if (p.url && p.url.startsWith('blob:')) {
+                try { URL.revokeObjectURL(p.url); } catch (_e) {}
+            }
+        });
         state.photos = [];
         // Revocar blob URLs de fotos previas cacheadas para liberar memoria
         if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
@@ -1029,6 +1035,11 @@
 
         // Request compass permission on iOS (needs user gesture context)
         requestCompassPermission();
+
+        // Re-establish GPS watch if it was cleared by closeCamera()
+        if (state.gpsWatchId === null) {
+            initGPS();
+        }
 
         // Start camera — request max resolution for high-quality watermarked photos
         try {
@@ -1300,6 +1311,15 @@
 
         } catch (err) {
             console.error('Error en captureFrame:', err, err.stack);
+            // Rollback counters on failure to avoid sequence gaps
+            state.countTotal--;
+            if (state.currentMode === 'comparativo') {
+                state.seqComparativa--;
+                state.countComparativas--;
+            } else {
+                state.countAleatorias--;
+            }
+            if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
             // Resume camera so the user can retry
             try { camVideo.play(); } catch (_) {}
             // Mostrar mensaje más descriptivo según el tipo de error
@@ -1683,8 +1703,6 @@
             }
         }
 
-        // Save blob for later
-        state.capturedBlob = await canvasToBlob(targetCanvas, 'image/jpeg', 0.85);
     }
 
     /**
@@ -3688,6 +3706,12 @@
         state.countComparativas = 0;
         state.countTotal = 0;
         state.seqComparativa = 0;
+        // Revocar blob URLs de fotos de galería para liberar memoria
+        state.photos.forEach(function(p) {
+            if (p.url && p.url.startsWith('blob:')) {
+                try { URL.revokeObjectURL(p.url); } catch (_e) {}
+            }
+        });
         state.photos = [];
         state.waypoints = [];
         if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
