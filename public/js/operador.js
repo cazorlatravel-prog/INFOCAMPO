@@ -650,15 +650,15 @@
             const res = await fetch(url);
             const data = await res.json();
             if (data.ok && data.montes && data.montes.length > 0) {
-                let html = '<option value="">-- Todos los montes --</option>';
+                let html = '<option value="">Todos los montes</option>';
                 data.montes.forEach(m => {
                     html += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
                 });
                 filterMonte.innerHTML = html;
                 filterMonte.disabled = false;
             } else {
-                filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
-                filterMonte.disabled = true;
+                filterMonte.innerHTML = '<option value="">Sin montes disponibles</option>';
+                filterMonte.disabled = false;
             }
         } catch (err) {
             console.warn('Error loading montes:', err);
@@ -1927,10 +1927,6 @@
         if (filterProvincia) {
             filterProvincia.addEventListener('change', () => {
                 loadMunicipios(filterProvincia.value);
-                if (filterMonte) {
-                    filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
-                    filterMonte.disabled = true;
-                }
                 loadMontes();
                 clearInfra();
             });
@@ -3415,7 +3411,11 @@
             e.preventDefault();
             deferredInstallPrompt = e;
 
-            // Only show if user hasn't dismissed recently
+            // Always show install button in user menu
+            const menuBtn = document.getElementById('btn-install-menu');
+            if (menuBtn) menuBtn.style.display = '';
+
+            // Only show banner if user hasn't dismissed recently
             const dismissed = localStorage.getItem('pwa-install-dismissed');
             if (dismissed) {
                 const dismissedAt = parseInt(dismissed, 10);
@@ -3474,6 +3474,31 @@
         } else {
             alert('Para instalar FotoGPS:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
         }
+    }
+
+    // Global function for install button in user menu
+    window.triggerInstallFromMenu = async function() {
+        if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            if (outcome === 'accepted') {
+                const menuBtn = document.getElementById('btn-install-menu');
+                if (menuBtn) menuBtn.style.display = 'none';
+                banner.classList.add('hidden');
+                showNotification('App instalada correctamente');
+            }
+        } else {
+            showInstallInstructions();
+        }
+    };
+
+    // Show install button in menu for iOS (beforeinstallprompt doesn't fire)
+    const isIOSCheck = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isIOSCheck && !isStandalone) {
+        const menuBtn = document.getElementById('btn-install-menu');
+        if (menuBtn) menuBtn.style.display = '';
     }
 
     // ===================================================================

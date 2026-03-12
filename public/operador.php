@@ -143,6 +143,9 @@ if ($initials === '') $initials = 'OP';
                         <strong><?= htmlspecialchars($userName) ?></strong>
                         <small><?= htmlspecialchars($empresaName) ?></small>
                     </div>
+                    <button type="button" id="btn-install-menu" class="user-menu-item" style="display:none;" onclick="triggerInstallFromMenu()">
+                        <i class="bi bi-download"></i> Instalar App
+                    </button>
                     <a href="/login.php?logout=1" class="user-menu-item user-menu-logout">
                         <i class="bi bi-box-arrow-left"></i> Cerrar sesion
                     </a>
@@ -165,7 +168,7 @@ if ($initials === '') $initials = 'OP';
                     <select id="filter-municipio" class="input-field" disabled>
                         <option value="">Todos los municipios</option>
                     </select>
-                    <select id="filter-monte" class="input-field" disabled>
+                    <select id="filter-monte" class="input-field">
                         <option value="">Todos los montes</option>
                     </select>
                 </div>
