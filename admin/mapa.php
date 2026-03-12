@@ -85,12 +85,17 @@ if ($empresaId > 0) {
     $stmtInfra = $pdo->prepare(
         "SELECT i.id, i.nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica, i.tipo,
                 i.provincia, i.municipio, i.monte,
-                COUNT(r.id) AS num_fotos,
-                (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
+                COALESCE(rc.num_fotos, 0) AS num_fotos,
+                rc.ultimo_estado
          FROM infraestructuras i
-         LEFT JOIN registros r ON r.infra_id = i.id
-         WHERE i.empresa_id = :emp AND i.activa = 1 AND i.lat_teorica IS NOT NULL AND i.lon_teorica IS NOT NULL
-         GROUP BY i.id"
+         LEFT JOIN (
+             SELECT infra_id,
+                    COUNT(*) AS num_fotos,
+                    (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = r.infra_id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
+             FROM registros r
+             GROUP BY infra_id
+         ) rc ON rc.infra_id = i.id
+         WHERE i.empresa_id = :emp AND i.activa = 1 AND i.lat_teorica IS NOT NULL AND i.lon_teorica IS NOT NULL"
     );
     $stmtInfra->execute([':emp' => $empresaId]);
     foreach ($stmtInfra->fetchAll() as $inf) {
@@ -110,21 +115,20 @@ if ($empresaId > 0) {
     }
 }
 
-// Cargar capas KML guardadas
+// KML y GeoJSON se cargan por AJAX desde endpoints separados con caché
+// para no incluir blobs grandes en el HTML de la página
 $jsCapasKml = [];
+$jsCapasInfra = [];
 if ($empresaId > 0) {
+    // Solo cargar metadatos (sin contenido), el contenido se pide por AJAX
     $stmtKml = $pdo->prepare(
-        "SELECT id, nombre, contenido_kml, color, grosor, opacidad FROM capas_kml WHERE empresa_id = :emp AND activa = 1 ORDER BY created_at DESC"
+        "SELECT id, nombre, color, grosor, opacidad FROM capas_kml WHERE empresa_id = :emp AND activa = 1 ORDER BY created_at DESC"
     );
     $stmtKml->execute([':emp' => $empresaId]);
     $jsCapasKml = $stmtKml->fetchAll();
-}
 
-// Cargar capas de infraestructuras (SHP/KML/KMZ subidos como GeoJSON)
-$jsCapasInfra = [];
-if ($empresaId > 0) {
     $stmtCI = $pdo->prepare(
-        "SELECT id, nombre, geojson, campo_capa, campo_tabla, color, grosor, opacidad
+        "SELECT id, nombre, campo_capa, campo_tabla, color, grosor, opacidad
          FROM capas_infraestructuras
          WHERE empresa_id = :emp AND activa = 1
          ORDER BY created_at DESC"

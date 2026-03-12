@@ -18,11 +18,23 @@ if (!headers_sent()) {
 }
 
 // -----------------------------------------------------------
-// Cargar variables de entorno desde .env
+// Cargar variables de entorno desde .env (cached in memory per-request,
+// uses APCu if available to avoid re-parsing the file on every request)
 // -----------------------------------------------------------
 $_ENV_VARS = [];
 $envFile = __DIR__ . '/../.env';
-if (file_exists($envFile)) {
+$_envCacheKey = 'infocampo_env_' . md5($envFile);
+$_envLoaded = false;
+
+// Try APCu cache first (avoids file I/O on every request)
+if (function_exists('apcu_fetch')) {
+    $_envCached = apcu_fetch($_envCacheKey, $_envLoaded);
+    if ($_envLoaded) {
+        $_ENV_VARS = $_envCached;
+    }
+}
+
+if (!$_envLoaded && file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         $line = trim($line);
@@ -36,6 +48,10 @@ if (file_exists($envFile)) {
             $value = substr($value, 1, -1);
         }
         $_ENV_VARS[$key] = $value;
+    }
+    // Cache for 5 minutes if APCu is available
+    if (function_exists('apcu_store')) {
+        apcu_store($_envCacheKey, $_ENV_VARS, 300);
     }
 }
 

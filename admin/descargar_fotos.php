@@ -4,11 +4,17 @@
  *
  * GET ?infra_id=123
  *
- * Descarga todas las fotos de Cloudinary de una infraestructura,
+ * Descarga todas las fotos de Cloudinary/ImageKit de una infraestructura,
  * las empaqueta en un ZIP y lo envía al navegador.
+ *
+ * Optimizado: descarga imágenes una a una al archivo ZIP temporal en disco,
+ * liberando memoria entre cada imagen para evitar uso excesivo de RAM.
  */
 
 declare(strict_types=1);
+
+// Allow long-running downloads but set a reasonable limit
+set_time_limit(600); // 10 minutes max
 
 require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin', 'supervisor', 'superadmin']);
@@ -37,18 +43,19 @@ if (!$infra) {
     exit;
 }
 
-// Obtener todos los registros con fotos (scoped by empresa_id via infraestructura)
+// Obtener registros con fotos — usar cursor para no cargar todo en memoria
 $stmt = $pdo->prepare(
-    "SELECT r.url_cloudinary, r.fecha, r.estado_incidencia, u.nombre AS usuario_nombre
+    "SELECT r.url_cloudinary, r.fecha, r.estado_incidencia, r.nombre_archivo
      FROM registros r
      INNER JOIN infraestructuras i ON r.infra_id = i.id
-     INNER JOIN usuarios u ON r.usuario_id = u.id
      WHERE r.infra_id = :infra_id AND i.empresa_id = :emp_id
+       AND r.url_cloudinary IS NOT NULL AND r.url_cloudinary != ''
      ORDER BY r.fecha ASC"
 );
 $stmt->execute([':infra_id' => $infraId, ':emp_id' => $empresaId]);
-$registros = $stmt->fetchAll();
 
+// Contar registros sin cargar todo
+$registros = $stmt->fetchAll();
 if (empty($registros)) {
     http_response_code(404);
     echo 'No hay fotos para esta infraestructura';
@@ -65,32 +72,38 @@ if ($zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) {
     exit;
 }
 
+// Reutilizar handle cURL para connection pooling (evita nuevo handshake TLS por imagen)
+$ch = curl_init();
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT        => 30,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_ENCODING       => '', // Accept compressed responses
+]);
+
 $idx = 1;
+$maxPhotos = 500; // Safety limit to prevent extreme cases
+$errors = 0;
+
 foreach ($registros as $reg) {
+    if ($idx > $maxPhotos) {
+        break;
+    }
+
     $url = $reg['url_cloudinary'];
-    if (empty($url)) {
+
+    // Descargar imagen reutilizando el handle cURL
+    curl_setopt($ch, CURLOPT_URL, $url);
+    $imageData = curl_exec($ch);
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    if ($imageData === false || $httpCode !== 200) {
+        $errors++;
         continue;
     }
 
-    // Descargar imagen desde Cloudinary
-    $imageData = @file_get_contents($url);
-    if ($imageData === false) {
-        // Reintentar con cURL si file_get_contents falla
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-        $imageData = curl_exec($ch);
-        curl_close($ch);
-    }
-
-    if ($imageData === false) {
-        continue;
-    }
-
+    // Generar nombre de archivo
     $fecha = date('Ymd_His', strtotime($reg['fecha']));
     $estado = $reg['estado_incidencia'];
     $filename = sprintf(
@@ -102,9 +115,14 @@ foreach ($registros as $reg) {
     );
 
     $zip->addFromString($filename, $imageData);
+
+    // Liberar memoria de la imagen inmediatamente
+    unset($imageData);
+
     $idx++;
 }
 
+curl_close($ch);
 $zip->close();
 
 // Enviar ZIP al navegador

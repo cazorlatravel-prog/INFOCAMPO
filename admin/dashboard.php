@@ -66,52 +66,32 @@ if ($empresaId > 0) {
     $row = $stmt->fetch();
     if ($row) $empresaNombre = $row['nombre'];
 
-    // Total infraestructuras
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id AND activa = 1");
-    $stmt->execute([':id' => $empresaId]);
-    $stats['infraestructuras'] = (int) $stmt->fetchColumn();
-
-    // Total registros
+    // Estadísticas combinadas en una sola query con agregación condicional
     $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM registros r
+        "SELECT
+            COUNT(*) AS total_registros,
+            SUM(r.estado_incidencia = 'durante' AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS durante_24h,
+            SUM(r.fecha >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS registros_7d,
+            SUM(r.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS registros_30d
+         FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id"
     );
     $stmt->execute([':id' => $empresaId]);
-    $stats['registros'] = (int) $stmt->fetchColumn();
+    $aggRow = $stmt->fetch();
+    $stats['registros']    = (int) ($aggRow['total_registros'] ?? 0);
+    $stats['durante_24h']  = (int) ($aggRow['durante_24h'] ?? 0);
+    $stats['registros_7d'] = (int) ($aggRow['registros_7d'] ?? 0);
+    $stats['registros_30d'] = (int) ($aggRow['registros_30d'] ?? 0);
 
-    // Operadores activos
+    // Infraestructuras y operadores (queries ligeras, no se pueden combinar)
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id AND activa = 1");
+    $stmt->execute([':id' => $empresaId]);
+    $stats['infraestructuras'] = (int) $stmt->fetchColumn();
+
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE empresa_id = :id AND rol = 'operador' AND activo = 1");
     $stmt->execute([':id' => $empresaId]);
     $stats['operadores'] = (int) $stmt->fetchColumn();
-
-    // Registros "durante" (en progreso) últimas 24h
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM registros r
-         INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.estado_incidencia = 'durante'
-           AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
-    );
-    $stmt->execute([':id' => $empresaId]);
-    $stats['durante_24h'] = (int) $stmt->fetchColumn();
-
-    // Registros últimos 7 días
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM registros r
-         INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
-    );
-    $stmt->execute([':id' => $empresaId]);
-    $stats['registros_7d'] = (int) $stmt->fetchColumn();
-
-    // Registros últimos 30 días
-    $stmt = $pdo->prepare(
-        "SELECT COUNT(*) FROM registros r
-         INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
-    );
-    $stmt->execute([':id' => $empresaId]);
-    $stats['registros_30d'] = (int) $stmt->fetchColumn();
 
     // Actividad diaria últimos 14 días (desglosada por fase)
     $stmt = $pdo->prepare(
@@ -158,27 +138,24 @@ if ($empresaId > 0) {
     $subidasFallidas = [];
     $stats['fallidas'] = 0;
     try {
-        $tableCheck = $pdo->query("SHOW TABLES LIKE 'subidas_fallidas'")->fetchColumn();
-        if ($tableCheck) {
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM subidas_fallidas WHERE empresa_id = :id AND resuelta = 0"
+        );
+        $stmt->execute([':id' => $empresaId]);
+        $stats['fallidas'] = (int) $stmt->fetchColumn();
+
+        if ($stats['fallidas'] > 0) {
             $stmt = $pdo->prepare(
-                "SELECT COUNT(*) FROM subidas_fallidas WHERE empresa_id = :id AND resuelta = 0"
+                "SELECT sf.*, i.nombre AS infra_nombre, i.codigo_unico, u.nombre AS usuario_nombre
+                 FROM subidas_fallidas sf
+                 INNER JOIN infraestructuras i ON sf.infra_id = i.id
+                 INNER JOIN usuarios u ON sf.usuario_id = u.id
+                 WHERE sf.empresa_id = :id AND sf.resuelta = 0
+                 ORDER BY sf.fecha_fallo DESC
+                 LIMIT 10"
             );
             $stmt->execute([':id' => $empresaId]);
-            $stats['fallidas'] = (int) $stmt->fetchColumn();
-
-            if ($stats['fallidas'] > 0) {
-                $stmt = $pdo->prepare(
-                    "SELECT sf.*, i.nombre AS infra_nombre, i.codigo_unico, u.nombre AS usuario_nombre
-                     FROM subidas_fallidas sf
-                     INNER JOIN infraestructuras i ON sf.infra_id = i.id
-                     INNER JOIN usuarios u ON sf.usuario_id = u.id
-                     WHERE sf.empresa_id = :id AND sf.resuelta = 0
-                     ORDER BY sf.fecha_fallo DESC
-                     LIMIT 10"
-                );
-                $stmt->execute([':id' => $empresaId]);
-                $subidasFallidas = $stmt->fetchAll();
-            }
+            $subidasFallidas = $stmt->fetchAll();
         }
     } catch (\Exception $e) {}
 }

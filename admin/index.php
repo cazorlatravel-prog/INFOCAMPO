@@ -50,11 +50,13 @@ $infraestructuras = [];
 if ($empresaId > 0) {
     $stmt = $pdo->prepare(
         "SELECT i.id, i.nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica, i.tipo,
-                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id) AS total_registros,
-                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id AND r.estado_incidencia = 'durante') AS num_durante,
+                COUNT(r.id) AS total_registros,
+                SUM(CASE WHEN r.estado_incidencia = 'durante' THEN 1 ELSE 0 END) AS num_durante,
                 (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
          FROM infraestructuras i
+         LEFT JOIN registros r ON r.infra_id = i.id
          WHERE i.empresa_id = :empresa_id AND i.activa = 1
+         GROUP BY i.id
          ORDER BY i.nombre"
     );
     $stmt->execute([':empresa_id' => $empresaId]);
