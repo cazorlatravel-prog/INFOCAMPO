@@ -22,29 +22,31 @@ if ($infraId <= 0) {
 }
 
 $pdo = getDB();
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
-// Obtener info de la infraestructura
+// Obtener info de la infraestructura (verificando que pertenece a la empresa)
 $stmt = $pdo->prepare(
-    "SELECT codigo_unico FROM infraestructuras WHERE id = :id"
+    "SELECT codigo_unico FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id"
 );
-$stmt->execute([':id' => $infraId]);
+$stmt->execute([':id' => $infraId, ':emp_id' => $empresaId]);
 $infra = $stmt->fetch();
 
 if (!$infra) {
-    http_response_code(404);
-    echo 'Infraestructura no encontrada';
+    http_response_code(403);
+    echo 'Infraestructura no encontrada o no pertenece a tu empresa';
     exit;
 }
 
-// Obtener todos los registros con fotos
+// Obtener todos los registros con fotos (scoped by empresa_id via infraestructura)
 $stmt = $pdo->prepare(
     "SELECT r.url_cloudinary, r.fecha, r.estado_incidencia, u.nombre AS usuario_nombre
      FROM registros r
+     INNER JOIN infraestructuras i ON r.infra_id = i.id
      INNER JOIN usuarios u ON r.usuario_id = u.id
-     WHERE r.infra_id = :infra_id
+     WHERE r.infra_id = :infra_id AND i.empresa_id = :emp_id
      ORDER BY r.fecha ASC"
 );
-$stmt->execute([':infra_id' => $infraId]);
+$stmt->execute([':infra_id' => $infraId, ':emp_id' => $empresaId]);
 $registros = $stmt->fetchAll();
 
 if (empty($registros)) {

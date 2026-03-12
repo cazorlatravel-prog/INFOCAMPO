@@ -27,7 +27,7 @@ $pdo = getDB();
 $currentPage = 'dashboard';
 
 // Obtener empresa_id
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // Cargar empresas para el selector
 $empresas = $pdo->query(

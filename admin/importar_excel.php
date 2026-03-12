@@ -58,7 +58,7 @@ if (!validateCsrf()) {
     exit;
 }
 
-$empresaId = (int) ($_POST['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 if ($empresaId <= 0) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Empresa no identificada'], JSON_UNESCAPED_UNICODE);

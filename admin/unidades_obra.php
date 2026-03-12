@@ -16,7 +16,7 @@ $pdo = getDB();
 $currentPage = 'unidades_obra';
 
 // Obtener empresa_id (de la sesión si admin autenticado, o de la query si superadmin suplantando)
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // ---------------------------------------------------------------
 // Procesar acciones POST

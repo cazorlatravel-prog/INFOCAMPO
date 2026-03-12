@@ -14,7 +14,7 @@ requireRole(['admin', 'superadmin']);
 
 $pdo = getDB();
 $currentPage = 'capas_infra';
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 $empresas = $pdo->query(
     "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"

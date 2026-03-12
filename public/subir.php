@@ -146,6 +146,14 @@ try {
     $infraCodigo = $infraRow['codigo'] ?: $infraRow['nombre'];
     $infraEmpresaId = (int) $infraRow['empresa_id'];
 
+    // Validar que la infraestructura pertenece a la empresa del usuario
+    $sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+    if ($sessionEmpresaId > 0 && $infraEmpresaId !== $sessionEmpresaId) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Infraestructura no pertenece a tu empresa']);
+        exit;
+    }
+
     // Obtener formato de nombre configurado para la empresa
     $stmtFmt = $pdo->prepare("SELECT formato_nombre_foto FROM empresas WHERE id = :id");
     $stmtFmt->execute([':id' => $infraEmpresaId]);

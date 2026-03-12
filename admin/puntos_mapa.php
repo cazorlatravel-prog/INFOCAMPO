@@ -13,7 +13,7 @@ requireRole(['admin', 'superadmin']);
 
 $pdo = getDB();
 $currentPage = 'puntos_mapa';
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 $puntos = [];
 if ($empresaId > 0) {

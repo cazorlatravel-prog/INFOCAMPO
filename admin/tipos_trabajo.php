@@ -15,7 +15,7 @@ $pdo = getDB();
 
 $currentPage = 'tipos_trabajo';
 
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // ---------------------------------------------------------------
 // Procesar acciones POST

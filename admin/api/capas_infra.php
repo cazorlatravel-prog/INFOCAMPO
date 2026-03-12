@@ -18,7 +18,11 @@ requireRole(['admin', 'superadmin']);
 header('Content-Type: application/json; charset=utf-8');
 
 $pdo = getDB();
-$empresaId = (int) ($_GET['empresa_id'] ?? $_POST['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+// Solo superadmins pueden especificar empresa_id diferente
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+if (($_SESSION['user_rol'] ?? '') === 'superadmin' && (isset($_GET['empresa_id']) || isset($_POST['empresa_id']))) {
+    $empresaId = (int) ($_GET['empresa_id'] ?? $_POST['empresa_id']);
+}
 
 if ($empresaId <= 0) {
     http_response_code(400);
