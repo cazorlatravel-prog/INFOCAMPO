@@ -736,6 +736,7 @@ if ($initials === '') $initials = 'OP';
     })();
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/haversine.js"></script>
     <script src="js/offline.js"></script>
     <script src="js/operador.js"></script>
 </body>
