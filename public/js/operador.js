@@ -128,6 +128,8 @@
     const visitasBody        = $('#visitas-body');
     const guardarVisitaSection = $('#guardar-visita-section');
     const btnGuardarVisita   = $('#btn-guardar-visita');
+    const guardarVisitaSinFotoSection = $('#guardar-visita-sin-foto-section');
+    const btnGuardarVisitaSinFoto = $('#btn-guardar-visita-sin-foto');
     const btnEditarBack      = $('#btn-editar-back');
     const btnGuardarEdicion  = $('#btn-guardar-edicion');
     const btnAñadirFotoVisita = $('#btn-añadir-foto-visita');
@@ -970,7 +972,13 @@
             hint.classList.toggle('hidden', enabled);
         }
 
-        // Show/hide guardar visita button (visible when infra selected and there are photos)
+        // Show/hide guardar visita sin foto (visible when infra selected, hidden when there are photos)
+        if (guardarVisitaSinFotoSection) {
+            const hasPhotos = state.photos.length > 0;
+            guardarVisitaSinFotoSection.classList.toggle('hidden', !enabled || hasPhotos);
+        }
+
+        // Show/hide finalizar visita button (visible when infra selected and there are photos)
         if (guardarVisitaSection) {
             const hasPhotos = state.photos.length > 0;
             guardarVisitaSection.classList.toggle('hidden', !enabled || !hasPhotos);
@@ -2124,6 +2132,9 @@
 
         // Guardar visita (finalizar y resetear)
         if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
+
+        // Guardar visita sin foto
+        if (btnGuardarVisitaSinFoto) btnGuardarVisitaSinFoto.addEventListener('click', guardarVisitaSinFoto);
 
         // Waypoints download from ficha
         const btnWaypointsFicha = $('#btn-waypoints-ficha');
@@ -3600,6 +3611,60 @@
         let url = `${CFG.endpoints.waypoints}?empresa_id=${CFG.empresaId}&usuario_id=${CFG.usuarioId}`;
         if (state.infraId) url += `&infra_id=${state.infraId}`;
         window.open(url, '_blank');
+    }
+
+    async function guardarVisitaSinFoto() {
+        if (!state.infraId) {
+            alert('Selecciona una infraestructura primero.');
+            return;
+        }
+
+        // Deshabilitar botón mientras guarda
+        if (btnGuardarVisitaSinFoto) {
+            btnGuardarVisitaSinFoto.disabled = true;
+            btnGuardarVisitaSinFoto.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('infra_id', state.infraId);
+            formData.append('lat_real', state.gps.lat || 0);
+            formData.append('lon_real', state.gps.lon || 0);
+            formData.append('estado_incidencia', SITUACIONES[state.situacionIdx]);
+            formData.append('observaciones', ($('#observaciones-general') || {}).value || '');
+
+            if (tipoTrabajo && tipoTrabajo.value) {
+                formData.append('tipo_trabajo_id', tipoTrabajo.value);
+            }
+            if (unidadObra.value) {
+                formData.append('unidad_obra_id', unidadObra.value);
+            }
+
+            // Campos dinámicos
+            const dynFields = collectDynamicFields();
+            for (const [campoId, valor] of Object.entries(dynFields)) {
+                formData.append(`campos[${campoId}]`, valor);
+            }
+
+            const res = await fetch(CFG.endpoints.guardarVisita, { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.ok) {
+                showNotification(`Visita a "${state.infraName}" guardada correctamente`);
+                // Resetear estado como finalizarVisita
+                finalizarVisita();
+            } else {
+                alert('Error: ' + (data.error || 'Error desconocido'));
+            }
+        } catch (err) {
+            console.error('Error guardando visita:', err);
+            alert('Error de conexión al guardar la visita.');
+        } finally {
+            if (btnGuardarVisitaSinFoto) {
+                btnGuardarVisitaSinFoto.disabled = false;
+                btnGuardarVisitaSinFoto.innerHTML = '<i class="bi bi-save-fill"></i> Guardar visita';
+            }
+        }
     }
 
     function finalizarVisita() {

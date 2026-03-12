@@ -337,7 +337,14 @@ if ($initials === '') $initials = 'OP';
             </div>
         </div>
 
-        <!-- Botón Finalizar Visita (fijo abajo, rojo, fuera del scroll) -->
+        <!-- Botón Guardar Visita (sin foto) — visible cuando hay infra seleccionada -->
+        <div id="guardar-visita-sin-foto-section" class="guardar-visita-fixed hidden" style="bottom:72px;">
+            <button type="button" id="btn-guardar-visita-sin-foto" class="btn-guardar-visita-sin-foto" style="width:100%;">
+                <i class="bi bi-save-fill"></i> Guardar visita
+            </button>
+        </div>
+
+        <!-- Botón Finalizar Visita (fijo abajo, con fotos) -->
         <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
             <div style="display:flex;gap:8px;width:100%;">
                 <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita" style="flex:1;">
@@ -683,6 +690,7 @@ if ($initials === '') $initials = 'OP';
                 waypoints: 'api/waypoints.php',
                 puntosMapa: 'api/puntos_mapa.php',
                 campos: 'api/campos.php',
+                guardarVisita: 'api/guardar_visita.php',
             },
             formatoNombreFoto: <?= $formatoNombreFoto ?>,
             opMostrarEmpresa: <?= $opMostrarEmpresa ?>,

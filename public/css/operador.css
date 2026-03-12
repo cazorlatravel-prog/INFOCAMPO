@@ -2493,6 +2493,35 @@ select.input-field {
     box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
 }
 
+.btn-guardar-visita-sin-foto {
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
+    transition: all 0.2s ease;
+    letter-spacing: 0.3px;
+}
+
+.btn-guardar-visita-sin-foto:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn-guardar-visita-sin-foto:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ==========================================================
    BOTÓN GUARDAR EDICIÓN (verde, en editar visita)
    ========================================================== */
