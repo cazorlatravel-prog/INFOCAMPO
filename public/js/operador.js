@@ -1849,6 +1849,14 @@
             const centerX = 256 + pixelX;
             const centerY = 256 + pixelY;
 
+            // Verify tileCanvas is not tainted before compositing to main canvas
+            try {
+                tileCanvas.toDataURL();
+            } catch (_taintErr) {
+                console.warn('Mini-map: canvas tainted by tiles, skipping');
+                return;
+            }
+
             // Draw rounded rectangle clip path on mapCanvas
             roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
             mapCtx.clip();
@@ -3451,7 +3459,7 @@
                 }, type, quality);
             } catch (err) {
                 clearTimeout(timer);
-                reject(new Error('Canvas toBlob error: ' + err.message));
+                reject(new Error('Canvas tainted or toBlob failed: ' + err.message));
             }
         });
     }

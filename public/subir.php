@@ -175,6 +175,7 @@ try {
     $situacionLabel = $situacionLabels[$incidencia] ?? 'Antes';
 
     // Construir nombre según formato
+
     switch ($formatoNombre) {
         case 2:
             // CODIGO_INFRA_SITUACION_NºFOTO
