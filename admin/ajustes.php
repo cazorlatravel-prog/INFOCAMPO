@@ -109,21 +109,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $opInfra     = isset($_POST['op_mostrar_infraestructura']) ? 1 : 0;
             $opSituacion = isset($_POST['op_mostrar_situacion']) ? 1 : 0;
             $opMapa      = isset($_POST['op_mostrar_mapa']) ? 1 : 0;
+            $opCapasInfra = isset($_POST['op_mostrar_capas_infra']) ? 1 : 0;
             $opMapaZoom  = (int) ($_POST['op_mapa_zoom'] ?? 9);
             $allowedZooms = [9, 10, 12, 13];
             if (!in_array($opMapaZoom, $allowedZooms, true)) $opMapaZoom = 9;
 
             $stmt = $pdo->prepare(
                 "UPDATE empresas SET op_mostrar_empresa = :emp, op_mostrar_infraestructura = :inf,
-                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa, op_mapa_zoom = :zoom WHERE id = :id"
+                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa, op_mostrar_capas_infra = :capas, op_mapa_zoom = :zoom WHERE id = :id"
             );
             $stmt->execute([
-                ':emp'  => $opEmpresa,
-                ':inf'  => $opInfra,
-                ':sit'  => $opSituacion,
-                ':mapa' => $opMapa,
-                ':zoom' => $opMapaZoom,
-                ':id'   => $targetEmpId,
+                ':emp'   => $opEmpresa,
+                ':inf'   => $opInfra,
+                ':sit'   => $opSituacion,
+                ':mapa'  => $opMapa,
+                ':capas' => $opCapasInfra,
+                ':zoom'  => $opMapaZoom,
+                ':id'    => $targetEmpId,
             ]);
             $msg = 'Campos del operador actualizados correctamente.';
             $msgType = 'success';
@@ -163,6 +165,7 @@ $opEmpresa   = (int) ($empresa['op_mostrar_empresa'] ?? 0);
 $opInfra     = (int) ($empresa['op_mostrar_infraestructura'] ?? 0);
 $opSituacion = (int) ($empresa['op_mostrar_situacion'] ?? 0);
 $opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
+$opCapasInfra = (int) ($empresa['op_mostrar_capas_infra'] ?? 0);
 $opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
 
 // Watermark settings — base fields (default ON)
@@ -339,6 +342,14 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                         <option value="9" <?= $opMapaZoom === 9 ? 'selected' : '' ?>>1:500.000</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="op_capas_infra" name="op_mostrar_capas_infra" value="1" <?= $opCapasInfra ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="op_capas_infra">
+                                    <i class="bi bi-layers me-1"></i> Capas de infraestructuras en mapa
+                                </label>
+                                <div class="text-muted small mt-1">Permite al operador ver las capas GeoJSON de infraestructuras en el mapa de visitas.</div>
                             </div>
                         </div>
 

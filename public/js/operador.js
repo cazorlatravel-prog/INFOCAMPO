@@ -2528,8 +2528,8 @@
 
             // Load KML layers from DB
             loadMapKmlLayers();
-            // Load infrastructure GeoJSON layers
-            loadMapInfraLayers();
+            // Load infrastructure GeoJSON layers (si el admin lo permite)
+            if (CFG.opMostrarCapasInfra) loadMapInfraLayers();
             // Load waypoints GPX layer (comparative photos, "antes" state)
             loadMapWaypoints();
             // Load admin custom points

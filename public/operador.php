@@ -42,12 +42,13 @@ $opMostrarEmpresa = 0;
 $opMostrarInfra = 0;
 $opMostrarSituacion = 0;
 $opMostrarMapa = 0;
+$opMostrarCapasInfra = 0;
 $opMapaZoom = 9;
 $wmFecha = 1; $wmCoordenadas = 1; $wmOrientacion = 1; $wmUbicacion = 1; $wmPais = 1; $wmBrujula = 1;
 $wmCodigoInfra = 0; $wmSituacion = 0; $wmTipoFoto = 0;
 $wmMapa = 0; $wmMapaZoom = 15; $wmMapaTamano = 2; $wmTextoTamano = 2;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_fecha, wm_mostrar_coordenadas, wm_mostrar_orientacion, wm_mostrar_ubicacion, wm_mostrar_pais, wm_mostrar_brujula, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mostrar_capas_infra, op_mapa_zoom, wm_mostrar_fecha, wm_mostrar_coordenadas, wm_mostrar_orientacion, wm_mostrar_ubicacion, wm_mostrar_pais, wm_mostrar_brujula, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) {
@@ -57,6 +58,7 @@ if ($empresaId > 0) {
         $opMostrarInfra = (int) ($row['op_mostrar_infraestructura'] ?? 0);
         $opMostrarSituacion = (int) ($row['op_mostrar_situacion'] ?? 0);
         $opMostrarMapa = (int) ($row['op_mostrar_mapa'] ?? 0);
+        $opMostrarCapasInfra = (int) ($row['op_mostrar_capas_infra'] ?? 0);
         $opMapaZoom = (int) ($row['op_mapa_zoom'] ?? 9);
         $wmFecha = (int) ($row['wm_mostrar_fecha'] ?? 1);
         $wmCoordenadas = (int) ($row['wm_mostrar_coordenadas'] ?? 1);
@@ -697,6 +699,7 @@ if ($initials === '') $initials = 'OP';
             opMostrarInfra: <?= $opMostrarInfra ?>,
             opMostrarSituacion: <?= $opMostrarSituacion ?>,
             opMostrarMapa: <?= $opMostrarMapa ?>,
+            opMostrarCapasInfra: <?= $opMostrarCapasInfra ?>,
             opMapaZoom: <?= $opMapaZoom ?>,
             watermark: {
                 fecha: <?= $wmFecha ?>,
