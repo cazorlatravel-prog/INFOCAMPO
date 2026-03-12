@@ -490,7 +490,7 @@
             const addr = data.address || {};
             state.geoLocation = {
                 city: addr.city || addr.town || addr.village || addr.municipality || '',
-                province: addr.state || addr.province || addr.county || '',
+                province: addr.province || addr.county || addr.state || '',
                 postcode: addr.postcode || '',
                 country: addr.country || '',
             };
