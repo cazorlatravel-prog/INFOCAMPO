@@ -11,12 +11,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/config.php';
-
-// Parámetros del operador (URL > sesión > 0)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../includes/auth.php';
 $usuarioId = isset($_GET['user']) ? (int) $_GET['user'] : (int) ($_SESSION['user_id'] ?? 0);
 $empresaId = isset($_GET['empresa']) ? (int) $_GET['empresa'] : (int) ($_SESSION['empresa_id'] ?? 0);
 
