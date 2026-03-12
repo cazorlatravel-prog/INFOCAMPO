@@ -258,6 +258,27 @@ function stopImpersonation(): bool
 }
 
 /**
+ * Obtener empresa_id de forma segura.
+ * Solo superadmins pueden especificar un empresa_id diferente al de su sesión.
+ * Admins y supervisores siempre obtienen el de su sesión.
+ */
+function getEmpresaIdSeguro(): int
+{
+    $sessionEmpId = (int) ($_SESSION['empresa_id'] ?? 0);
+    $userRol = $_SESSION['user_rol'] ?? '';
+
+    // Solo superadmins pueden ver/modificar datos de otra empresa
+    if ($userRol === 'superadmin') {
+        $requested = $_GET['empresa_id'] ?? $_POST['empresa_id'] ?? null;
+        if ($requested !== null) {
+            return (int) $requested;
+        }
+    }
+
+    return $sessionEmpId;
+}
+
+/**
  * Verificar si estamos en modo suplantación.
  * Auto-detiene si ha superado el tiempo máximo (1 hora).
  */

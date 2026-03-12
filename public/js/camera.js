@@ -27,6 +27,7 @@ const Camera = (() => {
     let geoLocation = null;
     let stream = null;
     let capturedBlob = null;
+    let gpsWatchId = null;
 
     const cfg = window.INFOCAMPO_CONFIG;
 
@@ -44,6 +45,10 @@ const Camera = (() => {
                 audio: false
             });
             video.srcObject = stream;
+            // Ensure iOS Safari plays inline
+            video.setAttribute('playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('muted', '');
         } catch (err) {
             alert('No se pudo acceder a la cámara: ' + err.message);
         }
@@ -58,7 +63,7 @@ const Camera = (() => {
             return;
         }
 
-        navigator.geolocation.watchPosition(
+        gpsWatchId = navigator.geolocation.watchPosition(
             (pos) => {
                 currentPosition.lat = pos.coords.latitude;
                 currentPosition.lon = pos.coords.longitude;
@@ -136,7 +141,7 @@ const Camera = (() => {
             };
             _lastGeoLat = lat;
             _lastGeoLon = lon;
-        } catch { /* silencioso */ }
+        } catch (_e) { /* silencioso */ }
     }
 
     // =========================================================
@@ -154,7 +159,7 @@ const Camera = (() => {
                 ghostActive = true;
                 btnGhost.classList.add('active');
             }
-        } catch {
+        } catch (_e) {
             // Sin imagen ghost disponible – silencioso
         }
     }
@@ -169,11 +174,17 @@ const Camera = (() => {
             try {
                 const perm = await DeviceOrientationEvent.requestPermission();
                 if (perm === 'granted') _startCompassListener();
-            } catch { /* denied */ }
+            } catch (_e) { /* denied */ }
         }
 
         const vw = video.videoWidth;
         const vh = video.videoHeight;
+
+        if (!vw || !vh) {
+            console.warn('captureFrame: video not ready (dimensions 0)');
+            return;
+        }
+
         captureCanvas.width = vw;
         captureCanvas.height = vh;
 
@@ -278,5 +289,18 @@ const Camera = (() => {
 
     document.addEventListener('DOMContentLoaded', init);
 
-    return { retake, getCurrentNivel: () => niveles[nivelIdx] };
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            stream = null;
+        }
+        video.pause();
+        video.srcObject = null;
+        if (gpsWatchId != null) {
+            navigator.geolocation.clearWatch(gpsWatchId);
+            gpsWatchId = null;
+        }
+    }
+
+    return { retake, getCurrentNivel: () => niveles[nivelIdx], stopCamera };
 })();

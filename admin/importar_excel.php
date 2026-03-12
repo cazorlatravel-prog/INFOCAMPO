@@ -13,7 +13,19 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../vendor/autoload.php';
+
+// Verificar que Composer esté instalado
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+if (!file_exists($autoloadPath)) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode([
+        'ok' => false,
+        'error' => 'Dependencias no instaladas. Ejecuta "composer install" en el servidor.',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+require_once $autoloadPath;
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -29,13 +41,24 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Detectar si PHP descartó los datos por exceder post_max_size
+if (empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > 0) {
+    $maxSize = ini_get('post_max_size');
+    http_response_code(413);
+    echo json_encode([
+        'ok' => false,
+        'error' => "El archivo excede el límite del servidor (post_max_size: {$maxSize}). Contacta al administrador para aumentar el límite.",
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (!validateCsrf()) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-$empresaId = (int) ($_POST['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 if ($empresaId <= 0) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Empresa no identificada'], JSON_UNESCAPED_UNICODE);

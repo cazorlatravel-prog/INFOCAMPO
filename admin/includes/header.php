@@ -112,6 +112,10 @@ if ($_navEmpresaId > 0) {
             </div>
         </div>
 
+        <button type="button" id="btn-admin-install-menu" class="btn btn-sm" style="display:none;background:rgba(255,255,255,0.15);color:#fff;font-size:0.72rem;border:1px solid rgba(255,255,255,0.2);padding:5px 10px;" onclick="triggerAdminInstall()" title="Instalar App">
+            <i class="bi bi-download"></i> <span class="d-none d-md-inline">Instalar</span>
+        </button>
+
         <?php if (!$impersonating): ?>
             <a href="/login.php?logout=1" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;" aria-label="Cerrar sesion">
                 <i class="bi bi-box-arrow-left"></i>
@@ -384,35 +388,46 @@ if ($_navEmpresaId > 0) {
     var dismissed = localStorage.getItem('admin-pwa-install-dismissed');
     if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 7 * 24 * 60 * 60 * 1000) return;
 
+    var menuBtn = document.getElementById('btn-admin-install-menu');
+
     window.addEventListener('beforeinstallprompt', function(e) {
         e.preventDefault();
         deferredPrompt = e;
         banner.style.display = 'block';
+        // Always show permanent button in header
+        if (menuBtn) menuBtn.style.display = '';
     });
 
-    // iOS detection - show banner with manual instructions
+    // iOS detection - show banner with manual instructions + permanent button
     var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     if (isIOS && !window.navigator.standalone) {
         banner.style.display = 'block';
+        if (menuBtn) menuBtn.style.display = '';
     }
 
-    btnInstall.addEventListener('click', async function() {
+    function doAdminInstall() {
         if (deferredPrompt) {
             deferredPrompt.prompt();
-            var result = await deferredPrompt.userChoice;
-            deferredPrompt = null;
-            if (result.outcome === 'accepted') {
-                banner.style.display = 'none';
-            }
+            deferredPrompt.userChoice.then(function(result) {
+                deferredPrompt = null;
+                if (result.outcome === 'accepted') {
+                    banner.style.display = 'none';
+                    if (menuBtn) menuBtn.style.display = 'none';
+                }
+            });
         } else {
-            // Fallback instructions
             if (isIOS) {
                 alert('Para instalar FotoGPS en tu dispositivo:\n\n1. Pulsa el boton Compartir (cuadrado con flecha)\n2. Pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
             } else {
                 alert('Para instalar FotoGPS:\n\n1. Abre el menu del navegador (tres puntos)\n2. Pulsa "Instalar aplicacion" o "Añadir a pantalla de inicio"');
             }
         }
-    });
+    }
+
+    // Global function for header button
+    window.triggerAdminInstall = doAdminInstall;
+
+    btnInstall.addEventListener('click', doAdminInstall);
 
     if (btnDismiss) {
         btnDismiss.addEventListener('click', function() {

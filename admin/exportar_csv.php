@@ -22,7 +22,7 @@ requireRole(['admin', 'superadmin', 'supervisor']);
 $pdo = getDB();
 
 $tipo = $_GET['tipo'] ?? '';
-$empresaId = (int) ($_GET['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 if ($empresaId <= 0) {
     http_response_code(400);
