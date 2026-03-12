@@ -1298,11 +1298,17 @@
             });
 
             // Save base image for annotation overlay (before any annotation)
-            const prevCtx = previewCanvas.getContext('2d');
-            state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            // getImageData can throw SecurityError on tainted canvas — non-critical
             state.pendingFilename = filename;
             state.annotation = null;
             state.annotationMode = false;
+            try {
+                const prevCtx = previewCanvas.getContext('2d');
+                state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            } catch (imgDataErr) {
+                console.warn('getImageData failed (annotations disabled):', imgDataErr);
+                state.baseImageData = null;
+            }
 
             // Show preview screen for optional annotation before uploading
             showScreen('preview');
@@ -1322,7 +1328,7 @@
             if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
             // Resume camera so the user can retry
             try { camVideo.play(); } catch (_) {}
-            // Mostrar mensaje más descriptivo según el tipo de error
+            // Mostrar mensaje descriptivo con detalle del error para diagnóstico
             let userMsg = 'Error al capturar la foto. Inténtalo de nuevo.';
             if (err.message && err.message.includes('taint')) {
                 userMsg = 'Error de seguridad con el mapa. Se reintentará sin mapa.';
@@ -1331,7 +1337,7 @@
             } else if (err.message && err.message.includes('toBlob')) {
                 userMsg = 'Error al generar la imagen. Inténtalo de nuevo.';
             }
-            alert(userMsg);
+            alert(userMsg + '\n\nDetalle: ' + (err.message || String(err)));
         } finally {
             _capturing = false;
             // Restore shutter button
