@@ -52,20 +52,13 @@ FotoGPS.app (INFOCAMPO) es una plataforma SaaS (Software as a Service) disenada 
 - Definir campos de formulario dinamicos personalizados por empresa
 - Gestionar capas KML/GeoJSON para visualizar en los mapas
 
-### Para superadministradores (plataforma)
-- Gestionar todas las empresas (planes, licencias, limites)
-- Gestionar usuarios de todas las empresas
-- Configurar campos de formulario por empresa
-- Impersonar (suplantar) a cualquier usuario para soporte tecnico
-
 ## 1.4 Roles de usuario
 
 | Rol | Acceso | Panel |
 |---|---|---|
-| **Superadmin** | Control total de la plataforma | `/superadmin/` y `/admin/` |
-| **Admin** | Gestion completa de su empresa | `/admin/` |
-| **Supervisor** | Acceso de solo lectura al panel admin | `/admin/` |
-| **Operador** | Captura de fotos en campo | `/public/operador.php` |
+| **Admin** | Gestion completa de la empresa | Panel de administracion |
+| **Supervisor** | Acceso de consulta al panel admin | Panel de administracion |
+| **Operador** | Captura de fotos en campo | App de campo (movil) |
 
 ---
 
@@ -79,7 +72,6 @@ FotoGPS.app (INFOCAMPO) es una plataforma SaaS (Software as a Service) disenada 
 4. Segun tu rol, seras redirigido al panel correspondiente:
    - Operadores: Pantalla de toma de datos
    - Administradores/Supervisores: Panel de administracion
-   - Superadministradores: Panel de administracion con opciones de plataforma
 
 > **Nota:** La contrasena es sensible a mayusculas/minusculas. Si no puedes acceder, contacta con tu administrador.
 
@@ -632,70 +624,7 @@ En la columna derecha se muestra una previsualizacion de como vera el operador l
 
 ---
 
-# 5. Manual del Superadministrador
-
-El superadministrador tiene acceso a todas las funciones del administrador, mas las siguientes funciones adicionales de gestion de la plataforma.
-
-## 5.1 Gestion de Empresas
-
-Accede desde el menu **Plataforma > Empresas**.
-
-### Crear empresa
-| Campo | Descripcion |
-|---|---|
-| Nombre* | Nombre de la empresa |
-| NIF/CIF | Identificador fiscal |
-| Plan | FREE / BASIC / PROFESSIONAL / ENTERPRISE |
-| Email de contacto | Email de la empresa |
-| Inicio licencia | Fecha de inicio (por defecto: hoy) |
-| Fin licencia | Fecha de fin (por defecto: +1 ano) |
-| Max. usuarios | Limite de usuarios permitidos |
-| Max. infraestructuras | Limite de infraestructuras |
-| Activa | Estado de la empresa |
-
-### Tabla de empresas
-Cada empresa muestra:
-- Nombre y email de contacto
-- NIF
-- Plan (badge de color por nivel)
-- Periodo de licencia (con alerta si ha expirado)
-- Usuarios actuales / limite
-- Infraestructuras actuales / limite
-- Estado (Activa/Inactiva)
-- Acciones: Editar, Ver usuarios, Ver infraestructuras, Configurar campos, Acceder como admin, Activar/Desactivar, Eliminar
-
-> **Precaucion:** Eliminar una empresa borra TODOS sus datos: usuarios, infraestructuras, inspecciones, campos y registros.
-
-## 5.2 Gestion Global de Usuarios
-
-Accede desde **Plataforma > Usuarios Globales**. Funciona igual que la gestion de usuarios por empresa, pero con:
-- **Filtro por empresa:** Dropdown para seleccionar empresa o ver todas
-- **Campo Empresa:** Al crear un usuario, puedes asignarlo a cualquier empresa
-- **Impersonar:** Boton para acceder como cualquier usuario
-
-## 5.3 Campos de Formulario por Empresa
-
-Accede desde **Plataforma > Campos Globales**. Permite configurar los campos dinamicos del formulario para cada empresa.
-
-## 5.4 Impersonacion (Suplantar usuario)
-
-La impersonacion permite al superadministrador acceder al sistema como si fuera otro usuario, util para soporte tecnico:
-
-1. Desde la tabla de empresas, pulsa el boton de **login** en una empresa
-2. O desde la tabla de usuarios, pulsa **Impersonar** en un usuario
-3. Aparecera una **barra naranja** en la parte superior indicando que estas impersonando
-4. Navega por el sistema como si fueras ese usuario
-5. Para volver a tu cuenta de superadmin, pulsa **Volver** en la barra naranja
-
-> La impersonacion tiene un limite de 1 hora. Transcurrido ese tiempo, se cierra automaticamente y vuelves a tu sesion de superadmin.
-
-## 5.5 Selector de empresa en el panel admin
-
-Como superadmin, en cada pagina del panel de administracion veras un **selector de empresa** en la parte superior que te permite cambiar de empresa sin salir de la pagina actual. Esto te permite revisar datos de diferentes empresas rapidamente.
-
----
-
-# 6. Preguntas frecuentes
+# 5. Preguntas frecuentes
 
 **P: Las fotos que tomo sin conexion, se pierden?**
 R: No. Se guardan localmente en el dispositivo y se sincronizan automaticamente cuando recuperes conexion a internet. Mientras tanto, veras un indicador de "fotos pendientes".

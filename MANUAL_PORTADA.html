@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario - FotoGPS.app</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap');
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a1628;
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ============================================
+           PORTADA PRINCIPAL
+           ============================================ */
+        .cover {
+            position: relative;
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Fondo con degradado que evoca los montes andaluces */
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                /* Capa superior: gradiente principal */
+                linear-gradient(
+                    175deg,
+                    rgba(15, 40, 25, 0.95) 0%,
+                    rgba(20, 60, 35, 0.85) 20%,
+                    rgba(25, 80, 45, 0.7) 40%,
+                    rgba(45, 100, 60, 0.6) 55%,
+                    rgba(180, 140, 60, 0.5) 70%,
+                    rgba(220, 160, 50, 0.4) 80%,
+                    rgba(240, 120, 40, 0.3) 90%,
+                    rgba(200, 80, 30, 0.4) 100%
+                );
+            z-index: 1;
+        }
+
+        /* Patron de montanas */
+        .mountains {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 55%;
+            z-index: 0;
+        }
+
+        .mountain {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .mountain svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Patron de arboles (pinos/cortafuegos) */
+        .trees-pattern {
+            position: absolute;
+            bottom: 8%;
+            left: 0;
+            right: 0;
+            height: 200px;
+            z-index: 0;
+            opacity: 0.3;
+        }
+
+        .tree {
+            position: absolute;
+            bottom: 0;
+        }
+
+        .tree svg {
+            fill: #1a3a20;
+        }
+
+        /* Estrellas sutiles */
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50%;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            border-radius: 50%;
+            opacity: 0.4;
+            animation: twinkle 3s infinite alternate;
+        }
+
+        @keyframes twinkle {
+            0% { opacity: 0.2; }
+            100% { opacity: 0.7; }
+        }
+
+        /* Contenido principal */
+        .cover-content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 40px 24px;
+            max-width: 900px;
+        }
+
+        /* Badge superior */
+        .cover-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 100px;
+            padding: 8px 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.85);
+            margin-bottom: 32px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .cover-badge .dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+            50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+        }
+
+        /* Icono central */
+        .cover-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border-radius: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 28px;
+            box-shadow:
+                0 20px 40px rgba(59, 130, 246, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        .cover-icon::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 30px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.3), transparent);
+            z-index: -1;
+        }
+
+        .cover-icon svg {
+            width: 52px;
+            height: 52px;
+            fill: #fff;
+        }
+
+        /* Titulo */
+        .cover-title {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 900;
+            line-height: 1.05;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .cover-title .brand {
+            background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .cover-title .app {
+            font-weight: 400;
+            opacity: 0.5;
+            font-size: 0.6em;
+        }
+
+        /* Subtitulo */
+        .cover-subtitle {
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 40px;
+            line-height: 1.4;
+        }
+
+        .cover-subtitle strong {
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Separador decorativo */
+        .cover-divider {
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+            margin: 0 auto 40px;
+            border-radius: 2px;
+        }
+
+        /* Tarjetas informativas */
+        .cover-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 48px;
+        }
+
+        .cover-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 20px 16px;
+            text-align: center;
+            transition: transform 0.3s, background 0.3s;
+        }
+
+        .cover-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .cover-card-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .cover-card-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .cover-card-desc {
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.5);
+            line-height: 1.3;
+        }
+
+        /* Escena ilustrativa: tecnico + cortafuegos */
+        .scene {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto 40px;
+            height: 220px;
+        }
+
+        .scene-firebreak {
+            position: absolute;
+            bottom: 0;
+            left: 10%;
+            right: 10%;
+            height: 8px;
+            background: linear-gradient(90deg, transparent, #c4a35a, #d4b46a, #c4a35a, transparent);
+            border-radius: 4px;
+            opacity: 0.6;
+        }
+
+        /* Arboles a los lados del cortafuegos */
+        .scene-tree {
+            position: absolute;
+            bottom: 8px;
+        }
+
+        .scene-tree svg {
+            opacity: 0.7;
+        }
+
+        /* Tecnico con movil */
+        .scene-technician {
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        .technician-body {
+            position: relative;
+            display: inline-block;
+        }
+
+        /* Silueta del tecnico */
+        .technician-svg {
+            width: 60px;
+            height: 120px;
+        }
+
+        /* Flash de la camara */
+        .camera-flash {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle, rgba(255,255,255,0.8), rgba(59,130,246,0.3), transparent);
+            border-radius: 50%;
+            animation: flash-pulse 3s infinite;
+        }
+
+        @keyframes flash-pulse {
+            0%, 80%, 100% { opacity: 0; transform: translateX(-50%) scale(0.5); }
+            85% { opacity: 1; transform: translateX(-50%) scale(1.5); }
+            95% { opacity: 0; transform: translateX(-50%) scale(2); }
+        }
+
+        /* Lineas GPS */
+        .gps-lines {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 60px;
+        }
+
+        .gps-line {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            width: 2px;
+            height: 40px;
+            background: linear-gradient(to bottom, rgba(34, 197, 94, 0.6), transparent);
+            transform-origin: bottom center;
+            animation: gps-signal 2.5s infinite;
+        }
+
+        .gps-line:nth-child(1) { transform: translateX(-50%) rotate(-20deg); animation-delay: 0s; }
+        .gps-line:nth-child(2) { transform: translateX(-50%) rotate(0deg); animation-delay: 0.3s; }
+        .gps-line:nth-child(3) { transform: translateX(-50%) rotate(20deg); animation-delay: 0.6s; }
+
+        @keyframes gps-signal {
+            0%, 100% { opacity: 0.2; height: 30px; }
+            50% { opacity: 0.8; height: 45px; }
+        }
+
+        /* Icono de satelite */
+        .satellite {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .satellite svg {
+            width: 24px;
+            height: 24px;
+            fill: #22c55e;
+            opacity: 0.7;
+        }
+
+        /* Pie */
+        .cover-footer {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .cover-version {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 100px;
+            padding: 4px 14px;
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 640px) {
+            .cover-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .scene {
+                height: 160px;
+            }
+        }
+
+        /* ============================================
+           IMPRESION
+           ============================================ */
+        @media print {
+            body {
+                background: #fff;
+                color: #000;
+            }
+            .cover {
+                min-height: auto;
+                page-break-after: always;
+                padding: 60px 40px;
+            }
+            .cover::before {
+                display: none;
+            }
+            .cover-content {
+                border: 3px solid #1e3a5f;
+                border-radius: 20px;
+                padding: 60px 40px;
+            }
+            .cover-title .brand {
+                -webkit-text-fill-color: #1e3a5f;
+                color: #1e3a5f;
+            }
+            .cover-subtitle {
+                color: #444;
+            }
+            .cover-card {
+                border: 1px solid #ddd;
+                background: #f9f9f9;
+            }
+            .cover-card-title {
+                color: #1e3a5f;
+            }
+            .cover-card-desc {
+                color: #666;
+            }
+            .stars, .mountains, .trees-pattern, .scene,
+            .camera-flash, .gps-lines, .satellite {
+                display: none;
+            }
+            .cover-badge .dot {
+                animation: none;
+                background: #22c55e;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="cover">
+    <!-- Estrellas decorativas -->
+    <div class="stars" aria-hidden="true">
+        <div class="star" style="top:8%;left:15%;animation-delay:0.2s;"></div>
+        <div class="star" style="top:12%;left:45%;animation-delay:1.1s;width:3px;height:3px;"></div>
+        <div class="star" style="top:5%;left:72%;animation-delay:0.7s;"></div>
+        <div class="star" style="top:18%;left:88%;animation-delay:1.5s;"></div>
+        <div class="star" style="top:25%;left:30%;animation-delay:0.4s;width:3px;height:3px;"></div>
+        <div class="star" style="top:15%;left:60%;animation-delay:2s;"></div>
+        <div class="star" style="top:22%;left:10%;animation-delay:0.9s;"></div>
+        <div class="star" style="top:8%;left:92%;animation-delay:1.8s;width:3px;height:3px;"></div>
+    </div>
+
+    <!-- Montanas de fondo (Sierra de Cazorla) -->
+    <div class="mountains" aria-hidden="true">
+        <!-- Montana lejana -->
+        <div class="mountain" style="opacity: 0.15;">
+            <svg viewBox="0 0 1200 300" preserveAspectRatio="none">
+                <path d="M0,300 L0,180 Q100,80 200,140 Q300,60 400,120 Q500,40 600,100 Q700,50 800,130 Q900,70 1000,110 Q1100,60 1200,150 L1200,300 Z" fill="#1a4a2a"/>
+            </svg>
+        </div>
+        <!-- Montana media -->
+        <div class="mountain" style="opacity: 0.25;">
+            <svg viewBox="0 0 1200 280" preserveAspectRatio="none">
+                <path d="M0,280 L0,200 Q150,100 300,160 Q400,90 500,150 Q600,80 700,140 Q850,60 1000,130 Q1100,90 1200,170 L1200,280 Z" fill="#1f5530"/>
+            </svg>
+        </div>
+        <!-- Montana cercana -->
+        <div class="mountain" style="opacity: 0.35;">
+            <svg viewBox="0 0 1200 240" preserveAspectRatio="none">
+                <path d="M0,240 L0,180 Q200,120 350,170 Q450,110 550,160 Q700,100 850,150 Q950,120 1100,170 L1200,190 L1200,240 Z" fill="#245a35"/>
+            </svg>
+        </div>
+        <!-- Cortafuegos (franja clara horizontal) -->
+        <div style="position:absolute;bottom:18%;left:0;right:0;height:6px;background:linear-gradient(90deg,transparent 5%,rgba(196,163,90,0.25) 20%,rgba(196,163,90,0.35) 50%,rgba(196,163,90,0.25) 80%,transparent 95%);z-index:1;"></div>
+        <!-- Vegetacion baja -->
+        <div class="mountain" style="opacity: 0.5;">
+            <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,120 L0,90 Q100,70 200,85 Q300,65 400,80 Q500,60 600,75 Q700,55 800,70 Q900,50 1000,65 Q1100,55 1200,80 L1200,120 Z" fill="#1a3a20"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="cover-content">
+
+        <div class="cover-badge">
+            <span class="dot"></span>
+            Manual de Usuario
+        </div>
+
+        <!-- Icono de la app -->
+        <div class="cover-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+        </div>
+
+        <h1 class="cover-title">
+            <span class="brand">FotoGPS</span><span class="app">.app</span>
+        </h1>
+
+        <p class="cover-subtitle">
+            Plataforma de <strong>recogida de datos en campo</strong><br>
+            con fotografia geoposicionada
+        </p>
+
+        <div class="cover-divider"></div>
+
+        <!-- Escena ilustrativa -->
+        <div class="scene" aria-hidden="true">
+            <!-- Arboles izquierda (antes del cortafuegos) -->
+            <svg class="scene-tree" style="left:5%;bottom:12px;" width="30" height="60" viewBox="0 0 30 60">
+                <polygon points="15,5 2,45 28,45" fill="#1a5a28" opacity="0.6"/>
+                <rect x="13" y="45" width="4" height="10" fill="#3a2a1a" opacity="0.5"/>
+            </svg>
+            <svg class="scene-tree" style="left:12%;bottom:12px;" width="25" height="50" viewBox="0 0 25 50">
+                <polygon points="12.5,3 1,38 24,38" fill="#1a5a28" opacity="0.5"/>
+                <rect x="10.5" y="38" width="4" height="8" fill="#3a2a1a" opacity="0.4"/>
+            </svg>
+            <svg class="scene-tree" style="left:18%;bottom:12px;" width="35" height="70" viewBox="0 0 35 70">
+                <polygon points="17.5,5 2,52 33,52" fill="#1a5a28" opacity="0.7"/>
+                <rect x="15" y="52" width="5" height="12" fill="#3a2a1a" opacity="0.5"/>
+            </svg>
+            <svg class="scene-tree" style="left:26%;bottom:12px;" width="28" height="55" viewBox="0 0 28 55">
+                <polygon points="14,4 1,42 27,42" fill="#1a5a28" opacity="0.55"/>
+                <rect x="12" y="42" width="4" height="9" fill="#3a2a1a" opacity="0.45"/>
+            </svg>
+
+            <!-- Arboles derecha -->
+            <svg class="scene-tree" style="right:5%;bottom:12px;" width="32" height="65" viewBox="0 0 32 65">
+                <polygon points="16,5 2,48 30,48" fill="#1a5a28" opacity="0.65"/>
+                <rect x="14" y="48" width="4" height="11" fill="#3a2a1a" opacity="0.5"/>
+            </svg>
+            <svg class="scene-tree" style="right:13%;bottom:12px;" width="28" height="55" viewBox="0 0 28 55">
+                <polygon points="14,4 1,42 27,42" fill="#1a5a28" opacity="0.5"/>
+                <rect x="12" y="42" width="4" height="9" fill="#3a2a1a" opacity="0.4"/>
+            </svg>
+            <svg class="scene-tree" style="right:20%;bottom:12px;" width="35" height="70" viewBox="0 0 35 70">
+                <polygon points="17.5,5 2,52 33,52" fill="#1a5a28" opacity="0.7"/>
+                <rect x="15" y="52" width="5" height="12" fill="#3a2a1a" opacity="0.5"/>
+            </svg>
+            <svg class="scene-tree" style="right:28%;bottom:12px;" width="26" height="52" viewBox="0 0 26 52">
+                <polygon points="13,4 1,40 25,40" fill="#1a5a28" opacity="0.55"/>
+                <rect x="11" y="40" width="4" height="8" fill="#3a2a1a" opacity="0.4"/>
+            </svg>
+
+            <!-- Franja del cortafuegos -->
+            <div class="scene-firebreak"></div>
+
+            <!-- Tecnico en el cortafuegos -->
+            <div class="scene-technician">
+                <!-- Senales GPS -->
+                <div class="gps-lines">
+                    <div class="gps-line"></div>
+                    <div class="gps-line"></div>
+                    <div class="gps-line"></div>
+                </div>
+                <div class="satellite">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.05 4.14l-1.6-1.22A1 1 0 003.13 4.3L4.73 5.5a1 1 0 001.32-1.36zM3.97 8.85a1 1 0 00-1.22-.73L.93 8.55a1 1 0 00.49 1.94l1.82-.44a1 1 0 00.73-1.2zM8.15 3.07a1 1 0 001.22-.73l.44-1.82A1 1 0 007.87.03l-.44 1.82a1 1 0 00.72 1.22zM15 12c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3zm-2-9.95v2.02C16.39 4.54 19.46 7.61 19.93 11h2.02C21.44 6.5 17.5 2.56 13 2.05zM13 6.07v2.02c1.73.49 3.42 2.18 3.91 3.91h2.02c-.57-2.84-2.99-5.26-5.93-5.93z"/>
+                    </svg>
+                </div>
+
+                <div class="technician-body">
+                    <!-- Flash de la camara del movil -->
+                    <div class="camera-flash"></div>
+                    <!-- Silueta del tecnico sacando foto con movil -->
+                    <svg class="technician-svg" viewBox="0 0 60 120" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Casco -->
+                        <ellipse cx="30" cy="14" rx="12" ry="8" fill="#f59e0b" opacity="0.9"/>
+                        <rect x="18" y="14" width="24" height="4" rx="2" fill="#d97706" opacity="0.7"/>
+                        <!-- Cabeza -->
+                        <circle cx="30" cy="22" r="8" fill="#deb887" opacity="0.8"/>
+                        <!-- Cuerpo (chaleco reflectante) -->
+                        <rect x="20" y="30" width="20" height="35" rx="4" fill="#f59e0b" opacity="0.85"/>
+                        <!-- Franjas reflectantes -->
+                        <rect x="20" y="42" width="20" height="3" fill="#fff" opacity="0.7"/>
+                        <rect x="20" y="52" width="20" height="3" fill="#fff" opacity="0.7"/>
+                        <!-- Brazos -->
+                        <!-- Brazo derecho (sosteniendo movil hacia arriba) -->
+                        <rect x="40" y="32" width="6" height="22" rx="3" fill="#deb887" opacity="0.7" transform="rotate(-30 43 43)"/>
+                        <!-- Movil -->
+                        <rect x="44" y="18" width="10" height="18" rx="2" fill="#1e293b" opacity="0.9"/>
+                        <rect x="45.5" y="20" width="7" height="12" rx="1" fill="#60a5fa" opacity="0.6"/>
+                        <!-- Brazo izquierdo -->
+                        <rect x="14" y="34" width="6" height="20" rx="3" fill="#deb887" opacity="0.7" transform="rotate(15 17 44)"/>
+                        <!-- Pantalones -->
+                        <rect x="22" y="65" width="7" height="30" rx="3" fill="#374151" opacity="0.8"/>
+                        <rect x="31" y="65" width="7" height="30" rx="3" fill="#374151" opacity="0.8"/>
+                        <!-- Botas -->
+                        <rect x="20" y="92" width="10" height="8" rx="3" fill="#5a3e28" opacity="0.8"/>
+                        <rect x="30" y="92" width="10" height="8" rx="3" fill="#5a3e28" opacity="0.8"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjetas de funcionalidades -->
+        <div class="cover-cards">
+            <div class="cover-card">
+                <span class="cover-card-icon">&#128247;</span>
+                <div class="cover-card-title">Fotos GPS</div>
+                <div class="cover-card-desc">Captura geoposicionada con marca de agua UTM</div>
+            </div>
+            <div class="cover-card">
+                <span class="cover-card-icon">&#127760;</span>
+                <div class="cover-card-title">Mapas</div>
+                <div class="cover-card-desc">Visualizacion con ortofoto, KML y navegacion</div>
+            </div>
+            <div class="cover-card">
+                <span class="cover-card-icon">&#128202;</span>
+                <div class="cover-card-title">Informes</div>
+                <div class="cover-card-desc">PDF, CSV, ZIP y GPX por infraestructura</div>
+            </div>
+            <div class="cover-card">
+                <span class="cover-card-icon">&#128274;</span>
+                <div class="cover-card-title">Offline</div>
+                <div class="cover-card-desc">Trabaja sin conexion, sincroniza al volver</div>
+            </div>
+        </div>
+
+        <!-- Info de aplicacion -->
+        <div style="font-size: 0.85rem; color: rgba(255,255,255,0.4); line-height: 1.6;">
+            <div style="margin-bottom: 4px;">Gestion y seguimiento fotografico de cortafuegos e infraestructuras forestales</div>
+            <div><strong style="color: rgba(255,255,255,0.6);">INFOCAMPO</strong> &mdash; Plataforma SaaS Multi-empresa</div>
+        </div>
+
+    </div>
+
+    <!-- Pie -->
+    <div class="cover-footer">
+        <div>Marzo 2026</div>
+        <div class="cover-version">v2.0 &bull; fotogps.app</div>
+    </div>
+</div>
+
+</body>
+</html>
