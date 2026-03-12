@@ -1173,6 +1173,12 @@
         if (_capturing) return;
         _capturing = true;
 
+        // Visual feedback: disable shutter button and show spinner
+        if (btnShutter) {
+            btnShutter.disabled = true;
+            btnShutter.style.opacity = '0.5';
+        }
+
         try {
             const vw = camVideo.videoWidth;
             const vh = camVideo.videoHeight;
@@ -1180,6 +1186,7 @@
             if (!vw || !vh) {
                 console.warn('captureFrame: video not ready (dimensions 0)');
                 _capturing = false;
+                if (btnShutter) { btnShutter.disabled = false; btnShutter.style.opacity = ''; }
                 return;
             }
 
@@ -1290,6 +1297,11 @@
             alert('Error al capturar la foto. Inténtalo de nuevo.');
         } finally {
             _capturing = false;
+            // Restore shutter button
+            if (btnShutter) {
+                btnShutter.disabled = false;
+                btnShutter.style.opacity = '';
+            }
         }
     }
 
@@ -1642,9 +1654,16 @@
             drawCompassRose(ctx, w, h, meta.bearing);
         }
 
-        // 4. Mini-map (bottom-left, optional)
+        // 4. Mini-map (bottom-left, optional) — with timeout to prevent blocking
         if (wmCfg.mapa && meta.lat != null && meta.lon != null) {
-            await drawMiniMap(ctx, w, h, meta.lat, meta.lon, wmCfg.mapaZoom || 15, wmCfg.mapaTamano || 2);
+            try {
+                await Promise.race([
+                    drawMiniMap(ctx, w, h, meta.lat, meta.lon, wmCfg.mapaZoom || 15, wmCfg.mapaTamano || 2),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('MiniMap timeout')), 8000)),
+                ]);
+            } catch (e) {
+                console.warn('Mini-map skipped:', e.message);
+            }
         }
 
         // Save blob for later
@@ -3365,17 +3384,28 @@
     }
 
     function canvasToBlob(canvas, type, quality) {
-        return new Promise((resolve) => {
-            canvas.toBlob(resolve, type, quality);
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error('Canvas toBlob timeout'));
+            }, 10000);
+            canvas.toBlob((blob) => {
+                clearTimeout(timer);
+                resolve(blob);
+            }, type, quality);
         });
     }
 
-    function loadImage(src) {
+    function loadImage(src, timeoutMs = 5000) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = reject;
+            const timer = setTimeout(() => {
+                img.onload = img.onerror = null;
+                img.src = '';
+                reject(new Error('Image load timeout'));
+            }, timeoutMs);
+            img.onload = () => { clearTimeout(timer); resolve(img); };
+            img.onerror = () => { clearTimeout(timer); reject(new Error('Image load error')); };
             img.src = src;
         });
     }
