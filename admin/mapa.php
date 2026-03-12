@@ -1387,6 +1387,41 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 var extData = extractKmlExtendedData(pm);
                 var center = getKmlPlacemarkCenter(pm);
 
+                // Si <name> está vacío, intentar obtener nombre de ExtendedData
+                if (!nombre) {
+                    var nameKeys = ['nombre', 'name', 'codigo', 'código', 'codigo_unico',
+                                    'cod', 'code', 'id', 'label', 'titulo', 'title',
+                                    'infraestructura', 'denominacion', 'denominación',
+                                    'referencia', 'ref', 'designation', 'descripcion'];
+                    for (var i = 0; i < nameKeys.length; i++) {
+                        if (extData[nameKeys[i]]) {
+                            nombre = extData[nameKeys[i]];
+                            break;
+                        }
+                    }
+                }
+                // Si aún vacío, construir nombre desde campos disponibles
+                if (!nombre) {
+                    var parts = [];
+                    if (extData['tipo'] || extData['type'] || extData['category']) {
+                        parts.push(extData['tipo'] || extData['type'] || extData['category']);
+                    }
+                    if (extData['municipio'] || extData['municipality']) {
+                        parts.push(extData['municipio'] || extData['municipality']);
+                    }
+                    if (extData['monte'] || extData['forest']) {
+                        parts.push(extData['monte'] || extData['forest']);
+                    }
+                    if (parts.length > 0) {
+                        nombre = parts.join(' - ');
+                    }
+                }
+                // Último recurso: usar la primera clave de extData que tenga valor
+                if (!nombre && Object.keys(extData).length > 0) {
+                    var firstKey = Object.keys(extData)[0];
+                    nombre = extData[firstKey];
+                }
+
                 // Try to match with DB infrastructure (by name, then by coordinates)
                 var matchedInfra = matchKmlToInfra(nombre, extData, center);
 
