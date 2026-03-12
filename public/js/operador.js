@@ -771,6 +771,7 @@
     async function createNewInfra(name) {
         try {
             const formData = new FormData();
+            formData.append('csrf_token', CFG.csrfToken || '');
             formData.append('empresa_id', CFG.empresaId);
             formData.append('nombre', name);
             formData.append('lat', state.gps.lat || 0);
@@ -1468,6 +1469,7 @@
 
         // Online — upload directly
         const formData = new FormData();
+        formData.append('csrf_token', CFG.csrfToken || '');
         formData.append('imagen', blob, filename + '.jpg');
         formData.append('infra_id', uploadData.infra_id);
         formData.append('usuario_id', uploadData.usuario_id);
@@ -3658,6 +3660,7 @@
 
         try {
             const formData = new FormData();
+            formData.append('csrf_token', CFG.csrfToken || '');
             formData.append('infra_id', state.infraId);
             formData.append('lat_real', state.gps.lat || 0);
             formData.append('lon_real', state.gps.lon || 0);
@@ -4010,6 +4013,7 @@
         const editarObs = $('#editar-observaciones');
 
         const formData = new FormData();
+        formData.append('csrf_token', CFG.csrfToken || '');
         formData.append('action', 'editar');
         formData.append('registro_id', editingRegistroId);
         formData.append('usuario_id', CFG.usuarioId);

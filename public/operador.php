@@ -675,6 +675,7 @@ if ($initials === '') $initials = 'OP';
     <!-- Config -->
     <script>
         window.INFOCAMPO = {
+            csrfToken: <?= json_encode(csrfToken()) ?>,
             usuarioId: <?= $usuarioId ?>,
             empresaId: <?= $empresaId ?>,
             userName: <?= json_encode($userName) ?>,
