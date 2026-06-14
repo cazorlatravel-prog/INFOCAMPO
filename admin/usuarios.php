@@ -103,10 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                     $msg = 'Usuario creado correctamente.';
                     $msgType = 'success';
 
-                    // Si es operador, mostrar el enlace generado
                     if ($rol === 'operador') {
-                        $link = APP_URL . '/public/operador.php?user=' . $newUserId . '&empresa=' . $empresaId;
-                        $msg .= ' Enlace de acceso: <br><code>' . htmlspecialchars($link) . '</code>';
+                        $msg .= ' El operador puede acceder desde <code>' . htmlspecialchars(APP_URL . '/login.php') . '</code>';
                     }
                 }
             }
@@ -332,7 +330,7 @@ foreach ($usuarios as $u) {
                                         'operador'    => 'bg-secondary',
                                         default       => 'bg-dark',
                                     };
-                                    $operadorLink = APP_URL . '/public/operador.php?user=' . $u['id'] . '&empresa=' . $empresaId;
+                                    $operadorLink = APP_URL . '/login.php';
                                     ?>
                                     <tr class="<?= $u['activo'] ? '' : 'opacity-50' ?>">
                                         <td>

@@ -21,7 +21,7 @@ if (isset($_GET['logout'])) {
 if (isLoggedIn()) {
     $rol = $_SESSION['user_rol'] ?? '';
     if ($rol === 'operador') {
-        header('Location: /public/operador.php?user=' . ($_SESSION['user_id'] ?? 0) . '&empresa=' . ($_SESSION['empresa_id'] ?? 0));
+        header('Location: /public/operador.php');
         exit;
     }
     if (in_array($rol, ['admin', 'supervisor', 'superadmin'], true)) {
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $rol = $result['rol'];
                 if ($rol === 'operador') {
-                    header('Location: /public/operador.php?user=' . $result['id'] . '&empresa=' . $result['empresa_id']);
+                    header('Location: /public/operador.php');
                     exit;
                 } elseif (in_array($rol, ['admin', 'supervisor', 'superadmin'], true)) {
                     header('Location: /admin/dashboard.php');
