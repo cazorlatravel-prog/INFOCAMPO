@@ -157,6 +157,19 @@
         initOffline();
         registerServiceWorker();
         initExitConfirmation();
+        initCsrfRefresh();
+    }
+
+    function initCsrfRefresh() {
+        setInterval(async () => {
+            try {
+                const r = await fetch(CFG.baseUrl + '/api/csrf_refresh.php', { credentials: 'same-origin' });
+                if (r.ok) {
+                    const d = await r.json();
+                    if (d.ok && d.token) CFG.csrfToken = d.token;
+                }
+            } catch (_) {}
+        }, 15 * 60 * 1000);
     }
 
     // ===================================================================
@@ -1026,9 +1039,14 @@
     // SCREEN MANAGEMENT
     // ===================================================================
     function showScreen(name) {
+        const prev = state.screen;
         Object.values(screens).forEach(s => s.classList.remove('active'));
         screens[name].classList.add('active');
         state.screen = name;
+        if (prev === 'preview' && name === 'ficha' && state.capturedBlob) {
+            state.capturedBlob = null;
+            state.baseImageData = null;
+        }
     }
 
     // ===================================================================

@@ -177,8 +177,8 @@ if (isset($_GET['edit'])) {
         .coord-text { font-size: 0.75rem; color: #6b7280; font-family: monospace; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
         .status-dot.antes { background: #3b82f6; }
-        .status-dot.durante { background: #f59e0b; animation: pulse-durante 2s infinite; }
-        .status-dot.despues { background: #22c55e; }
+        .status-dot.durante { background: #f59e0b; border-radius: 2px; animation: pulse-durante 2s infinite; }
+        .status-dot.despues { background: #22c55e; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border-radius: 0; }
         .status-dot.none { background: #d1d5db; }
         @keyframes pulse-durante { 0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); } 50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); } }
         .durante-badge { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; background: #fef3c7; color: #d97706; font-weight: 700; }

@@ -219,7 +219,7 @@ body {
 /* --- Forms --- */
 .form-control, .form-select {
     border-radius: var(--radius-sm);
-    border-color: var(--border);
+    border-color: #9ca3af;
     font-size: 0.88rem;
     padding: 8px 12px;
     transition: border-color var(--transition), box-shadow var(--transition);
@@ -374,14 +374,14 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* Status dots */
+/* Status dots — color + shape for accessibility (WCAG 1.4.1) */
 .status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
+    width: 10px; height: 10px; border-radius: 50%;
     display: inline-block;
 }
 .status-dot.antes   { background: var(--accent); }
-.status-dot.durante { background: var(--warning); }
-.status-dot.despues { background: var(--success); }
+.status-dot.durante { background: var(--warning); border-radius: 2px; /* square = during */ }
+.status-dot.despues { background: var(--success); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border-radius: 0; /* triangle = done */ }
 
 /* --- Filter Panels --- */
 .filter-panel {
@@ -409,8 +409,8 @@ body {
     border: 3px solid var(--bg-card);
 }
 .timeline-dot.antes   { background: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.timeline-dot.durante { background: var(--warning); box-shadow: 0 0 0 2px var(--warning); }
-.timeline-dot.despues { background: var(--success); box-shadow: 0 0 0 2px var(--success); }
+.timeline-dot.durante { background: var(--warning); box-shadow: 0 0 0 2px var(--warning); border-radius: 3px; }
+.timeline-dot.despues { background: var(--success); box-shadow: 0 0 0 2px var(--success); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border-radius: 0; }
 
 .timeline-photo {
     max-width: 100%; border-radius: var(--radius-sm);

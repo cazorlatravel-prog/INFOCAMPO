@@ -292,7 +292,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                         <div class="timeline" id="view-timeline">
                             <?php foreach ($registros as $reg): ?>
                                 <div class="timeline-item">
-                                    <div class="timeline-dot <?= $reg['estado_incidencia'] ?>"></div>
+                                    <div class="timeline-dot <?= $reg['estado_incidencia'] ?>" aria-hidden="true" title="<?= ucfirst($reg['estado_incidencia']) ?>"></div>
                                     <div class="card">
                                         <div class="card-body">
                                             <div class="d-flex justify-content-between align-items-center mb-2">
