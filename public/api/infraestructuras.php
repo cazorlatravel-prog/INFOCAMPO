@@ -173,6 +173,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // POST: crear nueva infraestructura
 // ---------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+        exit;
+    }
     $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
     $nombre    = trim($_POST['nombre'] ?? '');
     $lat       = (float) ($_POST['lat'] ?? 0);

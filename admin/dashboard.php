@@ -51,18 +51,25 @@ if ($empresaId > 0) {
     $row = $stmt->fetch();
     if ($row) $empresaNombre = $row['nombre'];
 
+    // Fechas de corte calculadas en PHP (portable MySQL/PostgreSQL: evita
+    // las diferencias de sintaxis de INTERVAL entre motores)
+    $cut24 = (new DateTime('-24 hours'))->format('Y-m-d H:i:s');
+    $cut7  = (new DateTime('-7 days'))->format('Y-m-d H:i:s');
+    $cut30 = (new DateTime('-30 days'))->format('Y-m-d H:i:s');
+    $cut14 = (new DateTime('-14 days'))->format('Y-m-d H:i:s');
+
     // Estadísticas combinadas en una sola query con agregación condicional
     $stmt = $pdo->prepare(
         "SELECT
             COUNT(*) AS total_registros,
-            SUM(CASE WHEN r.estado_incidencia = 'durante' AND r.fecha >= NOW() - INTERVAL '24 HOUR' THEN 1 ELSE 0 END) AS durante_24h,
-            SUM(CASE WHEN r.fecha >= NOW() - INTERVAL '7 DAY' THEN 1 ELSE 0 END) AS registros_7d,
-            SUM(CASE WHEN r.fecha >= NOW() - INTERVAL '30 DAY' THEN 1 ELSE 0 END) AS registros_30d
+            SUM(CASE WHEN r.estado_incidencia = 'durante' AND r.fecha >= :cut24 THEN 1 ELSE 0 END) AS durante_24h,
+            SUM(CASE WHEN r.fecha >= :cut7 THEN 1 ELSE 0 END) AS registros_7d,
+            SUM(CASE WHEN r.fecha >= :cut30 THEN 1 ELSE 0 END) AS registros_30d
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id"
     );
-    $stmt->execute([':id' => $empresaId]);
+    $stmt->execute([':id' => $empresaId, ':cut24' => $cut24, ':cut7' => $cut7, ':cut30' => $cut30]);
     $aggRow = $stmt->fetch();
     $stats['registros']    = (int) ($aggRow['total_registros'] ?? 0);
     $stats['durante_24h']  = (int) ($aggRow['durante_24h'] ?? 0);
@@ -86,11 +93,11 @@ if ($empresaId > 0) {
                 SUM(CASE WHEN r.estado_incidencia = 'despues' THEN 1 ELSE 0 END) AS fot_despues
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.fecha >= NOW() - INTERVAL '14 DAY'
+         WHERE i.empresa_id = :id AND r.fecha >= :cut14
          GROUP BY DATE(r.fecha)
          ORDER BY dia ASC"
     );
-    $stmt->execute([':id' => $empresaId]);
+    $stmt->execute([':id' => $empresaId, ':cut14' => $cut14]);
     $actividadDiaria = $stmt->fetchAll();
 
     // Últimos 10 registros

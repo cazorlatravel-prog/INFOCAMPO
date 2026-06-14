@@ -142,9 +142,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // Verificar que el registro pertenece al usuario
-        $stmt = $pdo->prepare("SELECT id FROM registros WHERE id = :id AND usuario_id = :uid");
-        $stmt->execute([':id' => $registroId, ':uid' => $usuarioId]);
+        // Verificar que el registro pertenece al usuario Y a su empresa (tenant scope)
+        $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+        $stmt = $pdo->prepare(
+            "SELECT r.id FROM registros r
+             INNER JOIN infraestructuras i ON r.infra_id = i.id
+             WHERE r.id = :id AND r.usuario_id = :uid AND i.empresa_id = :emp"
+        );
+        $stmt->execute([':id' => $registroId, ':uid' => $usuarioId, ':emp' => $empresaId]);
         if (!$stmt->fetch()) {
             echo json_encode(['ok' => false, 'error' => 'No tienes permiso para editar este registro']);
             exit;

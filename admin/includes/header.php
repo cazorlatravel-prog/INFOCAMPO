@@ -17,14 +17,15 @@ $currentPage = $currentPage ?? '';
 $_alertCount = 0;
 if ($_navEmpresaId > 0) {
     try {
+        $_alertCut24 = (new DateTime('-24 hours'))->format('Y-m-d H:i:s');
         $stmtAlert = getDB()->prepare(
             "SELECT COUNT(*) FROM registros r
              INNER JOIN infraestructuras i ON r.infra_id = i.id
              WHERE i.empresa_id = :emp_id
                AND r.estado_incidencia = 'durante'
-               AND r.fecha >= NOW() - INTERVAL '24 HOUR'"
+               AND r.fecha >= :cut24"
         );
-        $stmtAlert->execute([':emp_id' => $_navEmpresaId]);
+        $stmtAlert->execute([':emp_id' => $_navEmpresaId, ':cut24' => $_alertCut24]);
         $_alertCount = (int) $stmtAlert->fetchColumn();
     } catch (Exception $e) {}
 }

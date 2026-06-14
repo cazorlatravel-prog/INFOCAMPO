@@ -55,7 +55,7 @@ if (!validateCsrf()) {
 // ---------------------------------------------------------------
 // 1. Validar campos obligatorios
 // ---------------------------------------------------------------
-$requiredFields = ['infra_id', 'usuario_id', 'lat_real', 'lon_real'];
+$requiredFields = ['infra_id', 'lat_real', 'lon_real'];
 foreach ($requiredFields as $field) {
     if (!isset($_POST[$field]) || trim((string)$_POST[$field]) === '') {
         http_response_code(400);
@@ -82,7 +82,9 @@ if (!in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true)) {
 
 // Sanitizar y castear
 $infraId     = (int) $_POST['infra_id'];
-$usuarioId   = (int) $_POST['usuario_id'];
+// El operador se toma SIEMPRE de la sesión, nunca del cliente (evita suplantar
+// la autoría del registro enviando otro usuario_id por POST).
+$usuarioId   = (int) ($_SESSION['user_id'] ?? 0);
 $latReal     = (float) $_POST['lat_real'];
 $lonReal     = (float) $_POST['lon_real'];
 $incidencia  = $_POST['estado_incidencia'] ?? 'antes';
@@ -156,35 +158,46 @@ if ($clientToken !== null) {
 }
 
 // ---------------------------------------------------------------
-// 2. Generar nombre de archivo según formato configurado por la empresa
+// 2. Validar infraestructura y tenant (autorización: debe fallar CERRADA)
+//    Esta comprobación va fuera del try de generación de nombre: un error de
+//    BD aquí no debe permitir continuar sin validar la propiedad del recurso.
 // ---------------------------------------------------------------
 try {
     $pdo = getDB();
-
-    // Obtener código de infraestructura y empresa_id
     $stmtInfra = $pdo->prepare(
         "SELECT i.codigo_unico, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
     );
     $stmtInfra->execute([':id' => $infraId]);
     $infraRow = $stmtInfra->fetch();
+} catch (\PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Error de base de datos']);
+    exit;
+}
 
-    if (!$infraRow) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Infraestructura no encontrada']);
-        exit;
-    }
+if (!$infraRow) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Infraestructura no encontrada']);
+    exit;
+}
 
-    $infraCodigo = $infraRow['codigo_unico'] ?: $infraRow['nombre'];
-    $infraEmpresaId = (int) $infraRow['empresa_id'];
+$infraCodigo = $infraRow['codigo_unico'] ?: $infraRow['nombre'];
+$infraEmpresaId = (int) $infraRow['empresa_id'];
 
-    // Validar que la infraestructura pertenece a la empresa del usuario
-    $sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
-    if ($sessionEmpresaId > 0 && $infraEmpresaId !== $sessionEmpresaId) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Infraestructura no pertenece a tu empresa']);
-        exit;
-    }
+// Validar que la infraestructura pertenece a la empresa del usuario.
+// Sin un empresa_id de sesión válido (>0) se deniega (fail-closed).
+$sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+if ($sessionEmpresaId <= 0 || $infraEmpresaId !== $sessionEmpresaId) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Infraestructura no pertenece a tu empresa']);
+    exit;
+}
 
+// ---------------------------------------------------------------
+// 2b. Generar nombre de archivo según formato configurado por la empresa
+//     (degradable: si falla, se usa un nombre por defecto)
+// ---------------------------------------------------------------
+try {
     // Obtener formato de nombre configurado para la empresa
     $stmtFmt = $pdo->prepare("SELECT formato_nombre_foto FROM empresas WHERE id = :id");
     $stmtFmt->execute([':id' => $infraEmpresaId]);
@@ -232,7 +245,7 @@ try {
 }
 
 // ---------------------------------------------------------------
-// 2b. Derivar secuencia comparativa en el servidor (fuente de verdad)
+// 2c. Derivar secuencia comparativa en el servidor (fuente de verdad)
 //     El contador del cliente puede no ser fiable (sync offline, continuar
 //     visita, varios operadores). Si la secuencia recibida es nula o ya existe
 //     para esta infraestructura, asignar MAX(secuencia)+1.

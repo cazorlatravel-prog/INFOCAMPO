@@ -26,6 +26,14 @@ $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     $action = $_POST['action'] ?? '';
 
+    // Los supervisores tienen acceso de SOLO LECTURA: bloquear toda escritura
+    // (la UI oculta los botones, pero el endpoint POST es accesible directamente)
+    if (($_SESSION['user_rol'] ?? '') === 'supervisor') {
+        $action = '';
+        $msg = 'Los supervisores tienen acceso de solo lectura. Acción no permitida.';
+        $msgType = 'danger';
+    }
+
     // --- Crear usuario ---
     if ($action === 'create_user') {
         $nombre   = trim($_POST['nombre'] ?? '');
