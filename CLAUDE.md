@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-INFOCAMPO is a multi-tenant SaaS platform for field infrastructure inspections. It enables field operators to capture geolocated photos with GPS watermarks, company admins to manage infrastructure and generate reports, and super admins to manage the entire platform including companies, licenses, and dynamic form configurations.
+INFOCAMPO is a single-tenant field infrastructure inspection app for the company **TRAGSA**. It enables field operators to capture geolocated photos with GPS watermarks, and admins to manage infrastructure, users, and dynamic form configurations, and to generate reports.
+
+> **Note:** The codebase originated as a multi-tenant SaaS and still carries `empresa_id` scoping in the schema and queries. It now operates single-tenant: there is exactly one company (TRAGSA), all sessions resolve to its `empresa_id`, and the SaaS-only features (company CRUD, cross-tenant impersonation, license/quota limits) have been removed. Keep the `empresa_id` machinery intact — it is the (now trivial) tenant scope.
 
 **Language:** Spanish (UI, database columns, comments). All code identifiers and API responses use Spanish terminology.
 
@@ -60,13 +62,12 @@ INFOCAMPO is a multi-tenant SaaS platform for field infrastructure inspections. 
 │       ├── watermark.js      # Canvas GPS watermark rendering
 │       └── haversine.js      # GPS distance calculation
 │
-├── superadmin/              # Platform-wide super admin panel
-│   ├── login.php            # Super admin authentication
-│   ├── index.php            # Global dashboard with metrics
-│   ├── empresas.php         # Company CRUD + license management
-│   ├── usuarios.php         # Global user management
-│   ├── campos.php           # Dynamic form field builder per company
-│   ├── impersonate.php      # User impersonation for support
+├── superadmin/              # Legacy owner role (mostly redirects to /admin/)
+│   ├── login.php            # Redirects to unified /login.php
+│   ├── index.php            # Redirects to /admin/dashboard.php
+│   ├── usuarios.php         # Redirects to /admin/usuarios.php
+│   ├── campos.php           # Redirects to /admin/campos.php
+│   ├── perfil.php           # Super admin profile
 │   └── logout.php           # Logout endpoint
 │
 ├── includes/                # Shared PHP utilities
@@ -86,14 +87,15 @@ INFOCAMPO is a multi-tenant SaaS platform for field infrastructure inspections. 
 
 ## Architecture
 
-### Multi-Tenant Model
+### Single-Tenant Model (TRAGSA)
 
-Three user tiers with strict data isolation by `empresa_id`:
+All data is scoped by `empresa_id`, which always resolves to TRAGSA. There is no
+company selection or cross-tenant access anywhere in the UI.
 
 | Role | Access | Panel |
 |------|--------|-------|
-| `superadmin` | Full platform control, impersonation | `/superadmin/` |
-| `admin` | Company infrastructure, users, reports | `/admin/` |
+| `superadmin` | Owner account; uses the admin panel | `/admin/` |
+| `admin` | Infrastructure, users, fields, reports | `/admin/` |
 | `supervisor` | Read-only admin access | `/admin/` |
 | `operador` | Photo capture and form submission | `/public/operador.php` |
 
@@ -104,7 +106,7 @@ Three user tiers with strict data isolation by `empresa_id`:
 - **CSRF protection:** Token in hidden form fields, validated via `validateCsrf()`, also via `X-CSRF-Token` header
 - **Passwords:** bcrypt with cost 12: `password_hash($pw, PASSWORD_BCRYPT, ['cost' => 12])`
 - **SQL injection prevention:** All queries use PDO prepared statements with named parameters
-- **Impersonation:** Superadmin-only, stores original session for restoration
+- **Tenant scope:** `getEmpresaIdSeguro()` always returns the session's `empresa_id` (TRAGSA). No cross-tenant impersonation.
 
 ### Database Tables
 
