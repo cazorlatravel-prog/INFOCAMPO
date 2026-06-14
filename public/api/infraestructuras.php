@@ -32,17 +32,9 @@ try {
     exit;
 }
 
-// Detectar si las columnas provincia/municipio existen
-$hasLocationCols = false;
-$hasMonteCols = false;
-try {
-    $cols = $pdo->query("SHOW COLUMNS FROM infraestructuras LIKE 'provincia'")->fetchAll();
-    $hasLocationCols = count($cols) > 0;
-    $cols = $pdo->query("SHOW COLUMNS FROM infraestructuras LIKE 'monte'")->fetchAll();
-    $hasMonteCols = count($cols) > 0;
-} catch (\Exception $e) {
-    // tabla puede no existir todavía
-}
+// Las columnas provincia, municipio y monte existen desde schema_v4+
+$hasLocationCols = true;
+$hasMonteCols = true;
 
 // ---------------------------------------------------------------
 // GET: buscar infraestructuras / listas de provincias/municipios

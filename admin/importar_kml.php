@@ -32,6 +32,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Detectar si PHP descartó los datos por exceder post_max_size
+if (empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > 0) {
+    $maxSize = ini_get('post_max_size');
+    http_response_code(413);
+    echo json_encode([
+        'ok' => false,
+        'error' => "El archivo excede el límite del servidor (post_max_size: {$maxSize}). Contacta al administrador para aumentar el límite.",
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // Validar CSRF
 if (!validateCsrf()) {
     http_response_code(403);
@@ -39,7 +50,7 @@ if (!validateCsrf()) {
     exit;
 }
 
-$empresaId = (int) ($_POST['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 if ($empresaId <= 0) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Empresa no identificada'], JSON_UNESCAPED_UNICODE);
@@ -315,20 +326,55 @@ function extractPlacemarks(SimpleXMLElement $element, string $ns, array &$result
             if (!$descNodes) $descNodes = $pm->xpath('description');
             $descripcion = $descNodes ? trim(strip_tags((string) $descNodes[0])) : '';
 
-            // Extraer coordenadas de Point
+            // Extraer coordenadas: Point, LineString o Polygon (centroide)
             $lat = null;
             $lon = null;
 
+            // 1) Intentar Point
             $coordNodes = $pm->xpath('.//kml:Point/kml:coordinates');
             if (!$coordNodes) $coordNodes = $pm->xpath('.//Point/coordinates');
 
             if ($coordNodes) {
                 $coordStr = trim((string) $coordNodes[0]);
-                // Formato KML: lon,lat[,alt]
                 $parts = explode(',', $coordStr);
                 if (count($parts) >= 2) {
                     $lon = (float) trim($parts[0]);
                     $lat = (float) trim($parts[1]);
+                }
+            }
+
+            // 2) Si no hay Point, intentar LineString (centroide)
+            if ($lat === null || $lon === null) {
+                $lineNodes = $pm->xpath('.//kml:LineString/kml:coordinates');
+                if (!$lineNodes) $lineNodes = $pm->xpath('.//LineString/coordinates');
+                if (!$lineNodes) {
+                    // 3) Intentar Polygon
+                    $lineNodes = $pm->xpath('.//kml:Polygon//kml:coordinates');
+                    if (!$lineNodes) $lineNodes = $pm->xpath('.//Polygon//coordinates');
+                }
+
+                if ($lineNodes) {
+                    $coordStr = trim((string) $lineNodes[0]);
+                    $points = preg_split('/\s+/', $coordStr);
+                    $sumLat = 0.0;
+                    $sumLon = 0.0;
+                    $count = 0;
+                    foreach ($points as $pt) {
+                        $parts = explode(',', trim($pt));
+                        if (count($parts) >= 2) {
+                            $pLon = (float) $parts[0];
+                            $pLat = (float) $parts[1];
+                            if ($pLat != 0.0 || $pLon != 0.0) {
+                                $sumLon += $pLon;
+                                $sumLat += $pLat;
+                                $count++;
+                            }
+                        }
+                    }
+                    if ($count > 0) {
+                        $lon = round($sumLon / $count, 7);
+                        $lat = round($sumLat / $count, 7);
+                    }
                 }
             }
 

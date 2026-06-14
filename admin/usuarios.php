@@ -15,7 +15,7 @@ $pdo = getDB();
 $currentPage = 'usuarios';
 
 // Obtener empresa_id (de la sesión si admin autenticado, o de la query si superadmin suplantando)
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // ---------------------------------------------------------------
 // Procesar acciones POST
@@ -195,11 +195,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 }
 
 // ---------------------------------------------------------------
-// Cargar empresas (para selector si es superadmin suplantando)
+// Cargar empresas (solo superadmin)
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 // ---------------------------------------------------------------
 // Cargar datos de la empresa y usuarios
@@ -250,6 +255,7 @@ foreach ($usuarios as $u) {
             <h4 class="mb-0"><i class="bi bi-people me-2"></i>Usuarios</h4>
 
             <div class="d-flex gap-2 align-items-center">
+                <?php if ($isSuperadmin): ?>
                 <form method="get" class="d-flex gap-2 align-items-center">
                     <label class="fw-semibold small text-nowrap">Empresa:</label>
                     <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
@@ -261,6 +267,7 @@ foreach ($usuarios as $u) {
                         <?php endforeach; ?>
                     </select>
                 </form>
+                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formUsuario">
                         <i class="bi bi-plus-lg"></i> Nuevo Usuario

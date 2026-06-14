@@ -17,7 +17,7 @@ requireRole(['admin', 'supervisor', 'superadmin']);
 $pdo = getDB();
 $currentPage = 'fotos';
 
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // Cargar nombre de empresa
 $empresaNombre = '';

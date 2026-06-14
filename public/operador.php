@@ -11,13 +11,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 
-// Parámetros del operador (URL > sesión > 0)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 $usuarioId = isset($_GET['user']) ? (int) $_GET['user'] : (int) ($_SESSION['user_id'] ?? 0);
 $empresaId = isset($_GET['empresa']) ? (int) $_GET['empresa'] : (int) ($_SESSION['empresa_id'] ?? 0);
 
@@ -43,12 +38,13 @@ $opMostrarEmpresa = 0;
 $opMostrarInfra = 0;
 $opMostrarSituacion = 0;
 $opMostrarMapa = 0;
+$opMostrarCapasInfra = 0;
 $opMapaZoom = 9;
 $wmFecha = 1; $wmCoordenadas = 1; $wmOrientacion = 1; $wmUbicacion = 1; $wmPais = 1; $wmBrujula = 1;
 $wmCodigoInfra = 0; $wmSituacion = 0; $wmTipoFoto = 0;
 $wmMapa = 0; $wmMapaZoom = 15; $wmMapaTamano = 2; $wmTextoTamano = 2;
 if ($empresaId > 0) {
-    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mapa_zoom, wm_mostrar_fecha, wm_mostrar_coordenadas, wm_mostrar_orientacion, wm_mostrar_ubicacion, wm_mostrar_pais, wm_mostrar_brujula, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
+    $stmt = $pdo->prepare("SELECT nombre, formato_nombre_foto, op_mostrar_empresa, op_mostrar_infraestructura, op_mostrar_situacion, op_mostrar_mapa, op_mostrar_capas_infra, op_mapa_zoom, wm_mostrar_fecha, wm_mostrar_coordenadas, wm_mostrar_orientacion, wm_mostrar_ubicacion, wm_mostrar_pais, wm_mostrar_brujula, wm_mostrar_codigo_infra, wm_mostrar_situacion, wm_mostrar_tipo_foto, wm_mostrar_mapa, wm_mapa_zoom, wm_mapa_tamano, wm_texto_tamano FROM empresas WHERE id = :id");
     $stmt->execute([':id' => $empresaId]);
     $row = $stmt->fetch();
     if ($row) {
@@ -58,6 +54,7 @@ if ($empresaId > 0) {
         $opMostrarInfra = (int) ($row['op_mostrar_infraestructura'] ?? 0);
         $opMostrarSituacion = (int) ($row['op_mostrar_situacion'] ?? 0);
         $opMostrarMapa = (int) ($row['op_mostrar_mapa'] ?? 0);
+        $opMostrarCapasInfra = (int) ($row['op_mostrar_capas_infra'] ?? 0);
         $opMapaZoom = (int) ($row['op_mapa_zoom'] ?? 9);
         $wmFecha = (int) ($row['wm_mostrar_fecha'] ?? 1);
         $wmCoordenadas = (int) ($row['wm_mostrar_coordenadas'] ?? 1);
@@ -144,6 +141,9 @@ if ($initials === '') $initials = 'OP';
                         <strong><?= htmlspecialchars($userName) ?></strong>
                         <small><?= htmlspecialchars($empresaName) ?></small>
                     </div>
+                    <button type="button" id="btn-install-menu" class="user-menu-item" style="display:none;" onclick="triggerInstallFromMenu()">
+                        <i class="bi bi-download"></i> Instalar App
+                    </button>
                     <a href="/login.php?logout=1" class="user-menu-item user-menu-logout">
                         <i class="bi bi-box-arrow-left"></i> Cerrar sesion
                     </a>
@@ -166,7 +166,7 @@ if ($initials === '') $initials = 'OP';
                     <select id="filter-municipio" class="input-field" disabled>
                         <option value="">Todos los municipios</option>
                     </select>
-                    <select id="filter-monte" class="input-field" disabled>
+                    <select id="filter-monte" class="input-field">
                         <option value="">Todos los montes</option>
                     </select>
                 </div>
@@ -335,7 +335,14 @@ if ($initials === '') $initials = 'OP';
             </div>
         </div>
 
-        <!-- Botón Finalizar Visita (fijo abajo, rojo, fuera del scroll) -->
+        <!-- Botón Guardar Visita (sin foto) — visible cuando hay infra seleccionada -->
+        <div id="guardar-visita-sin-foto-section" class="guardar-visita-fixed hidden" style="bottom:72px;">
+            <button type="button" id="btn-guardar-visita-sin-foto" class="btn-guardar-visita-sin-foto" style="width:100%;">
+                <i class="bi bi-save-fill"></i> Guardar visita
+            </button>
+        </div>
+
+        <!-- Botón Finalizar Visita (fijo abajo, con fotos) -->
         <div id="guardar-visita-section" class="guardar-visita-fixed hidden">
             <div style="display:flex;gap:8px;width:100%;">
                 <button type="button" id="btn-guardar-visita" class="btn-finalizar-visita" style="flex:1;">
@@ -664,11 +671,11 @@ if ($initials === '') $initials = 'OP';
     <!-- Config -->
     <script>
         window.INFOCAMPO = {
+            csrfToken: <?= json_encode(csrfToken()) ?>,
             usuarioId: <?= $usuarioId ?>,
             empresaId: <?= $empresaId ?>,
             userName: <?= json_encode($userName) ?>,
             empresaName: <?= json_encode($empresaName) ?>,
-            csrfToken: <?= json_encode(csrfToken()) ?>,
             endpoints: {
                 upload: 'subir.php',
                 infraestructuras: 'api/infraestructuras.php',
@@ -682,12 +689,14 @@ if ($initials === '') $initials = 'OP';
                 waypoints: 'api/waypoints.php',
                 puntosMapa: 'api/puntos_mapa.php',
                 campos: 'api/campos.php',
+                guardarVisita: 'api/guardar_visita.php',
             },
             formatoNombreFoto: <?= $formatoNombreFoto ?>,
             opMostrarEmpresa: <?= $opMostrarEmpresa ?>,
             opMostrarInfra: <?= $opMostrarInfra ?>,
             opMostrarSituacion: <?= $opMostrarSituacion ?>,
             opMostrarMapa: <?= $opMostrarMapa ?>,
+            opMostrarCapasInfra: <?= $opMostrarCapasInfra ?>,
             opMapaZoom: <?= $opMapaZoom ?>,
             watermark: {
                 fecha: <?= $wmFecha ?>,
@@ -724,6 +733,7 @@ if ($initials === '') $initials = 'OP';
     })();
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/haversine.js"></script>
     <script src="js/offline.js"></script>
     <script src="js/operador.js"></script>
 </body>

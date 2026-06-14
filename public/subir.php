@@ -177,6 +177,14 @@ try {
     $infraCodigo = $infraRow['codigo_unico'] ?: $infraRow['nombre'];
     $infraEmpresaId = (int) $infraRow['empresa_id'];
 
+    // Validar que la infraestructura pertenece a la empresa del usuario
+    $sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+    if ($sessionEmpresaId > 0 && $infraEmpresaId !== $sessionEmpresaId) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Infraestructura no pertenece a tu empresa']);
+        exit;
+    }
+
     // Obtener formato de nombre configurado para la empresa
     $stmtFmt = $pdo->prepare("SELECT formato_nombre_foto FROM empresas WHERE id = :id");
     $stmtFmt->execute([':id' => $infraEmpresaId]);
@@ -193,41 +201,22 @@ try {
     $codigoSafe = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $infraCodigo);
     $codigoSafe = substr($codigoSafe, 0, 60);
 
+    // Mapeo de situación a etiqueta legible
+    $situacionLabels = ['antes' => 'Antes', 'durante' => 'Durante', 'despues' => 'Despues'];
+    $situacionLabel = $situacionLabels[$incidencia] ?? 'Antes';
+
     // Construir nombre según formato
+
     switch ($formatoNombre) {
         case 2:
-            // CODIGO_INFRA_TIPO_TRABAJO_NºFOTO
-            $tipoTrabajoNombre = '';
-            if ($tipoTrabajoId) {
-                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
-                $stmtTT->execute([':id' => $tipoTrabajoId]);
-                $ttRow = $stmtTT->fetch();
-                if ($ttRow) {
-                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
-                }
-            }
-            $nombreArchivo = $tipoTrabajoNombre
-                ? "{$codigoSafe}_{$tipoTrabajoNombre}_{$numFotoStr}"
-                : "{$codigoSafe}_{$numFotoStr}";
+            // CODIGO_INFRA_SITUACION_NºFOTO
+            $nombreArchivo = "{$codigoSafe}_{$situacionLabel}_{$numFotoStr}";
             break;
 
         case 3:
-            // CODIGO_INFRA_TIPO_TRABAJO_TIPO_FOTO_NºFOTO
-            $tipoTrabajoNombre = '';
-            if ($tipoTrabajoId) {
-                $stmtTT = $pdo->prepare("SELECT nombre FROM tipos_trabajo WHERE id = :id");
-                $stmtTT->execute([':id' => $tipoTrabajoId]);
-                $ttRow = $stmtTT->fetch();
-                if ($ttRow) {
-                    $tipoTrabajoNombre = preg_replace('/[^a-zA-Z0-9_\-áéíóúñÁÉÍÓÚÑ]/u', '_', $ttRow['nombre']);
-                }
-            }
+            // CODIGO_INFRA_SITUACION_TIPO_FOTO_NºFOTO
             $tipoFotoLabel = $tipoFoto === 'comparativo' ? 'Comparativa' : 'Aleatoria';
-            if ($tipoTrabajoNombre) {
-                $nombreArchivo = "{$codigoSafe}_{$tipoTrabajoNombre}_{$tipoFotoLabel}_{$numFotoStr}";
-            } else {
-                $nombreArchivo = "{$codigoSafe}_{$tipoFotoLabel}_{$numFotoStr}";
-            }
+            $nombreArchivo = "{$codigoSafe}_{$situacionLabel}_{$tipoFotoLabel}_{$numFotoStr}";
             break;
 
         default: // case 1

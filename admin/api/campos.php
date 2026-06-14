@@ -17,12 +17,7 @@ $pdo = getDB();
 
 header('Content-Type: application/json; charset=utf-8');
 
-$empresaId = (int) ($_GET['empresa_id'] ?? $_POST['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
-
-// Supervisores y admins solo pueden ver su empresa
-if (in_array($_SESSION['user_rol'], ['admin', 'supervisor']) && $empresaId !== (int) $_SESSION['empresa_id']) {
-    $empresaId = (int) $_SESSION['empresa_id'];
-}
+$empresaId = getEmpresaIdSeguro();
 
 if ($empresaId <= 0) {
     http_response_code(400);

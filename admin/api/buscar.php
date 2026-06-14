@@ -15,7 +15,7 @@ header('Content-Type: application/json; charset=utf-8');
 $pdo = getDB();
 
 $q = trim($_GET['q'] ?? '');
-$empresaId = (int) ($_GET['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 if ($q === '' || mb_strlen($q) < 2) {
     echo json_encode(['ok' => true, 'results' => []], JSON_UNESCAPED_UNICODE);

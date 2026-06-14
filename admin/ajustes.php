@@ -15,7 +15,7 @@ $pdo = getDB();
 
 $currentPage = 'ajustes';
 
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // ---------------------------------------------------------------
 // Procesar acciones POST
@@ -109,21 +109,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $opInfra     = isset($_POST['op_mostrar_infraestructura']) ? 1 : 0;
             $opSituacion = isset($_POST['op_mostrar_situacion']) ? 1 : 0;
             $opMapa      = isset($_POST['op_mostrar_mapa']) ? 1 : 0;
+            $opCapasInfra = isset($_POST['op_mostrar_capas_infra']) ? 1 : 0;
             $opMapaZoom  = (int) ($_POST['op_mapa_zoom'] ?? 9);
             $allowedZooms = [9, 10, 12, 13];
             if (!in_array($opMapaZoom, $allowedZooms, true)) $opMapaZoom = 9;
 
             $stmt = $pdo->prepare(
                 "UPDATE empresas SET op_mostrar_empresa = :emp, op_mostrar_infraestructura = :inf,
-                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa, op_mapa_zoom = :zoom WHERE id = :id"
+                 op_mostrar_situacion = :sit, op_mostrar_mapa = :mapa, op_mostrar_capas_infra = :capas, op_mapa_zoom = :zoom WHERE id = :id"
             );
             $stmt->execute([
-                ':emp'  => $opEmpresa,
-                ':inf'  => $opInfra,
-                ':sit'  => $opSituacion,
-                ':mapa' => $opMapa,
-                ':zoom' => $opMapaZoom,
-                ':id'   => $targetEmpId,
+                ':emp'   => $opEmpresa,
+                ':inf'   => $opInfra,
+                ':sit'   => $opSituacion,
+                ':mapa'  => $opMapa,
+                ':capas' => $opCapasInfra,
+                ':zoom'  => $opMapaZoom,
+                ':id'    => $targetEmpId,
             ]);
             $msg = 'Campos del operador actualizados correctamente.';
             $msgType = 'success';
@@ -137,11 +139,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 }
 
 // ---------------------------------------------------------------
-// Cargar empresas (para selector si es superadmin)
+// Cargar empresas (solo superadmin)
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 // ---------------------------------------------------------------
 // Cargar datos de la empresa seleccionada
@@ -158,6 +165,7 @@ $opEmpresa   = (int) ($empresa['op_mostrar_empresa'] ?? 0);
 $opInfra     = (int) ($empresa['op_mostrar_infraestructura'] ?? 0);
 $opSituacion = (int) ($empresa['op_mostrar_situacion'] ?? 0);
 $opMapa      = (int) ($empresa['op_mostrar_mapa'] ?? 0);
+$opCapasInfra = (int) ($empresa['op_mostrar_capas_infra'] ?? 0);
 $opMapaZoom  = (int) ($empresa['op_mapa_zoom'] ?? 9);
 
 // Watermark settings — base fields (default ON)
@@ -193,6 +201,7 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h4 class="mb-0"><i class="bi bi-gear me-2"></i>Ajustes de Empresa</h4>
 
+            <?php if ($isSuperadmin): ?>
             <form method="get" class="d-flex gap-2 align-items-center">
                 <label class="fw-semibold small text-nowrap">Empresa:</label>
                 <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
@@ -204,6 +213,7 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                     <?php endforeach; ?>
                 </select>
             </form>
+            <?php endif; ?>
         </div>
 
         <?php if ($msg): ?>
@@ -246,10 +256,10 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                 <input class="form-check-input" type="radio" name="formato_nombre_foto" id="formato2"
                                        value="2" <?= $formatoActual === 2 ? 'checked' : '' ?> onchange="updatePreview()">
                                 <label class="form-check-label fw-semibold" for="formato2">
-                                    Opción 2: Código Infraestructura + Tipo Trabajo + N° Foto
+                                    Opción 2: Código Infraestructura + Situación de Obra + N° Foto
                                 </label>
                                 <div class="text-muted small mt-1">
-                                    Ejemplo: <code>INF-001_Inspección_001</code>, <code>INF-001_Mantenimiento_001</code>
+                                    Ejemplo: <code>INF-001_Antes_001</code>, <code>INF-001_Durante_002</code>, <code>INF-001_Despues_003</code>
                                 </div>
                             </div>
 
@@ -257,10 +267,10 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                 <input class="form-check-input" type="radio" name="formato_nombre_foto" id="formato3"
                                        value="3" <?= $formatoActual === 3 ? 'checked' : '' ?> onchange="updatePreview()">
                                 <label class="form-check-label fw-semibold" for="formato3">
-                                    Opción 3: Código Infraestructura + Tipo Trabajo + Tipo Foto + N° Foto
+                                    Opción 3: Código Infraestructura + Situación de Obra + Tipo Foto + N° Foto
                                 </label>
                                 <div class="text-muted small mt-1">
-                                    Ejemplo: <code>INF-001_Inspección_Aleatoria_001</code>, <code>INF-001_Inspección_Comparativa_002</code>
+                                    Ejemplo: <code>INF-001_Antes_Aleatoria_001</code>, <code>INF-001_Durante_Comparativa_002</code>
                                 </div>
                             </div>
                         </div>
@@ -332,6 +342,14 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
                                         <option value="9" <?= $opMapaZoom === 9 ? 'selected' : '' ?>>1:500.000</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-3 p-3 rounded border">
+                                <input class="form-check-input" type="checkbox" id="op_capas_infra" name="op_mostrar_capas_infra" value="1" <?= $opCapasInfra ? 'checked' : '' ?>>
+                                <label class="form-check-label fw-semibold" for="op_capas_infra">
+                                    <i class="bi bi-layers me-1"></i> Capas de infraestructuras en mapa
+                                </label>
+                                <div class="text-muted small mt-1">Permite al operador ver las capas GeoJSON de infraestructuras en el mapa de visitas.</div>
                             </div>
                         </div>
 
@@ -516,8 +534,8 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
         const el = document.getElementById('preview-format');
         const examples = {
             '1': '<code>TORRE-A42_001.jpg</code> &nbsp; <code>TORRE-A42_002.jpg</code> &nbsp; <code>TORRE-A42_003.jpg</code>',
-            '2': '<code>TORRE-A42_Inspección_001.jpg</code> &nbsp; <code>TORRE-A42_Mantenimiento_001.jpg</code>',
-            '3': '<code>TORRE-A42_Inspección_Aleatoria_001.jpg</code> &nbsp; <code>TORRE-A42_Inspección_Comparativa_001.jpg</code>',
+            '2': '<code>TORRE-A42_Antes_001.jpg</code> &nbsp; <code>TORRE-A42_Durante_002.jpg</code> &nbsp; <code>TORRE-A42_Despues_003.jpg</code>',
+            '3': '<code>TORRE-A42_Antes_Aleatoria_001.jpg</code> &nbsp; <code>TORRE-A42_Durante_Comparativa_002.jpg</code>',
         };
         el.innerHTML = examples[val] || '';
 

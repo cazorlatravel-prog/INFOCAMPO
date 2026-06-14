@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    // Requiere autenticación para evitar fuga de datos entre empresas
     if (!isLoggedIn()) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autenticado']);
@@ -25,12 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     // empresa_id siempre desde la sesión (el superadmin puede pasar uno explícito)
-    $sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
-    $userRole = $_SESSION['user_rol'] ?? '';
-    if ($userRole === 'superadmin' && isset($_GET['empresa_id'])) {
+    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+    if (($_SESSION['user_rol'] ?? '') === 'superadmin' && isset($_GET['empresa_id'])) {
         $empresaId = (int) $_GET['empresa_id'];
-    } else {
-        $empresaId = $sessionEmpresaId;
     }
     $todos = isset($_GET['todos']) && $_GET['todos'] === '1';
 
@@ -76,10 +74,9 @@ validateCsrf();
 
 $action = $_POST['action'] ?? '';
 // empresa_id siempre desde la sesión (el superadmin puede pasar uno explícito)
-if (($_SESSION['user_rol'] ?? '') === 'superadmin' && isset($_POST['empresa_id'])) {
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+if ($userRole === 'superadmin' && isset($_POST['empresa_id'])) {
     $empresaId = (int) $_POST['empresa_id'];
-} else {
-    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 }
 
 if ($empresaId <= 0) {

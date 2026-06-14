@@ -8,6 +8,8 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
+// Unidades de obra rara vez cambian — cachear 5 minutos
+header('Cache-Control: private, max-age=300');
 
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/auth.php';

@@ -1,16 +1,22 @@
--- ============================================================
+-- =============================================
 -- INFOCAMPO SaaS — Migración v18
--- Token de idempotencia para subidas de fotos
---
--- Añade la columna `client_token` a `registros` para deduplicar
--- subidas reintentadas (cola offline / fallos de red), evitando
--- registros duplicados de la misma captura.
--- ============================================================
+-- Permitir visitas sin foto (url_cloudinary nullable)
+-- y añadir columna es_visita_sin_foto
+-- =============================================
 
+-- 1. Permitir que url_cloudinary sea NULL (visitas sin foto)
 ALTER TABLE registros
-    ADD COLUMN IF NOT EXISTS client_token VARCHAR(64) DEFAULT NULL AFTER nombre_archivo;
+    MODIFY COLUMN url_cloudinary VARCHAR(512) DEFAULT NULL COMMENT 'URL de la imagen (NULL si visita sin foto)';
 
--- Índice único para garantizar que un mismo token solo crea un registro.
--- (En re-ejecución lanza error 1061, tolerado por migrate.php como inofensivo.)
+-- 2. Añadir flag para distinguir visitas sin foto
 ALTER TABLE registros
-    ADD UNIQUE INDEX uq_registros_client_token (client_token);
+    ADD COLUMN IF NOT EXISTS es_visita_sin_foto TINYINT(1) NOT NULL DEFAULT 0 AFTER nombre_archivo;
+
+-- 3. Permitir lat/lon con defaults para visitas sin GPS
+ALTER TABLE registros
+    MODIFY COLUMN lat_real DECIMAL(10,7) DEFAULT 0 COMMENT 'Latitud GPS real del operador',
+    MODIFY COLUMN lon_real DECIMAL(10,7) DEFAULT 0 COMMENT 'Longitud GPS real del operador';
+
+-- 4. Opción para que el admin permita ver capas de infraestructuras en el mapa del operador
+ALTER TABLE empresas
+    ADD COLUMN IF NOT EXISTS op_mostrar_capas_infra TINYINT(1) NOT NULL DEFAULT 0 AFTER op_mapa_zoom;

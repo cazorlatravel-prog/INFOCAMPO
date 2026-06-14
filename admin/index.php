@@ -18,7 +18,7 @@ $currentPage = 'infraestructuras';
 // ---------------------------------------------------------------
 // Filtros
 // ---------------------------------------------------------------
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 $infraId   = isset($_GET['infra_id'])   ? (int) $_GET['infra_id']   : 0;
 $filtroEstado   = $_GET['estado'] ?? '';
 $filtroUsuario  = isset($_GET['usuario_id']) ? (int) $_GET['usuario_id'] : 0;
@@ -32,11 +32,16 @@ if ($impersonating && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
 }
 
 // ---------------------------------------------------------------
-// Cargar empresas para filtro
+// Cargar empresas para filtro (solo superadmin)
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 // ---------------------------------------------------------------
 // Cargar infraestructuras + contadores de incidencias
@@ -45,11 +50,13 @@ $infraestructuras = [];
 if ($empresaId > 0) {
     $stmt = $pdo->prepare(
         "SELECT i.id, i.nombre, i.codigo_unico, i.lat_teorica, i.lon_teorica, i.tipo,
-                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id) AS total_registros,
-                (SELECT COUNT(*) FROM registros r WHERE r.infra_id = i.id AND r.estado_incidencia = 'durante') AS num_durante,
+                COUNT(r.id) AS total_registros,
+                SUM(CASE WHEN r.estado_incidencia = 'durante' THEN 1 ELSE 0 END) AS num_durante,
                 (SELECT r2.estado_incidencia FROM registros r2 WHERE r2.infra_id = i.id ORDER BY r2.fecha DESC LIMIT 1) AS ultimo_estado
          FROM infraestructuras i
+         LEFT JOIN registros r ON r.infra_id = i.id
          WHERE i.empresa_id = :empresa_id AND i.activa = 1
+         GROUP BY i.id
          ORDER BY i.nombre"
     );
     $stmt->execute([':empresa_id' => $empresaId]);
@@ -137,7 +144,8 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
 
             <!-- COLUMNA IZQUIERDA: Filtros -->
             <div class="col-lg-3">
-                <!-- Selector de empresa -->
+                <?php if ($isSuperadmin): ?>
+                <!-- Selector de empresa (solo superadmin) -->
                 <div class="card mb-3">
                     <div class="card-body">
                         <h6 class="card-title text-muted mb-3"><i class="bi bi-building me-1"></i>Empresa</h6>
@@ -153,6 +161,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                         </form>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Lista de infraestructuras -->
                 <?php if ($infraestructuras): ?>

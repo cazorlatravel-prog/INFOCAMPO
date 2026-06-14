@@ -16,7 +16,7 @@ requireRole(['admin', 'supervisor', 'superadmin']);
 $pdo = getDB();
 $currentPage = 'infraestructuras';
 
-$empresaId = (int) ($_GET['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 $infraId   = (int) ($_GET['infra_id'] ?? 0);
 
 // Verificar pertenencia

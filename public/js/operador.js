@@ -128,6 +128,8 @@
     const visitasBody        = $('#visitas-body');
     const guardarVisitaSection = $('#guardar-visita-section');
     const btnGuardarVisita   = $('#btn-guardar-visita');
+    const guardarVisitaSinFotoSection = $('#guardar-visita-sin-foto-section');
+    const btnGuardarVisitaSinFoto = $('#btn-guardar-visita-sin-foto');
     const btnEditarBack      = $('#btn-editar-back');
     const btnGuardarEdicion  = $('#btn-guardar-edicion');
     const btnAñadirFotoVisita = $('#btn-añadir-foto-visita');
@@ -406,11 +408,11 @@
         try {
             const val = localStorage.getItem('infocampo_seq_' + infraId);
             return val ? parseInt(val, 10) : 0;
-        } catch { return 0; }
+        } catch (_e) { return 0; }
     }
 
     function saveInfraSeq(infraId, seq) {
-        try { localStorage.setItem('infocampo_seq_' + infraId, String(seq)); } catch {}
+        try { localStorage.setItem('infocampo_seq_' + infraId, String(seq)); } catch (_e) {}
     }
 
     function formatDateMadrid(date) {
@@ -509,14 +511,15 @@
             const addr = data.address || {};
             state.geoLocation = {
                 city: addr.city || addr.town || addr.village || addr.municipality || '',
-                province: addr.state || addr.province || addr.county || '',
+                province: addr.province || addr.county || addr.state || '',
                 postcode: addr.postcode || '',
                 country: addr.country || '',
             };
             _lastGeocodeLat = lat;
             _lastGeocodeLon = lon;
             return state.geoLocation;
-        } catch {
+        } catch (e) {
+            console.warn('reverseGeocode failed:', e);
             return state.geoLocation || { city: '', province: '', postcode: '', country: '' };
         }
     }
@@ -541,7 +544,7 @@
             try {
                 const perm = await DeviceOrientationEvent.requestPermission();
                 if (perm === 'granted') _startCompassListener();
-            } catch { /* permission denied */ }
+            } catch (_e) { /* permission denied */ }
         }
     }
 
@@ -675,15 +678,15 @@
             const res = await fetch(url);
             const data = await res.json();
             if (data.ok && data.montes && data.montes.length > 0) {
-                let html = '<option value="">-- Todos los montes --</option>';
+                let html = '<option value="">Todos los montes</option>';
                 data.montes.forEach(m => {
                     html += `<option value="${escHtml(m)}">${escHtml(m)}</option>`;
                 });
                 filterMonte.innerHTML = html;
                 filterMonte.disabled = false;
             } else {
-                filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
-                filterMonte.disabled = true;
+                filterMonte.innerHTML = '<option value="">Sin montes disponibles</option>';
+                filterMonte.disabled = false;
             }
         } catch (err) {
             console.warn('Error loading montes:', err);
@@ -793,6 +796,7 @@
     async function createNewInfra(name) {
         try {
             const formData = new FormData();
+            formData.append('csrf_token', CFG.csrfToken || '');
             formData.append('empresa_id', CFG.empresaId);
             formData.append('nombre', name);
             formData.append('lat', state.gps.lat || 0);
@@ -823,6 +827,12 @@
         state.countComparativas = 0;
         state.countTotal = 0;
         state.seqComparativa = 0;
+        // Revocar blob URLs de fotos de galería para liberar memoria
+        state.photos.forEach(function(p) {
+            if (p.url && p.url.startsWith('blob:')) {
+                try { URL.revokeObjectURL(p.url); } catch (_e) {}
+            }
+        });
         state.photos = [];
         // Revocar blob URLs de fotos previas cacheadas para liberar memoria
         if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
@@ -994,7 +1004,13 @@
             hint.classList.toggle('hidden', enabled);
         }
 
-        // Show/hide guardar visita button (visible when infra selected and there are photos)
+        // Show/hide guardar visita sin foto (visible when infra selected, hidden when there are photos)
+        if (guardarVisitaSinFotoSection) {
+            const hasPhotos = state.photos.length > 0;
+            guardarVisitaSinFotoSection.classList.toggle('hidden', !enabled || hasPhotos);
+        }
+
+        // Show/hide finalizar visita button (visible when infra selected and there are photos)
         if (guardarVisitaSection) {
             const hasPhotos = state.photos.length > 0;
             guardarVisitaSection.classList.toggle('hidden', !enabled || !hasPhotos);
@@ -1048,6 +1064,11 @@
 
         // Request compass permission on iOS (needs user gesture context)
         requestCompassPermission();
+
+        // Re-establish GPS watch if it was cleared by closeCamera()
+        if (state.gpsWatchId === null) {
+            initGPS();
+        }
 
         // Start camera — request max resolution for high-quality watermarked photos
         try {
@@ -1207,6 +1228,12 @@
         if (_capturing) return;
         _capturing = true;
 
+        // Visual feedback: disable shutter button and show spinner
+        if (btnShutter) {
+            btnShutter.disabled = true;
+            btnShutter.style.opacity = '0.5';
+        }
+
         try {
             const vw = camVideo.videoWidth;
             const vh = camVideo.videoHeight;
@@ -1214,6 +1241,7 @@
             if (!vw || !vh) {
                 console.warn('captureFrame: video not ready (dimensions 0)');
                 _capturing = false;
+                if (btnShutter) { btnShutter.disabled = false; btnShutter.style.opacity = ''; }
                 return;
             }
 
@@ -1263,21 +1291,20 @@
             const codInfra = sanitizeFilename(state.infraCode || state.infraName);
             const formato = CFG.formatoNombreFoto || 1;
 
+            // Etiquetas para nombre de archivo
+            const situacionLabels = { 0: 'Antes', 1: 'Durante', 2: 'Despues' };
+            const situacionLabel = situacionLabels[state.situacionIdx] || 'Antes';
+            const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
+
             let filename;
             if (formato === 2) {
-                const ttName = getSelectedTipoTrabajoName();
-                filename = ttName
-                    ? `${codInfra}_${sanitizeFilename(ttName)}_${seqNum}`
-                    : `${codInfra}_${seqNum}`;
+                // Código + Situación + N°
+                filename = `${codInfra}_${situacionLabel}_${seqNum}`;
             } else if (formato === 3) {
-                const ttName = getSelectedTipoTrabajoName();
-                const tipoFotoLabel = state.currentMode === 'comparativo' ? 'Comparativa' : 'Aleatoria';
-                if (ttName) {
-                    filename = `${codInfra}_${sanitizeFilename(ttName)}_${tipoFotoLabel}_${seqNum}`;
-                } else {
-                    filename = `${codInfra}_${tipoFotoLabel}_${seqNum}`;
-                }
+                // Código + Situación + Tipo Foto + N°
+                filename = `${codInfra}_${situacionLabel}_${tipoFotoLabel}_${seqNum}`;
             } else {
+                // Código + N°
                 filename = `${codInfra}_${seqNum}`;
             }
 
@@ -1306,11 +1333,17 @@
             });
 
             // Save base image for annotation overlay (before any annotation)
-            const prevCtx = previewCanvas.getContext('2d');
-            state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            // getImageData can throw SecurityError on tainted canvas — non-critical
             state.pendingFilename = filename;
             state.annotation = null;
             state.annotationMode = false;
+            try {
+                const prevCtx = previewCanvas.getContext('2d');
+                state.baseImageData = prevCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            } catch (imgDataErr) {
+                console.warn('getImageData failed (annotations disabled):', imgDataErr);
+                state.baseImageData = null;
+            }
 
             // Show preview screen for optional annotation before uploading
             showScreen('preview');
@@ -1318,12 +1351,35 @@
             resetAnnotationUI();
 
         } catch (err) {
-            console.error('Error en captureFrame:', err);
+            console.error('Error en captureFrame:', err, err.stack);
+            // Rollback counters on failure to avoid sequence gaps
+            state.countTotal--;
+            if (state.currentMode === 'comparativo') {
+                state.seqComparativa--;
+                state.countComparativas--;
+            } else {
+                state.countAleatorias--;
+            }
+            if (state.infraId) saveInfraSeq(state.infraId, state.countTotal);
             // Resume camera so the user can retry
             try { camVideo.play(); } catch (_) {}
-            alert('Error al capturar la foto. Inténtalo de nuevo.');
+            // Mostrar mensaje descriptivo con detalle del error para diagnóstico
+            let userMsg = 'Error al capturar la foto. Inténtalo de nuevo.';
+            if (err.message && err.message.includes('taint')) {
+                userMsg = 'Error de seguridad con el mapa. Se reintentará sin mapa.';
+            } else if (err.message && err.message.includes('timeout')) {
+                userMsg = 'La captura tardó demasiado. Inténtalo de nuevo.';
+            } else if (err.message && err.message.includes('toBlob')) {
+                userMsg = 'Error al generar la imagen. Inténtalo de nuevo.';
+            }
+            alert(userMsg + '\n\nDetalle: ' + (err.message || String(err)));
         } finally {
             _capturing = false;
+            // Restore shutter button
+            if (btnShutter) {
+                btnShutter.disabled = false;
+                btnShutter.style.opacity = '';
+            }
         }
     }
 
@@ -1455,7 +1511,7 @@
 
         // Online — upload directly
         const formData = new FormData();
-        formData.append('csrf_token', uploadData.csrf_token || '');
+        formData.append('csrf_token', CFG.csrfToken || '');
         formData.append('client_token', uploadData.client_token || '');
         formData.append('imagen', blob, filename + '.jpg');
         formData.append('infra_id', uploadData.infra_id);
@@ -1686,13 +1742,18 @@
             drawCompassRose(ctx, w, h, meta.bearing);
         }
 
-        // 4. Mini-map (bottom-left, optional)
+        // 4. Mini-map (bottom-left, optional) — with timeout to prevent blocking
         if (wmCfg.mapa && meta.lat != null && meta.lon != null) {
-            await drawMiniMap(ctx, w, h, meta.lat, meta.lon, wmCfg.mapaZoom || 15, wmCfg.mapaTamano || 2);
+            try {
+                await Promise.race([
+                    drawMiniMap(ctx, w, h, meta.lat, meta.lon, wmCfg.mapaZoom || 15, wmCfg.mapaTamano || 2),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('MiniMap timeout')), 8000)),
+                ]);
+            } catch (e) {
+                console.warn('Mini-map skipped:', e.message);
+            }
         }
 
-        // Save blob for later
-        state.capturedBlob = await canvasToBlob(targetCanvas, 'image/jpeg', 0.85);
     }
 
     /**
@@ -1815,6 +1876,12 @@
             }
             const tiles = await Promise.all(tilePromises);
 
+            // Si no se cargó ningún tile, no dibujar nada
+            if (tiles.every(t => t === null)) {
+                console.warn('Mini-map: no tiles loaded');
+                return;
+            }
+
             // Create off-screen canvas for the composite tile area (768x768)
             const tileCanvas = document.createElement('canvas');
             tileCanvas.width = 768;
@@ -1831,66 +1898,101 @@
                 }
             }
 
+            // Verificar que el tileCanvas no esté tainted (CORS)
+            // antes de dibujarlo en el canvas principal de la foto
+            try {
+                tileCanvas.toDataURL();
+            } catch (taintErr) {
+                console.warn('Mini-map: canvas tainted by tiles, skipping', taintErr);
+                return;
+            }
+
+            // Canvas intermedio con el mapa completo (tiles + pin + borde)
+            // para no contaminar el canvas principal si algo falla
+            const mapCanvas = document.createElement('canvas');
+            mapCanvas.width = mapSize;
+            mapCanvas.height = mapSize;
+            const mapCtx = mapCanvas.getContext('2d');
+
             // Center point in the composite canvas
             const centerX = 256 + pixelX;
             const centerY = 256 + pixelY;
 
-            // Draw rounded rectangle clip path
-            ctx.save();
-            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
-            ctx.clip();
+            // Verify tileCanvas is not tainted before compositing to main canvas
+            try {
+                tileCanvas.toDataURL();
+            } catch (_taintErr) {
+                console.warn('Mini-map: canvas tainted by tiles, skipping');
+                return;
+            }
+
+            // Draw rounded rectangle clip path on mapCanvas
+            roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
+            mapCtx.clip();
 
             // Recortar exactamente mapSize px de los tiles (escala 1:1, sin reescalado borroso)
             const srcSize = mapSize;
-            ctx.drawImage(tileCanvas,
+            mapCtx.drawImage(tileCanvas,
                 centerX - srcSize / 2, centerY - srcSize / 2, srcSize, srcSize,
-                mapX, mapY, mapSize, mapSize
+                0, 0, mapSize, mapSize
             );
 
-            ctx.restore();
+            // Reset clip
+            mapCtx.restore();
+            mapCtx.save();
 
             // Draw border
-            ctx.save();
-            roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.lineWidth = borderWidth;
-            ctx.stroke();
-            ctx.restore();
+            roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
+            mapCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            mapCtx.lineWidth = borderWidth;
+            mapCtx.stroke();
 
             // Draw red location pin in center
-            const pinX = mapX + mapSize / 2;
-            const pinY = mapY + mapSize / 2;
+            const pinCx = mapSize / 2;
+            const pinCy = mapSize / 2;
             const pinSize = Math.max(6, Math.round(mapSize * 0.06));
 
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetY = 2;
+            mapCtx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            mapCtx.shadowBlur = 4;
+            mapCtx.shadowOffsetY = 2;
 
             // Pin circle
-            ctx.beginPath();
-            ctx.arc(pinX, pinY - pinSize, pinSize, 0, Math.PI * 2);
-            ctx.fillStyle = '#e74c3c';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = Math.max(1, Math.round(pinSize * 0.3));
-            ctx.stroke();
+            mapCtx.beginPath();
+            mapCtx.arc(pinCx, pinCy - pinSize, pinSize, 0, Math.PI * 2);
+            mapCtx.fillStyle = '#e74c3c';
+            mapCtx.fill();
+            mapCtx.strokeStyle = '#fff';
+            mapCtx.lineWidth = Math.max(1, Math.round(pinSize * 0.3));
+            mapCtx.stroke();
 
             // Pin point (triangle)
-            ctx.beginPath();
-            ctx.moveTo(pinX - pinSize * 0.5, pinY - pinSize * 0.3);
-            ctx.lineTo(pinX, pinY + pinSize * 0.5);
-            ctx.lineTo(pinX + pinSize * 0.5, pinY - pinSize * 0.3);
-            ctx.fillStyle = '#e74c3c';
-            ctx.fill();
+            mapCtx.beginPath();
+            mapCtx.moveTo(pinCx - pinSize * 0.5, pinCy - pinSize * 0.3);
+            mapCtx.lineTo(pinCx, pinCy + pinSize * 0.5);
+            mapCtx.lineTo(pinCx + pinSize * 0.5, pinCy - pinSize * 0.3);
+            mapCtx.fillStyle = '#e74c3c';
+            mapCtx.fill();
 
             // Inner dot
-            ctx.beginPath();
-            ctx.arc(pinX, pinY - pinSize, pinSize * 0.35, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
+            mapCtx.shadowColor = 'transparent';
+            mapCtx.shadowBlur = 0;
+            mapCtx.beginPath();
+            mapCtx.arc(pinCx, pinCy - pinSize, pinSize * 0.35, 0, Math.PI * 2);
+            mapCtx.fillStyle = '#fff';
+            mapCtx.fill();
 
-            ctx.restore();
+            mapCtx.restore();
+
+            // Verificación final: el mapCanvas no debe estar tainted
+            try {
+                mapCanvas.toDataURL();
+            } catch (taintErr2) {
+                console.warn('Mini-map: final canvas tainted, skipping', taintErr2);
+                return;
+            }
+
+            // Todo OK — dibujar el mini-mapa en el canvas principal de la foto
+            ctx.drawImage(mapCanvas, mapX, mapY);
 
         } catch (err) {
             console.warn('Error drawing mini-map:', err);
@@ -1970,10 +2072,6 @@
         if (filterProvincia) {
             filterProvincia.addEventListener('change', () => {
                 loadMunicipios(filterProvincia.value);
-                if (filterMonte) {
-                    filterMonte.innerHTML = '<option value="">-- Todos los montes --</option>';
-                    filterMonte.disabled = true;
-                }
                 loadMontes();
                 clearInfra();
             });
@@ -2110,6 +2208,9 @@
 
         // Guardar visita (finalizar y resetear)
         if (btnGuardarVisita) btnGuardarVisita.addEventListener('click', finalizarVisita);
+
+        // Guardar visita sin foto
+        if (btnGuardarVisitaSinFoto) btnGuardarVisitaSinFoto.addEventListener('click', guardarVisitaSinFoto);
 
         // Waypoints download from ficha
         const btnWaypointsFicha = $('#btn-waypoints-ficha');
@@ -2503,8 +2604,8 @@
 
             // Load KML layers from DB
             loadMapKmlLayers();
-            // Load infrastructure GeoJSON layers
-            loadMapInfraLayers();
+            // Load infrastructure GeoJSON layers (si el admin lo permite)
+            if (CFG.opMostrarCapasInfra) loadMapInfraLayers();
             // Load waypoints GPX layer (comparative photos, "antes" state)
             loadMapWaypoints();
             // Load admin custom points
@@ -3412,17 +3513,37 @@
     }
 
     function canvasToBlob(canvas, type, quality) {
-        return new Promise((resolve) => {
-            canvas.toBlob(resolve, type, quality);
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error('Canvas toBlob timeout'));
+            }, 10000);
+            try {
+                canvas.toBlob((blob) => {
+                    clearTimeout(timer);
+                    if (!blob) {
+                        reject(new Error('Canvas toBlob returned null'));
+                        return;
+                    }
+                    resolve(blob);
+                }, type, quality);
+            } catch (err) {
+                clearTimeout(timer);
+                reject(new Error('Canvas tainted or toBlob failed: ' + err.message));
+            }
         });
     }
 
-    function loadImage(src) {
+    function loadImage(src, timeoutMs = 5000) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = reject;
+            const timer = setTimeout(() => {
+                img.onload = img.onerror = null;
+                img.src = '';
+                reject(new Error('Image load timeout'));
+            }, timeoutMs);
+            img.onload = () => { clearTimeout(timer); resolve(img); };
+            img.onerror = () => { clearTimeout(timer); reject(new Error('Image load error')); };
             img.src = src;
         });
     }
@@ -3458,7 +3579,11 @@
             e.preventDefault();
             deferredInstallPrompt = e;
 
-            // Only show if user hasn't dismissed recently
+            // Always show install button in user menu
+            const menuBtn = document.getElementById('btn-install-menu');
+            if (menuBtn) menuBtn.style.display = '';
+
+            // Only show banner if user hasn't dismissed recently
             const dismissed = localStorage.getItem('pwa-install-dismissed');
             if (dismissed) {
                 const dismissedAt = parseInt(dismissed, 10);
@@ -3519,6 +3644,31 @@
         }
     }
 
+    // Global function for install button in user menu
+    window.triggerInstallFromMenu = async function() {
+        if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            if (outcome === 'accepted') {
+                const menuBtn = document.getElementById('btn-install-menu');
+                if (menuBtn) menuBtn.style.display = 'none';
+                banner.classList.add('hidden');
+                showNotification('App instalada correctamente');
+            }
+        } else {
+            showInstallInstructions();
+        }
+    };
+
+    // Show install button in menu for iOS (beforeinstallprompt doesn't fire)
+    const isIOSCheck = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isIOSCheck && !isStandalone) {
+        const menuBtn = document.getElementById('btn-install-menu');
+        if (menuBtn) menuBtn.style.display = '';
+    }
+
     // ===================================================================
     // FINALIZAR VISITA (Guardar y Resetear)
     // ===================================================================
@@ -3539,6 +3689,61 @@
         window.open(url, '_blank');
     }
 
+    async function guardarVisitaSinFoto() {
+        if (!state.infraId) {
+            alert('Selecciona una infraestructura primero.');
+            return;
+        }
+
+        // Deshabilitar botón mientras guarda
+        if (btnGuardarVisitaSinFoto) {
+            btnGuardarVisitaSinFoto.disabled = true;
+            btnGuardarVisitaSinFoto.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('csrf_token', CFG.csrfToken || '');
+            formData.append('infra_id', state.infraId);
+            formData.append('lat_real', state.gps.lat || 0);
+            formData.append('lon_real', state.gps.lon || 0);
+            formData.append('estado_incidencia', SITUACIONES[state.situacionIdx]);
+            formData.append('observaciones', ($('#observaciones-general') || {}).value || '');
+
+            if (tipoTrabajo && tipoTrabajo.value) {
+                formData.append('tipo_trabajo_id', tipoTrabajo.value);
+            }
+            if (unidadObra.value) {
+                formData.append('unidad_obra_id', unidadObra.value);
+            }
+
+            // Campos dinámicos
+            const dynFields = collectDynamicFields();
+            for (const [campoId, valor] of Object.entries(dynFields)) {
+                formData.append(`campos[${campoId}]`, valor);
+            }
+
+            const res = await fetch(CFG.endpoints.guardarVisita, { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.ok) {
+                showNotification(`Visita a "${state.infraName}" guardada correctamente`);
+                // Resetear estado como finalizarVisita
+                finalizarVisita();
+            } else {
+                alert('Error: ' + (data.error || 'Error desconocido'));
+            }
+        } catch (err) {
+            console.error('Error guardando visita:', err);
+            alert('Error de conexión al guardar la visita.');
+        } finally {
+            if (btnGuardarVisitaSinFoto) {
+                btnGuardarVisitaSinFoto.disabled = false;
+                btnGuardarVisitaSinFoto.innerHTML = '<i class="bi bi-save-fill"></i> Guardar visita';
+            }
+        }
+    }
+
     function finalizarVisita() {
         const numFotos = state.photos.length;
         const infraName = state.infraName;
@@ -3553,6 +3758,12 @@
         state.countComparativas = 0;
         state.countTotal = 0;
         state.seqComparativa = 0;
+        // Revocar blob URLs de fotos de galería para liberar memoria
+        state.photos.forEach(function(p) {
+            if (p.url && p.url.startsWith('blob:')) {
+                try { URL.revokeObjectURL(p.url); } catch (_e) {}
+            }
+        });
         state.photos = [];
         state.waypoints = [];
         if (state.prevPhotos.length > 0 && window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
@@ -3845,6 +4056,7 @@
         const editarObs = $('#editar-observaciones');
 
         const formData = new FormData();
+        formData.append('csrf_token', CFG.csrfToken || '');
         formData.append('action', 'editar');
         formData.append('registro_id', editingRegistroId);
         formData.append('usuario_id', CFG.usuarioId);

@@ -16,7 +16,11 @@ requireRole(['admin', 'superadmin']);
 header('Content-Type: application/json; charset=utf-8');
 
 $pdo = getDB();
-$empresaId = (int) ($_GET['empresa_id'] ?? $_POST['empresa_id'] ?? $_SESSION['empresa_id'] ?? 0);
+// Solo superadmins pueden especificar empresa_id diferente
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+if (($_SESSION['user_rol'] ?? '') === 'superadmin' && (isset($_GET['empresa_id']) || isset($_POST['empresa_id']))) {
+    $empresaId = (int) ($_GET['empresa_id'] ?? $_POST['empresa_id']);
+}
 
 if ($empresaId <= 0) {
     http_response_code(400);
@@ -26,15 +30,41 @@ if ($empresaId <= 0) {
 
 // ---------- GET: Listar capas ----------
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $capaId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+    if ($capaId > 0) {
+        // Cargar una sola capa (lazy loading desde el mapa)
+        $stmt = $pdo->prepare(
+            "SELECT id, nombre, contenido_kml, color, grosor, opacidad
+             FROM capas_kml
+             WHERE id = :id AND empresa_id = :emp AND activa = 1"
+        );
+        $stmt->execute([':id' => $capaId, ':emp' => $empresaId]);
+        $capa = $stmt->fetch();
+        if (!$capa) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Capa no encontrada'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        // KML content rarely changes — cache for 10 minutes
+        header('Cache-Control: private, max-age=600');
+        echo json_encode(['ok' => true, 'capa' => $capa], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Listar todas (metadatos sin contenido KML para reducir payload)
+    $includeContent = isset($_GET['full']);
+    $cols = $includeContent
+        ? "id, nombre, contenido_kml, color, grosor, opacidad, activa, created_at"
+        : "id, nombre, color, grosor, opacidad, activa, created_at";
+
     $stmt = $pdo->prepare(
-        "SELECT id, nombre, contenido_kml, color, grosor, opacidad, activa, created_at
-         FROM capas_kml
-         WHERE empresa_id = :emp AND activa = 1
-         ORDER BY created_at DESC"
+        "SELECT $cols FROM capas_kml WHERE empresa_id = :emp AND activa = 1 ORDER BY created_at DESC"
     );
     $stmt->execute([':emp' => $empresaId]);
     $capas = $stmt->fetchAll();
 
+    header('Cache-Control: private, max-age=60');
     echo json_encode(['ok' => true, 'capas' => $capas], JSON_UNESCAPED_UNICODE);
     exit;
 }

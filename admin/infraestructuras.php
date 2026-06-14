@@ -14,7 +14,7 @@ requireRole(['admin', 'supervisor', 'superadmin']);
 $pdo = getDB();
 $currentPage = 'infraestructuras';
 
-$empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
+$empresaId = getEmpresaIdSeguro();
 
 // ---------------------------------------------------------------
 // Procesar acciones POST
@@ -133,9 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 // ---------------------------------------------------------------
 // Cargar datos
 // ---------------------------------------------------------------
-$empresas = $pdo->query(
-    "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-)->fetchAll();
+$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
+if ($isSuperadmin) {
+    $empresas = $pdo->query(
+        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
+    )->fetchAll();
+} else {
+    $empresas = [];
+}
 
 $infraestructuras = [];
 $empresaNombre = '';
@@ -208,6 +213,7 @@ if (isset($_GET['edit'])) {
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h4 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Infraestructuras</h4>
             <div class="d-flex gap-2 align-items-center">
+                <?php if ($isSuperadmin): ?>
                 <form method="get" class="d-flex gap-2 align-items-center">
                     <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
                         <option value="">-- Empresa --</option>
@@ -218,6 +224,7 @@ if (isset($_GET['edit'])) {
                         <?php endforeach; ?>
                     </select>
                 </form>
+                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <a href="exportar_csv.php?tipo=infraestructuras&empresa_id=<?= $empresaId ?>" class="btn btn-outline-secondary btn-sm" title="Exportar a CSV/Excel">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
@@ -227,6 +234,9 @@ if (isset($_GET['edit'])) {
                     </button>
                     <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalKml">
                         <i class="bi bi-file-earmark-arrow-up"></i> Importar KML
+                    </button>
+                    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalCombinado" title="Importar KML (coordenadas) + Excel (datos) cruzados por nombre">
+                        <i class="bi bi-link-45deg"></i> KML + Excel
                     </button>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formInfra">
                         <i class="bi bi-plus-lg"></i> Nueva Infraestructura
@@ -608,6 +618,95 @@ if (isset($_GET['edit'])) {
     </div>
     <?php endif; ?>
 
+    <!-- Modal Importar KML + Excel combinado -->
+    <?php if ($empresaId > 0): ?>
+    <div class="modal fade" id="modalCombinado" tabindex="-1" aria-labelledby="modalCombinadoLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background: linear-gradient(135deg, #7c3aed, #2563eb); color: #fff;">
+                    <h5 class="modal-title" id="modalCombinadoLabel">
+                        <i class="bi bi-link-45deg me-2"></i>Importar KML + Excel combinado
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Sube un <strong>KML</strong> (con las coordenadas) y un <strong>Excel</strong> (con los datos: municipio, monte, provincia, etc.).
+                        El sistema <strong>cruza ambos archivos por nombre</strong> y crea infraestructuras completas con coordenadas + atributos.
+                        <br><br>
+                        <strong>Matching:</strong>
+                        <ul class="mb-0 mt-1">
+                            <li>El nombre del Placemark KML se compara con la columna "nombre" del Excel</li>
+                            <li>Match exacto, parcial (uno contiene al otro) y por similitud (&gt;80%)</li>
+                            <li>Puntos KML sin match se importan solo con coordenadas</li>
+                            <li>Filas Excel sin match se importan sin coordenadas</li>
+                        </ul>
+                    </div>
+
+                    <form id="form-combinado" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                        <input type="hidden" name="empresa_id" value="<?= $empresaId ?>">
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="combo_archivo_kml" class="form-label fw-semibold">
+                                    <i class="bi bi-geo-alt text-primary me-1"></i>Archivo KML / KMZ
+                                </label>
+                                <input type="file" class="form-control" id="combo_archivo_kml" name="archivo_kml"
+                                       accept=".kml,.kmz" required>
+                                <div class="form-text">Coordenadas de las infraestructuras</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="combo_archivo_excel" class="form-label fw-semibold">
+                                    <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i>Archivo Excel / CSV
+                                </label>
+                                <input type="file" class="form-control" id="combo_archivo_excel" name="archivo_excel"
+                                       accept=".xlsx,.xls,.csv" required>
+                                <div class="form-text">Datos: nombre, municipio, monte, provincia...</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Duplicados</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="duplicados" id="combo_dup_omitir" value="omitir" checked>
+                                <label class="form-check-label" for="combo_dup_omitir">
+                                    Omitir duplicados (nombre o coordenadas coincidentes)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="duplicados" id="combo_dup_importar" value="importar">
+                                <label class="form-check-label" for="combo_dup_importar">
+                                    Importar todos (pueden crearse duplicados)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Resultado -->
+                    <div id="combo-result" style="display:none;" class="mt-3"></div>
+
+                    <!-- Progreso -->
+                    <div id="combo-progress" style="display:none;" class="mt-3">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%; background: linear-gradient(90deg, #7c3aed, #2563eb);">
+                                Cruzando KML + Excel...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="btn-importar-combinado" onclick="importarCombinado()" style="background: linear-gradient(135deg, #7c3aed, #2563eb); border: none;">
+                        <i class="bi bi-link-45deg me-1"></i>Cruzar e Importar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -738,16 +837,46 @@ if (isset($_GET['edit'])) {
             let pointCount = 0;
 
             placemarks.forEach(pm => {
-                const coordEl = pm.querySelector('Point coordinates');
-                if (!coordEl) return;
+                let lat = null, lon = null;
 
-                const coordStr = coordEl.textContent.trim();
-                const parts = coordStr.split(',');
-                if (parts.length < 2) return;
+                // 1) Intentar Point
+                const pointCoord = pm.querySelector('Point coordinates');
+                if (pointCoord) {
+                    const parts = pointCoord.textContent.trim().split(',');
+                    if (parts.length >= 2) {
+                        lon = parseFloat(parts[0]);
+                        lat = parseFloat(parts[1]);
+                    }
+                }
 
-                const lon = parseFloat(parts[0]);
-                const lat = parseFloat(parts[1]);
-                if (isNaN(lat) || isNaN(lon)) return;
+                // 2) Si no hay Point, intentar LineString o Polygon (centroide)
+                if (lat === null || isNaN(lat)) {
+                    let coordEl = pm.querySelector('LineString coordinates');
+                    if (!coordEl) coordEl = pm.querySelector('Polygon coordinates');
+
+                    if (coordEl) {
+                        const allPoints = coordEl.textContent.trim().split(/\s+/);
+                        let sumLat = 0, sumLon = 0, count = 0;
+                        allPoints.forEach(pt => {
+                            const parts = pt.split(',');
+                            if (parts.length >= 2) {
+                                const pLon = parseFloat(parts[0]);
+                                const pLat = parseFloat(parts[1]);
+                                if (!isNaN(pLat) && !isNaN(pLon)) {
+                                    sumLon += pLon;
+                                    sumLat += pLat;
+                                    count++;
+                                }
+                            }
+                        });
+                        if (count > 0) {
+                            lon = sumLon / count;
+                            lat = sumLat / count;
+                        }
+                    }
+                }
+
+                if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) return;
 
                 const nameEl = pm.querySelector('name');
                 const nombre = nameEl ? nameEl.textContent.trim() : 'Sin nombre';
@@ -946,6 +1075,107 @@ if (isset($_GET['edit'])) {
             document.getElementById('kml-progress').style.display = 'none';
             document.getElementById('kml-preview-section').style.display = 'none';
             document.getElementById('archivo_kml').value = '';
+        });
+
+        // ---------------------------------------------------------------
+        // KML + Excel Combined Import
+        // ---------------------------------------------------------------
+        async function importarCombinado() {
+            const form = document.getElementById('form-combinado');
+            const kmlInput = document.getElementById('combo_archivo_kml');
+            const excelInput = document.getElementById('combo_archivo_excel');
+            const resultDiv = document.getElementById('combo-result');
+            const progressDiv = document.getElementById('combo-progress');
+            const btnImportar = document.getElementById('btn-importar-combinado');
+
+            if (!kmlInput.files[0] || !excelInput.files[0]) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Selecciona ambos archivos: KML y Excel</div>';
+                return;
+            }
+
+            progressDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+            btnImportar.disabled = true;
+            btnImportar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cruzando datos...';
+
+            const formData = new FormData(form);
+
+            try {
+                const resp = await fetch('importar_kml_excel.php', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await resp.json();
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+
+                if (data.ok) {
+                    let html = '<div class="alert alert-success">' +
+                        '<i class="bi bi-check-circle me-1"></i>' +
+                        '<strong>' + data.importados + '</strong> infraestructura' + (data.importados !== 1 ? 's' : '') + ' importada' + (data.importados !== 1 ? 's' : '') + ' correctamente.' +
+                        '<br><small>' +
+                        '<span class="text-success fw-bold">' + data.con_match + '</span> con cruce KML+Excel' +
+                        ' &bull; <span class="text-warning">' + data.sin_match_kml + '</span> sin cruce' +
+                        (data.omitidos > 0 ? ' &bull; <span class="text-muted">' + data.omitidos + ' omitidas (duplicadas)</span>' : '') +
+                        '</small>';
+
+                    if (data.errores && data.errores.length > 0) {
+                        html += '<br><small class="text-warning">' + data.errores.join('<br>') + '</small>';
+                    }
+
+                    html += '</div>';
+
+                    // Resumen de matching
+                    html += '<div class="row mb-2">' +
+                        '<div class="col-4 text-center"><div class="border rounded p-2"><div class="fs-4 fw-bold text-primary">' + data.total_kml + '</div><small class="text-muted">Puntos KML</small></div></div>' +
+                        '<div class="col-4 text-center"><div class="border rounded p-2"><div class="fs-4 fw-bold text-success">' + data.total_excel + '</div><small class="text-muted">Filas Excel</small></div></div>' +
+                        '<div class="col-4 text-center"><div class="border rounded p-2"><div class="fs-4 fw-bold" style="color:#7c3aed;">' + data.con_match + '</div><small class="text-muted">Cruzados</small></div></div>' +
+                        '</div>';
+
+                    if (data.detalles && data.detalles.length > 0) {
+                        html += '<div style="max-height: 250px; overflow-y: auto;">';
+                        html += '<table class="table table-sm table-striped small">';
+                        html += '<thead><tr><th>Nombre</th><th>Municipio</th><th>Monte</th><th>Lat</th><th>Lon</th><th>Cruce</th></tr></thead><tbody>';
+                        data.detalles.forEach(d => {
+                            const matchClass = d.match.startsWith('KML+Excel') ? 'text-success' : (d.match.startsWith('Solo KML') ? 'text-warning' : 'text-muted');
+                            html += '<tr>' +
+                                '<td>' + (d.nombre || '') + '</td>' +
+                                '<td>' + (d.municipio || '<span class="text-danger">-</span>') + '</td>' +
+                                '<td>' + (d.monte || '<span class="text-danger">-</span>') + '</td>' +
+                                '<td>' + (d.lat ? d.lat.toFixed(5) : '-') + '</td>' +
+                                '<td>' + (d.lon ? d.lon.toFixed(5) : '-') + '</td>' +
+                                '<td><span class="' + matchClass + '">' + d.match + '</span></td>' +
+                                '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+                    }
+
+                    resultDiv.innerHTML = html;
+
+                    if (data.importados > 0) {
+                        setTimeout(() => location.reload(), 3000);
+                    }
+                } else {
+                    resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>' + (data.error || 'Error desconocido') + '</div>';
+                }
+            } catch (err) {
+                progressDiv.style.display = 'none';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-1"></i>Error de conexión: ' + err.message + '</div>';
+            }
+
+            btnImportar.disabled = false;
+            btnImportar.innerHTML = '<i class="bi bi-link-45deg me-1"></i>Cruzar e Importar';
+        }
+
+        // Limpiar modal combinado al cerrar
+        document.getElementById('modalCombinado')?.addEventListener('hidden.bs.modal', function() {
+            document.getElementById('combo-result').style.display = 'none';
+            document.getElementById('combo-progress').style.display = 'none';
+            document.getElementById('combo_archivo_kml').value = '';
+            document.getElementById('combo_archivo_excel').value = '';
         });
     </script>
 </body>
