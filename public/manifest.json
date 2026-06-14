@@ -1,6 +1,6 @@
 {
-    "name": "FotoGPS.app - Operador de Campo",
-    "short_name": "FotoGPS",
+    "name": "INFOCAMPO - Operador de Campo",
+    "short_name": "INFOCAMPO",
     "description": "Captura fotos geolocalizadas con watermark GPS para inspecciones de campo",
     "start_url": "./operador.php",
     "scope": "./",

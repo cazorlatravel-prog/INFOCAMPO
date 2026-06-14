@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Buscar/crear infraestructuras
+ * INFOCAMPO - API: Buscar/crear infraestructuras
  *
  * GET  ?empresa_id=X&q=texto                    → buscar por nombre/código
  * GET  ?empresa_id=X&provincia=Y                → filtrar por provincia

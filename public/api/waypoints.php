@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Descarga de Waypoints (GPX)
+ * INFOCAMPO - API: Descarga de Waypoints (GPX)
  *
  * Genera un archivo GPX con los waypoints de fotos comparativas en situación "antes".
  * Los waypoints se nombran con el formato: CODIGO_INFRA W1, W2, W3...

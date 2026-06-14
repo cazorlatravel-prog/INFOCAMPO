@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Endpoint de subida de inspección
+ * INFOCAMPO - Endpoint de subida de inspección
  *
  * Recibe por POST:
  *   - imagen       : archivo JPEG del canvas

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Campos de Formulario (Admin)
+ * INFOCAMPO - API de Campos de Formulario (Admin)
  *
  * GET ?empresa_id=X            → Lista campos activos
  * GET ?empresa_id=X&export=csv → Exportar campos como CSV

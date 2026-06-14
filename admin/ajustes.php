@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Ajustes de Empresa (Admin)
+ * INFOCAMPO - Ajustes de Empresa (Admin)
  *
  * Permite al administrador configurar opciones de la empresa,
  * como el formato de nombre de las fotos que toman los operadores.
@@ -177,7 +177,7 @@ $wmTextoTamano = (int) ($empresa['wm_texto_tamano'] ?? 2);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FotoGPS.app - Ajustes</title>
+    <title>INFOCAMPO - Ajustes</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="/admin/css/admin.css" rel="stylesheet">

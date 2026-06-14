@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Gestión de Infraestructuras (Admin)
+ * INFOCAMPO - Gestión de Infraestructuras (Admin)
  *
  * CRUD completo para que los administradores de empresa
  * gestionen sus infraestructuras directamente.
@@ -157,7 +157,7 @@ if (isset($_GET['edit'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FotoGPS.app - Gestión de Infraestructuras</title>
+    <title>INFOCAMPO - Gestión de Infraestructuras</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="/admin/css/admin.css" rel="stylesheet">

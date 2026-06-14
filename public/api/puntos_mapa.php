@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Puntos de mapa personalizados
+ * INFOCAMPO - API: Puntos de mapa personalizados
  *
  * GET  ?empresa_id=X              → listar puntos activos (operador)
  * GET  ?empresa_id=X&todos=1      → listar todos incluidos inactivos (admin)

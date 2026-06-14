@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Búsqueda Global (Admin)
+ * INFOCAMPO - API de Búsqueda Global (Admin)
  *
  * Busca simultáneamente en infraestructuras, registros y usuarios.
  * Responde JSON para alimentar el buscador global del header.

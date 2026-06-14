@@ -1,6 +1,6 @@
 {
-    "name": "FotoGPS.app - Panel de Administración",
-    "short_name": "FotoGPS Admin",
+    "name": "INFOCAMPO - Panel de Administración",
+    "short_name": "INFOCAMPO",
     "description": "Panel de administración para gestión de inspecciones de campo",
     "start_url": "./dashboard.php",
     "scope": "./",

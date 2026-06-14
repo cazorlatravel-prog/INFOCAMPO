@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Descarga masiva de fotos (ZIP)
+ * INFOCAMPO - Descarga masiva de fotos (ZIP)
  *
  * GET ?infra_id=123
  *

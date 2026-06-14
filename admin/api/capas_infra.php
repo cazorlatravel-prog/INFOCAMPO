@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Capas de Infraestructuras (Admin)
+ * INFOCAMPO - API de Capas de Infraestructuras (Admin)
  *
  * GET:  Listar capas activas de la empresa
  * POST action=analizar: Sube KML/KMZ/SHP(ZIP), parsea a GeoJSON, devuelve atributos

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Visitas del Operador
+ * INFOCAMPO - API de Visitas del Operador
  *
  * GET: Lista visitas (registros) del operador agrupadas por infraestructura y fecha
  *   - usuario_id: ID del operador

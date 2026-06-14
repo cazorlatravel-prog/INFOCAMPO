@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Sistema de Autenticación
+ * INFOCAMPO - Sistema de Autenticación
  */
 
 declare(strict_types=1);

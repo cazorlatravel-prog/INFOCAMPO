@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Última foto de una infraestructura
+ * INFOCAMPO - API: Última foto de una infraestructura
  *
  * GET ?infra_id=123
  *

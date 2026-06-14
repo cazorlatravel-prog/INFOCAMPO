@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Capas KML (Admin)
+ * INFOCAMPO - API de Capas KML (Admin)
  *
  * CRUD para gestionar capas KML persistentes por empresa.
  * GET:  Listar capas activas de la empresa

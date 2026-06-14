@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Subidas fallidas
+ * INFOCAMPO - API: Subidas fallidas
  *
  * GET: Lista las subidas fallidas sin resolver para la empresa
  * POST action=resolver: Marca una subida como resuelta

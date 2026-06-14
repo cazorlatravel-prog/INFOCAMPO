@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Importar Infraestructuras desde KML
+ * INFOCAMPO - Importar Infraestructuras desde KML
  *
  * Acepta archivos KML/KMZ, extrae los Placemarks con coordenadas
  * y los inserta como infraestructuras de la empresa seleccionada.

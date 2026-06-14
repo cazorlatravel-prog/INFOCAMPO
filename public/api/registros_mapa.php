@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Registros con GPS para mapa
+ * INFOCAMPO - API: Registros con GPS para mapa
  *
  * GET ?empresa_id=X                         → todos los registros de la empresa
  * GET ?empresa_id=X&infra_id=Y              → registros de una infraestructura

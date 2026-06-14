@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Importar Infraestructuras desde KML + Excel combinado
+ * INFOCAMPO - Importar Infraestructuras desde KML + Excel combinado
  *
  * Recibe un archivo KML (coordenadas) y un Excel (datos: municipio, monte, etc.)
  * y los cruza por nombre para crear infraestructuras completas.

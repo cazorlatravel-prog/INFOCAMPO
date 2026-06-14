@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Timeline de Inspecciones (Admin)
+ * INFOCAMPO - Timeline de Inspecciones (Admin)
  *
  * Lista infraestructuras por empresa. Al seleccionar una,
  * muestra la línea de tiempo con fotos.
@@ -109,7 +109,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FotoGPS.app - Inspecciones</title>
+    <title>INFOCAMPO - Inspecciones</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="/admin/css/admin.css" rel="stylesheet">

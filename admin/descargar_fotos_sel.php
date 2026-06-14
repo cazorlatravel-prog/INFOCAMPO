@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Descarga masiva de fotos seleccionadas (ZIP)
+ * INFOCAMPO - Descarga masiva de fotos seleccionadas (ZIP)
  *
  * GET ?ids=1,2,3
  *

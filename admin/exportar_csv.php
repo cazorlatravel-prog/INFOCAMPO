@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Exportar datos a CSV/Excel
+ * INFOCAMPO - Exportar datos a CSV/Excel
  *
  * Exporta infraestructuras o registros de inspección en formato CSV
  * compatible con Excel (BOM UTF-8 + separador punto y coma).

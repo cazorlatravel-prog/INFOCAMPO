@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Guardar visita sin foto
+ * INFOCAMPO - Guardar visita sin foto
  *
  * Permite al operador registrar una visita a una infraestructura
  * sin necesidad de tomar una foto. Guarda observaciones, campos

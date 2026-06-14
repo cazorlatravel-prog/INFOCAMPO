@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Importar Infraestructuras desde Excel
+ * INFOCAMPO - Importar Infraestructuras desde Excel
  *
  * Acepta archivos .xlsx / .xls / .csv con datos de infraestructuras.
  * Las infraestructuras importadas NO necesitan coordenadas GPS;

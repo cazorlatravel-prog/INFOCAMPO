@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Obtener fotos comparativas anteriores de una infraestructura
+ * INFOCAMPO - API: Obtener fotos comparativas anteriores de una infraestructura
  *
  * GET ?infra_id=X → devuelve las últimas fotos comparativas ordenadas por secuencia
  */

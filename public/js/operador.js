@@ -3638,9 +3638,9 @@
     function showInstallInstructions() {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         if (isIOS) {
-            alert('Para instalar FotoGPS en tu iPhone:\n\n1. Pulsa el botón Compartir (cuadrado con flecha)\n2. Desplázate y pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
+            alert('Para instalar INFOCAMPO en tu iPhone:\n\n1. Pulsa el botón Compartir (cuadrado con flecha)\n2. Desplázate y pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
         } else {
-            alert('Para instalar FotoGPS:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
+            alert('Para instalar INFOCAMPO:\n\n1. Abre el menú del navegador (tres puntos)\n2. Pulsa "Instalar aplicación" o "Añadir a pantalla de inicio"');
         }
     }
 

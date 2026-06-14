@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Obtener campos dinámicos de una empresa
+ * INFOCAMPO - API: Obtener campos dinámicos de una empresa
  *
  * GET ?empresa_id=X  → devuelve los campos activos en JSON
  */

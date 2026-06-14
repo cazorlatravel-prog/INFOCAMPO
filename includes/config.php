@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 /**
- * INFOCAMPO SaaS - Configuración global
+ * INFOCAMPO - Configuración global
  */
 
 // -----------------------------------------------------------
@@ -102,7 +102,7 @@ if ($_appUrl === '') {
 // Quitar barra final si la tiene
 $_appUrl = rtrim($_appUrl, '/');
 define('APP_URL', $_appUrl);
-define('APP_NAME', 'FotoGPS.app');
+define('APP_NAME', 'INFOCAMPO');
 
 // -----------------------------------------------------------
 // Conexión PDO (singleton simple)

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Actualizar coordenadas de infraestructura via AJAX
+ * INFOCAMPO - Actualizar coordenadas de infraestructura via AJAX
  *
  * Permite al admin reubicar una infraestructura arrastrando su marcador en el mapa.
  */
