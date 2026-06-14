@@ -2569,6 +2569,8 @@
     const mapBaseLayers = {};
     let mapAdminPointsLayer = null; // Admin custom points layer
     let mapAllInfrasCache = [];     // Cache for search
+    let mapPhotoPointsLayer = null; // Capa de puntos de foto en su GPS real (lat_real/lon_real)
+    let mapPhotoPointsVisible = true;
 
     // Navigation mode state
     let navActive = false;
@@ -2629,11 +2631,16 @@
             layerControl.onAdd = function() {
                 const div = L.DomUtil.create('div', 'op-layer-switcher');
                 div.innerHTML =
-                    '<select id="op-base-layer-select" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;">' +
+                    '<select id="op-base-layer-select" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;width:100%;">' +
                     '<option value="osm">Mapa</option>' +
                     '<option value="ortofoto">Ortofoto</option>' +
                     '<option value="topografico">Topográfico</option>' +
-                    '</select>';
+                    '</select>' +
+                    '<button type="button" id="op-toggle-photos" title="Mostrar/ocultar puntos de foto" ' +
+                    'style="margin-top:6px;display:flex;align-items:center;justify-content:center;gap:5px;' +
+                    'font-size:11px;padding:6px 8px;border-radius:6px;border:1px solid #9db4f8;background:#eef2ff;' +
+                    'box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;width:100%;font-weight:700;color:#1a1a2e;">' +
+                    '<i class="bi bi-camera-fill"></i> Fotos</button>';
                 L.DomEvent.disableClickPropagation(div);
                 return div;
             };
@@ -2645,6 +2652,11 @@
                 mapActiveBaseLayer.addTo(leafletMap);
                 mapActiveBaseLayer.bringToBack();
             });
+
+            const btnTogglePhotos = document.getElementById('op-toggle-photos');
+            if (btnTogglePhotos) {
+                btnTogglePhotos.addEventListener('click', toggleMapPhotoPoints);
+            }
 
             // Set initial view to current GPS or Spain center
             if (state.gps.lat && state.gps.lon) {
@@ -2907,6 +2919,9 @@
                 const totalReg = regRes.ok ? (regRes.registros?.length || 0) : 0;
                 sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${visitedCount} visitada${visitedCount !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
             }
+
+            // Pintar puntos de foto individuales en su GPS real (lat_real/lon_real)
+            renderMapPhotoPoints(regRes.ok ? regRes.registros : []);
 
             // Load KML layers from DB
             loadMapKmlLayers();
@@ -3484,6 +3499,96 @@
             </div>
         </div>
         ${r.observaciones ? '<div class="mapa-detail-obs">' + escHtml(r.observaciones) + '</div>' : ''}`;
+    }
+
+    // ===================================================================
+    // PUNTOS DE FOTO EN EL MAPA (GPS real de cada foto)
+    // ===================================================================
+
+    /**
+     * Pinta un marcador por cada foto en su ubicación GPS real (lat_real/lon_real).
+     * Permite ver en el mapa dónde se tomó exactamente cada foto y revisarlas
+     * en las siguientes visitas. Coloreado por estado (antes/durante/después).
+     */
+    function renderMapPhotoPoints(registros) {
+        // Limpiar capa anterior para evitar acumulación
+        if (mapPhotoPointsLayer) {
+            leafletMap.removeLayer(mapPhotoPointsLayer);
+            mapPhotoPointsLayer = null;
+        }
+        if (!registros || registros.length === 0) return;
+
+        const stateColors = { 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e' };
+        const group = L.layerGroup();
+
+        registros.forEach(r => {
+            const lat = parseFloat(r.lat_real);
+            const lon = parseFloat(r.lon_real);
+            // Saltar coordenadas inválidas (0 / null / NaN / cerca de 0,0)
+            if (!lat || !lon || Math.abs(lat) < 0.0001 || Math.abs(lon) < 0.0001) return;
+            if (!r.url_cloudinary) return;
+
+            const color = stateColors[r.estado_incidencia] || '#9ca3af';
+            const icon = L.divIcon({
+                className: 'op-photo-point',
+                html: '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +
+                      'background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);' +
+                      'display:flex;align-items:center;justify-content:center;">' +
+                      '<i class="bi bi-camera-fill" style="transform:rotate(45deg);font-size:9px;color:#fff;"></i>' +
+                      '</div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 20],
+            });
+
+            const marker = L.marker([lat, lon], { icon, zIndexOffset: 200 });
+            marker.bindPopup(buildPhotoPointPopup(r), { maxWidth: 240 });
+            group.addLayer(marker);
+        });
+
+        mapPhotoPointsLayer = group;
+        if (mapPhotoPointsVisible) group.addTo(leafletMap);
+    }
+
+    /**
+     * Contenido del popup de un punto de foto: miniatura (ampliable), datos y estado.
+     */
+    function buildPhotoPointPopup(r) {
+        const fecha = new Date(r.fecha).toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+        });
+        const isComp = r.tipo_foto === 'comparativo';
+        const seqLabel = isComp && r.secuencia_comparativa ? ' · W' + r.secuencia_comparativa : '';
+        const url = escHtml(r.url_cloudinary);
+        const estado = escHtml(r.estado_incidencia || '');
+        return '<div style="width:200px;">' +
+            '<a href="' + url + '" target="_blank" rel="noopener">' +
+            '<img src="' + url + '" alt="" style="width:100%;border-radius:8px;display:block;" loading="lazy"></a>' +
+            '<div style="font-size:0.74rem;font-weight:700;margin-top:6px;color:#1a1a2e;">' + escHtml(r.infra_nombre || '') + '</div>' +
+            '<div style="font-size:0.68rem;color:#5a6675;margin-top:2px;">' + fecha + ' · ' + escHtml(r.usuario_nombre || '') + seqLabel + '</div>' +
+            '<div style="margin-top:4px;"><span class="estado-badge ' + estado + '">' + estado.toUpperCase() + '</span></div>' +
+            (r.observaciones ? '<div style="font-size:0.68rem;color:#46505f;margin-top:4px;">' + escHtml(r.observaciones) + '</div>' : '') +
+            '</div>';
+    }
+
+    /**
+     * Muestra/oculta la capa de puntos de foto.
+     */
+    function toggleMapPhotoPoints() {
+        mapPhotoPointsVisible = !mapPhotoPointsVisible;
+        if (mapPhotoPointsLayer) {
+            if (mapPhotoPointsVisible) {
+                mapPhotoPointsLayer.addTo(leafletMap);
+            } else {
+                leafletMap.removeLayer(mapPhotoPointsLayer);
+            }
+        }
+        const btn = document.getElementById('op-toggle-photos');
+        if (btn) {
+            btn.style.background = mapPhotoPointsVisible ? '#eef2ff' : '#fff';
+            btn.style.borderColor = mapPhotoPointsVisible ? '#9db4f8' : '#ccc';
+            btn.style.opacity = mapPhotoPointsVisible ? '1' : '0.7';
+        }
     }
 
     function startVisitFromMap(mode) {
