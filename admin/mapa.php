@@ -862,9 +862,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 }
 
                 var popupHtml = '<div style="min-width:200px;">' +
-                    '<strong>' + inf.nombre + '</strong><br>' +
-                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
-                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + inf.tipo + '</span>' : '') +
+                    '<strong>' + esc(inf.nombre) + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + esc(inf.codigo) + '</code>' +
+                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + esc(inf.tipo) + '</span>' : '') +
                     '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
                     '<br><small><i class="bi bi-camera"></i> ' + inf.num_fotos + ' foto' + (inf.num_fotos !== 1 ? 's' : '') + '</small>' +
                     '<div style="margin-top:6px;">' +
@@ -950,8 +950,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
                 marker.bindPopup(
                     '<div style="min-width:180px;">' +
-                    '<strong>' + inf.nombre + '</strong><br>' +
-                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
+                    '<strong>' + esc(inf.nombre) + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + esc(inf.codigo) + '</code>' +
                     '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
                     '<br><small style="color:#059669;"><i class="bi bi-arrows-move"></i> Arrastra para reubicar</small>' +
                     '</div>'
@@ -1234,7 +1234,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     shown++;
                 });
             } else if (desc) {
-                html += '<small>' + desc.substring(0, 150) + '</small><br>';
+                html += '<small>' + escapeXml(desc.substring(0, 150)) + '</small><br>';
             }
 
             if (center) {

@@ -689,15 +689,15 @@ const Fotos = (() => {
                         <span class="foto-badge ${f.estado}">${estadoMap[f.estado] || f.estado}</span>
                     </div>
                     <div class="foto-img-wrapper" onclick="Fotos.openLightbox(${idx})">
-                        <img src="${f.url}" alt="${f.infra}" loading="lazy">
+                        <img src="${f.url}" alt="${esc(f.infra)}" loading="lazy">
                     </div>
                     <div class="foto-info">
-                        <div class="foto-infra">${f.codigo} - ${f.infra}</div>
+                        <div class="foto-infra">${esc(f.codigo)} - ${esc(f.infra)}</div>
                         <div class="foto-meta-line">
-                            <span><i class="bi bi-person"></i> ${f.operador}</span>
-                            <span><i class="bi bi-calendar"></i> ${f.fecha_fmt}</span>
+                            <span><i class="bi bi-person"></i> ${esc(f.operador)}</span>
+                            <span><i class="bi bi-calendar"></i> ${esc(f.fecha_fmt)}</span>
                         </div>
-                        ${f.uo_nombre ? `<div class="foto-meta-line"><span><i class="bi bi-tools"></i> ${f.uo_nombre}</span></div>` : ''}
+                        ${f.uo_nombre ? `<div class="foto-meta-line"><span><i class="bi bi-tools"></i> ${esc(f.uo_nombre)}</span></div>` : ''}
                     </div>
                 </div>`;
         }).join('');

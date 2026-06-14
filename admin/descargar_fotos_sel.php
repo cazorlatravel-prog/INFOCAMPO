@@ -9,11 +9,14 @@
 
 declare(strict_types=1);
 
+set_time_limit(600);
+
 require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin', 'supervisor', 'superadmin']);
 
 $idsRaw = $_GET['ids'] ?? '';
 $ids = array_filter(array_map('intval', explode(',', $idsRaw)), fn($id) => $id > 0);
+$ids = array_slice($ids, 0, 500);
 
 if (empty($ids)) {
     http_response_code(400);
@@ -62,7 +65,15 @@ foreach ($registros as $reg) {
     $url = $reg['url_cloudinary'];
     if (empty($url)) continue;
 
-    // Descargar vía cURL verificando respuesta 200 OK
+    // Validar que la URL apunta a un dominio permitido (prevenir SSRF)
+    $parsedUrl = parse_url($url);
+    $allowedHosts = ['res.cloudinary.com', 'ik.imagekit.io'];
+    if (!$parsedUrl || !in_array($parsedUrl['host'] ?? '', $allowedHosts, true)) {
+        if (($parsedUrl['host'] ?? '') !== ($_SERVER['HTTP_HOST'] ?? '')) {
+            continue;
+        }
+    }
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -92,6 +103,11 @@ foreach ($registros as $reg) {
 }
 
 $zip->close();
+
+// Limpiar temp file en caso de error fatal
+register_shutdown_function(function() use ($tmpFile) {
+    if (file_exists($tmpFile)) @unlink($tmpFile);
+});
 
 if ($added === 0) {
     @unlink($tmpFile);

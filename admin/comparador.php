@@ -400,7 +400,7 @@ if ($infra) {
         var rect = container.getBoundingClientRect();
         var clientX = e.touches ? e.touches[0].clientX : e.clientX;
         var x = clientX - rect.left;
-        var pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        var pct = Math.max(1, Math.min(100, (x / rect.width) * 100));
 
         var afterDiv = document.getElementById('after-' + idx);
         var sliderDiv = document.getElementById('slider-' + idx);

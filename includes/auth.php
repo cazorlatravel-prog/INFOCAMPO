@@ -9,6 +9,11 @@ require_once __DIR__ . '/config.php';
 
 // Iniciar sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly'  => true,
+        'samesite' => 'Strict',
+    ]);
     session_start();
 }
 
@@ -57,10 +62,12 @@ function login(string $identifier, string $password): array|false
     $stmt->execute([':id' => $user['empresa_id']]);
     $empresa = $stmt->fetch();
 
-    if (!$empresa) {
-        // La empresa no existe - crear una empresa por defecto para no bloquear login
+    if (!$empresa || !$empresa['activa']) {
         return false;
     }
+
+    // Regenerar ID de sesión para prevenir session fixation
+    session_regenerate_id(true);
 
     // Guardar en sesión
     $_SESSION['user_id']    = (int) $user['id'];

@@ -193,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Auto-generar código único
-    $codigo = 'INF-' . strtoupper(substr(md5($nombre . time()), 0, 8));
+    $codigo = 'INF-' . strtoupper(substr(md5($nombre . bin2hex(random_bytes(4))), 0, 8));
 
     if ($hasLocationCols) {
         if ($hasMonteCols) {

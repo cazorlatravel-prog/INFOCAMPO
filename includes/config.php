@@ -98,7 +98,7 @@ $_appUrl = env('APP_URL');
 if ($_appUrl === '') {
     // Auto-detectar URL base desde la petición HTTP
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $host   = preg_replace('/[^a-zA-Z0-9.\-:]/', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
     $_appUrl = $scheme . '://' . $host;
 }
 // Quitar barra final si la tiene

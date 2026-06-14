@@ -98,7 +98,17 @@ foreach ($registros as $reg) {
         continue;
     }
 
-    // Descargar imagen reutilizando el handle cURL (verificando respuesta 200 OK)
+    // Validar que la URL apunta a un dominio permitido (prevenir SSRF)
+    $parsedUrl = parse_url($url);
+    $allowedHosts = ['res.cloudinary.com', 'ik.imagekit.io'];
+    if (!$parsedUrl || !in_array($parsedUrl['host'] ?? '', $allowedHosts, true)) {
+        // Permitir URLs locales del propio servidor (fallback local)
+        if (($parsedUrl['host'] ?? '') !== ($_SERVER['HTTP_HOST'] ?? '')) {
+            $errors++;
+            continue;
+        }
+    }
+
     curl_setopt($ch, CURLOPT_URL, $url);
     $imageData = curl_exec($ch);
     $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -139,8 +149,14 @@ if ($added === 0) {
     exit;
 }
 
+// Limpiar temp file en caso de error fatal
+register_shutdown_function(function() use ($tmpFile) {
+    if (file_exists($tmpFile)) @unlink($tmpFile);
+});
+
 // Enviar ZIP al navegador
-$zipName = $infra['codigo_unico'] . '_fotos_' . date('Ymd') . '.zip';
+$safeCodigo = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $infra['codigo_unico']);
+$zipName = $safeCodigo . '_fotos_' . date('Ymd') . '.zip';
 
 header('Content-Type: application/zip');
 header('Content-Disposition: attachment; filename="' . $zipName . '"');

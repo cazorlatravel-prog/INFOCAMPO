@@ -40,9 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         $nombre      = trim($_POST['nombre'] ?? '');
         $codigo      = trim($_POST['codigo'] ?? '');
         $descripcion = trim($_POST['descripcion'] ?? '');
-        $targetEmpId = (int) ($_POST['empresa_id'] ?? $empresaId);
-
-        if ($nombre === '' || $targetEmpId <= 0) {
+        if ($nombre === '' || $empresaId <= 0) {
             $msg = 'El nombre es obligatorio.';
             $msgType = 'danger';
         } else {
@@ -52,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                      VALUES (:emp_id, :nombre, :codigo, :descripcion)"
                 );
                 $stmt->execute([
-                    ':emp_id'      => $targetEmpId,
+                    ':emp_id'      => $empresaId,
                     ':nombre'      => $nombre,
                     ':codigo'      => $codigo ?: null,
                     ':descripcion' => $descripcion ?: null,

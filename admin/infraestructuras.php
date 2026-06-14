@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         $id        = (int) ($_POST['id'] ?? 0);
         $nombre    = trim($_POST['nombre'] ?? '');
         $codigo    = trim($_POST['codigo_unico'] ?? '');
-        $lat       = $_POST['lat_teorica'] !== '' ? (float) $_POST['lat_teorica'] : 0;
-        $lon       = $_POST['lon_teorica'] !== '' ? (float) $_POST['lon_teorica'] : 0;
+        $lat       = ($_POST['lat_teorica'] ?? '') !== '' ? (float) $_POST['lat_teorica'] : 0;
+        $lon       = ($_POST['lon_teorica'] ?? '') !== '' ? (float) $_POST['lon_teorica'] : 0;
         $tipo      = trim($_POST['tipo'] ?? '');
         $provincia = trim($_POST['provincia'] ?? '');
         $municipio = trim($_POST['municipio'] ?? '');
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         } else {
             // Auto-generar código si está vacío
             if ($codigo === '') {
-                $codigo = 'INF-' . strtoupper(substr(md5($nombre . time()), 0, 8));
+                $codigo = 'INF-' . strtoupper(substr(md5($nombre . bin2hex(random_bytes(4))), 0, 8));
             }
 
             if ($action === 'create') {
@@ -101,15 +101,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $stmt = $pdo->prepare("SELECT id FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id");
             $stmt->execute([':id' => $id, ':emp_id' => $empresaId]);
             if ($stmt->fetch()) {
-                // Eliminar valores_campo de registros asociados, luego registros, luego infraestructura
-                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id = :iid)")
-                    ->execute([':iid' => $id]);
-                $pdo->prepare("DELETE FROM registros WHERE infra_id = :iid")
-                    ->execute([':iid' => $id]);
-                $pdo->prepare("DELETE FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id")
-                    ->execute([':id' => $id, ':emp_id' => $empresaId]);
-                $msg = 'Infraestructura eliminada correctamente.';
-                $msgType = 'success';
+                $pdo->beginTransaction();
+                try {
+                    $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id = :iid)")
+                        ->execute([':iid' => $id]);
+                    $pdo->prepare("DELETE FROM registros WHERE infra_id = :iid")
+                        ->execute([':iid' => $id]);
+                    $pdo->prepare("DELETE FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id")
+                        ->execute([':id' => $id, ':emp_id' => $empresaId]);
+                    $pdo->commit();
+                    $msg = 'Infraestructura eliminada correctamente.';
+                    $msgType = 'success';
+                } catch (\Exception $e) {
+                    $pdo->rollBack();
+                    $msg = 'Error al eliminar la infraestructura.';
+                    $msgType = 'danger';
+                }
             } else {
                 $msg = 'No se pudo eliminar la infraestructura.';
                 $msgType = 'danger';

@@ -455,13 +455,20 @@ try {
     // ---------------------------------------------------------------
     $camposDinamicos = $_POST['campos'] ?? [];
     if (is_array($camposDinamicos) && !empty($camposDinamicos)) {
+        // Validar que los campo_id pertenecen a la empresa del usuario
+        $stmtValidCampos = $pdo->prepare(
+            "SELECT id FROM campos_formulario WHERE empresa_id = :emp AND activo = 1"
+        );
+        $stmtValidCampos->execute([':emp' => $sessionEmpresaId]);
+        $validCampoIds = array_column($stmtValidCampos->fetchAll(), 'id');
+
         $stmtCampo = $pdo->prepare(
             "INSERT INTO valores_campo (registro_id, campo_id, valor)
              VALUES (:registro_id, :campo_id, :valor)"
         );
         foreach ($camposDinamicos as $campoId => $valor) {
             $campoId = (int) $campoId;
-            if ($campoId > 0) {
+            if ($campoId > 0 && in_array($campoId, $validCampoIds, true)) {
                 $stmtCampo->execute([
                     ':registro_id' => $registroId,
                     ':campo_id'    => $campoId,
