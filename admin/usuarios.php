@@ -77,12 +77,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                 $check->execute([':email' => $email]);
                 $existing = $check->fetch();
                 if ($existing) {
-                    if ((int) $existing['empresa_id'] !== $empresaId) {
+                    $quien = htmlspecialchars($existing['nombre'] ?: '(sin nombre)');
+                    $rolEx = $existing['rol'];
+                    if ($rolEx === 'superadmin') {
+                        $msg = 'Ese email ya lo usa la cuenta de administrador principal '
+                             . '(<strong>' . $quien . '</strong>). Esa cuenta no aparece en la lista. '
+                             . 'Usa un email distinto para el nuevo usuario.';
+                    } elseif ((int) $existing['empresa_id'] !== $empresaId) {
                         $msg = 'Ya existe un usuario con ese email asignado a otra empresa '
-                             . '(<strong>' . htmlspecialchars($existing['nombre']) . '</strong>). '
-                             . 'Puedes reclamarlo usando el botón en la sección "Usuarios huérfanos" más abajo.';
+                             . '(<strong>' . $quien . '</strong>, ID empresa ' . (int) $existing['empresa_id'] . '). '
+                             . 'Puedes reclamarlo o eliminarlo en la sección "Usuarios huérfanos" más abajo.';
                     } else {
-                        $msg = 'Ya existe un usuario con ese email en esta empresa.';
+                        $msg = 'Ya existe un usuario con ese email en esta empresa '
+                             . '(<strong>' . $quien . '</strong>, rol ' . htmlspecialchars($rolEx) . '). '
+                             . 'Búscalo en la lista de abajo.';
                     }
                     $msgType = 'danger';
                     $duplicado = true;
@@ -90,16 +98,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             }
             // Verificar teléfono único (si se proporcionó)
             if (!$duplicado && $telefono !== null) {
-                $check = $pdo->prepare("SELECT id, nombre, empresa_id FROM usuarios WHERE telefono = :tel");
+                $check = $pdo->prepare("SELECT id, nombre, empresa_id, rol FROM usuarios WHERE telefono = :tel");
                 $check->execute([':tel' => $telefono]);
                 $existing = $check->fetch();
                 if ($existing) {
-                    if ((int) $existing['empresa_id'] !== $empresaId) {
+                    $quien = htmlspecialchars($existing['nombre'] ?: '(sin nombre)');
+                    $rolEx = $existing['rol'];
+                    if ($rolEx === 'superadmin') {
+                        $msg = 'Ese teléfono ya lo usa la cuenta de administrador principal '
+                             . '(<strong>' . $quien . '</strong>). Esa cuenta no aparece en la lista. '
+                             . 'Usa un teléfono distinto para el nuevo usuario.';
+                    } elseif ((int) $existing['empresa_id'] !== $empresaId) {
                         $msg = 'Ya existe un usuario con ese teléfono asignado a otra empresa '
-                             . '(<strong>' . htmlspecialchars($existing['nombre']) . '</strong>). '
-                             . 'Puedes reclamarlo usando el botón en la sección "Usuarios huérfanos" más abajo.';
+                             . '(<strong>' . $quien . '</strong>, ID empresa ' . (int) $existing['empresa_id'] . '). '
+                             . 'Puedes reclamarlo o eliminarlo en la sección "Usuarios huérfanos" más abajo.';
                     } else {
-                        $msg = 'Ya existe un usuario con ese teléfono en esta empresa.';
+                        $msg = 'Ya existe un usuario con ese teléfono en esta empresa '
+                             . '(<strong>' . $quien . '</strong>, rol ' . htmlspecialchars($rolEx) . '). '
+                             . 'Búscalo en la lista de abajo.';
                     }
                     $msgType = 'danger';
                     $duplicado = true;
