@@ -127,7 +127,9 @@ function getDB(): PDO
         $pdo = new PDO($dsn, DB_USER, DB_PASS, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
+            // En PostgreSQL vía Supabase pooler (transaction mode) los prepared
+            // statements del servidor no son fiables: emulamos del lado cliente.
+            PDO::ATTR_EMULATE_PREPARES   => (DB_DRIVER === 'pgsql'),
         ]);
         if (DB_DRIVER === 'pgsql') {
             $pdo->exec("SET client_encoding TO 'UTF8'");
