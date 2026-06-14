@@ -162,7 +162,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Mapa de Fotos</title>
+    <title>FotoGPS.app - Mapa de Fotos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="/admin/css/admin.css" rel="stylesheet">
@@ -2116,8 +2116,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             }
 
             var gpx = '<?xml version="1.0" encoding="UTF-8"?>\n' +
-                '<gpx version="1.1" creator="INFOCAMPO" xmlns="http://www.topografix.com/GPX/1/1">\n' +
-                '  <metadata><name>Fotos INFOCAMPO</name><time>' + new Date().toISOString() + '</time></metadata>\n';
+                '<gpx version="1.1" creator="FotoGPS.app" xmlns="http://www.topografix.com/GPX/1/1">\n' +
+                '  <metadata><name>Fotos FotoGPS</name><time>' + new Date().toISOString() + '</time></metadata>\n';
 
             // Number waypoints per infrastructure: CODIGO W1, W2, W3...
             var wpCountByInfra = {};

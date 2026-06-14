@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Acceso</title>
+    <title>FotoGPS.app - Acceso</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         :root {
@@ -348,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="login-icon">
                 <i class="bi bi-geo-alt-fill"></i>
             </div>
-            <h1>INFOCAMPO</h1>
+            <h1>FotoGPS<span>.app</span></h1>
             <p>Acceso a la plataforma</p>
         </div>
         <div class="login-body">
@@ -393,7 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
         <div class="login-footer">
-            INFOCAMPO &mdash; Recogida de datos en Campo
+            FotoGPS.app &mdash; Tu APP de recogida de datos en Campo
         </div>
     </div>
 

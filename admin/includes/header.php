@@ -37,7 +37,7 @@ if ($_navEmpresaId > 0) {
 <div id="admin-install-banner" class="admin-install-banner" style="display:none;">
     <div class="admin-install-banner-inner">
         <i class="bi bi-phone-fill"></i>
-        <span><strong>Instala INFOCAMPO</strong> en tu dispositivo</span>
+        <span><strong>Instala FotoGPS</strong> en tu dispositivo para acceso rapido</span>
         <button type="button" id="btn-admin-install" class="admin-install-btn">
             <i class="bi bi-download"></i> Instalar App
         </button>
@@ -50,7 +50,7 @@ if ($_navEmpresaId > 0) {
 <!-- Header -->
 <div class="brand-bar d-flex align-items-center justify-content-between">
     <div class="d-flex align-items-center gap-2 gap-md-3">
-        <h1 class="mb-0" style="font-size:1.15rem;font-weight:700;color:#fff;">INFOCAMPO</h1>
+        <h1 class="mb-0" style="font-size:1.15rem;font-weight:700;color:#fff;">FotoGPS<span style="opacity:0.5;font-weight:400;">.app</span></h1>
         <?php if ($_navEmpresaNombre): ?>
             <span class="badge d-none d-sm-inline-block" style="background:rgba(255,255,255,0.15);font-size:0.72rem;padding:4px 10px;border-radius:8px;">
                 <?= htmlspecialchars($_navEmpresaNombre) ?>
@@ -378,9 +378,9 @@ if ($_navEmpresaId > 0) {
             });
         } else {
             if (isIOS) {
-                alert('Para instalar INFOCAMPO en tu dispositivo:\n\n1. Pulsa el boton Compartir (cuadrado con flecha)\n2. Pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
+                alert('Para instalar FotoGPS en tu dispositivo:\n\n1. Pulsa el boton Compartir (cuadrado con flecha)\n2. Pulsa "Añadir a pantalla de inicio"\n3. Confirma pulsando "Añadir"');
             } else {
-                alert('Para instalar INFOCAMPO:\n\n1. Abre el menu del navegador (tres puntos)\n2. Pulsa "Instalar aplicacion" o "Añadir a pantalla de inicio"');
+                alert('Para instalar FotoGPS:\n\n1. Abre el menu del navegador (tres puntos)\n2. Pulsa "Instalar aplicacion" o "Añadir a pantalla de inicio"');
             }
         }
     }

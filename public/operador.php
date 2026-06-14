@@ -89,8 +89,8 @@ if ($initials === '') $initials = 'OP';
     <meta name="theme-color" content="#4f6ef7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="INFOCAMPO">
-    <title>INFOCAMPO - Operador de Campo</title>
+    <meta name="apple-mobile-web-app-title" content="FotoGPS">
+    <title>FotoGPS.app - Operador de Campo</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -106,7 +106,7 @@ if ($initials === '') $initials = 'OP';
         <div id="install-banner" class="install-banner hidden">
             <div class="install-banner-inner">
                 <i class="bi bi-phone-fill install-banner-pulse"></i>
-                <span class="install-banner-label"><strong>Instala INFOCAMPO</strong> en tu movil</span>
+                <span class="install-banner-label"><strong>Instala FotoGPS</strong> en tu movil</span>
                 <button type="button" id="btn-install-app" class="install-btn">
                     <i class="bi bi-download"></i> Instalar
                 </button>
@@ -123,7 +123,7 @@ if ($initials === '') $initials = 'OP';
                     <i class="bi bi-geo-alt-fill"></i>
                 </div>
                 <div class="brand-text">
-                    <strong>INFOCAMPO</strong>
+                    <strong>FotoGPS</strong>
                     <?php if ($opMostrarEmpresa): ?>
                     <span><?= htmlspecialchars($empresaName) ?></span>
                     <?php endif; ?>

@@ -136,14 +136,14 @@ try {
     $safeCode = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $infraCodigo ?: $infraNombre);
 
     $gpx = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-    $gpx .= '<gpx version="1.1" creator="INFOCAMPO"' . "\n";
+    $gpx .= '<gpx version="1.1" creator="FotoGPS.app"' . "\n";
     $gpx .= '     xmlns="http://www.topografix.com/GPX/1/1"' . "\n";
     $gpx .= '     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' . "\n";
     $gpx .= '     xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">' . "\n";
     $gpx .= "  <metadata>\n";
     $gpx .= "    <name>" . htmlspecialchars($safeCode . ' - Waypoints', ENT_XML1) . "</name>\n";
     $gpx .= "    <desc>Waypoints de fotos comparativas (situacion: " . htmlspecialchars($estado, ENT_XML1) . ")</desc>\n";
-    $gpx .= "    <author><name>INFOCAMPO</name></author>\n";
+    $gpx .= "    <author><name>FotoGPS</name></author>\n";
     $gpx .= "    <time>" . date('c') . "</time>\n";
     $gpx .= "  </metadata>\n";
 

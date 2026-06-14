@@ -110,7 +110,7 @@ $tituloDoc = count($infras) === 1
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Informe - INFOCAMPO</title>
+<title>Informe <?= $tituloDoc ?> - FotoGPS.app</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
     /* ============================================
@@ -663,7 +663,7 @@ $tituloDoc = count($infras) === 1
 
     <!-- Cabecera -->
     <div class="report-header">
-        <h1>INFOCAMPO &mdash; Informe de Inspección</h1>
+        <h1>FotoGPS.app &mdash; Informe de Inspección</h1>
         <p>Generado el <?= $fechaGeneracion ?> &mdash; <?= $empresaNombre ?></p>
     </div>
 

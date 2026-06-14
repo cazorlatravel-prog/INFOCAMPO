@@ -19,7 +19,7 @@ header('Content-Type: text/html; charset=utf-8');
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>INFOCAMPO - Migración</title>
+    <title>FotoGPS.app - Migración</title>
     <style>
         body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 2rem; }
         .ok { color: #0f0; }
@@ -30,7 +30,7 @@ header('Content-Type: text/html; charset=utf-8');
     </style>
 </head>
 <body>
-<h1>INFOCAMPO - Migración</h1>
+<h1>FotoGPS.app - Migración</h1>
 <pre>
 <?php
 // --- DEBUG: mostrar dónde busca los archivos ---

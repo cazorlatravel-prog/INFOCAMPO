@@ -153,7 +153,7 @@ foreach ($registros as $r) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>INFOCAMPO - Informes</title>
+<title>FotoGPS.app - Informes</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link href="/admin/css/admin.css" rel="stylesheet">
@@ -641,7 +641,7 @@ foreach ($registros as $r) {
 
             <!-- Footer -->
             <div class="report-footer">
-                INFOCAMPO &mdash; Informe generado &mdash; <?= $fechaGeneracion ?>
+                FotoGPS.app &mdash; Informe generado automáticamente &mdash; <?= $fechaGeneracion ?>
             </div>
         </div><!-- /report -->
 

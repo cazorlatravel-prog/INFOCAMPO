@@ -102,7 +102,7 @@ if ($_appUrl === '') {
 // Quitar barra final si la tiene
 $_appUrl = rtrim($_appUrl, '/');
 define('APP_URL', $_appUrl);
-define('APP_NAME', 'INFOCAMPO');
+define('APP_NAME', 'FotoGPS.app');
 
 // -----------------------------------------------------------
 // Conexión PDO (singleton simple)

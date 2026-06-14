@@ -20,7 +20,7 @@ header('Content-Type: text/html; charset=utf-8');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INFOCAMPO - Configuración del servidor</title>
+    <title>FotoGPS.app - Configuración del servidor</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; max-width: 800px; margin: 0 auto; }
         h1 { color: #4fc3f7; }
@@ -34,7 +34,7 @@ header('Content-Type: text/html; charset=utf-8');
     </style>
 </head>
 <body>
-<h1>INFOCAMPO - Configuración automática</h1>
+<h1>FotoGPS.app - Configuración automática</h1>
 
 <?php
 $baseDir = __DIR__;
