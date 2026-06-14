@@ -7,22 +7,28 @@
  *   - Fallback page when completely offline
  */
 
-const CACHE_NAME = 'infocampo-v14';
+const CACHE_NAME = 'infocampo-v15';
 const STATIC_ASSETS = [
     'css/operador.css',
     'js/operador.js',
-    'js/watermark.js',
     'js/offline.js',
     'manifest.json',
     'icons/icon-192.png',
     'icons/icon-512.png',
 ];
 
-// Install: pre-cache static assets
+// Install: pre-cache static assets de forma resiliente
+// (un asset que falle —p.ej. un icono ausente— no debe abortar toda la instalación)
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(STATIC_ASSETS);
+            return Promise.all(
+                STATIC_ASSETS.map((asset) =>
+                    cache.add(asset).catch((err) => {
+                        console.warn('[SW] No se pudo cachear:', asset, err);
+                    })
+                )
+            );
         }).then(() => self.skipWaiting())
     );
 });

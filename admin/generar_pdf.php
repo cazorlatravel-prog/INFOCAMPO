@@ -18,13 +18,23 @@ require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin', 'supervisor', 'superadmin']);
 
 // ---------------------------------------------------------------
-// Validar parámetro
+// Validar parámetros (acepta infra_id único o infra_ids múltiple CSV)
 // ---------------------------------------------------------------
-$infraId = isset($_GET['infra_id']) ? (int) $_GET['infra_id'] : 0;
+$infraIds = [];
+if (isset($_GET['infra_ids']) && $_GET['infra_ids'] !== '') {
+    $infraIds = array_filter(
+        array_map('intval', explode(',', (string) $_GET['infra_ids'])),
+        fn($id) => $id > 0
+    );
+} elseif (isset($_GET['infra_id'])) {
+    $single = (int) $_GET['infra_id'];
+    if ($single > 0) $infraIds = [$single];
+}
+$infraIds = array_values(array_unique($infraIds));
 
-if ($infraId <= 0) {
+if (empty($infraIds)) {
     http_response_code(400);
-    echo 'Parámetro infra_id requerido';
+    echo 'Parámetro infra_id o infra_ids requerido';
     exit;
 }
 
@@ -32,73 +42,75 @@ $pdo = getDB();
 $empresaId = $_SESSION['empresa_id'];
 
 // ---------------------------------------------------------------
-// Obtener datos de la infraestructura (scoped by empresa_id)
+// Cargar infraestructuras (scoped by empresa_id)
 // ---------------------------------------------------------------
+$placeholders = implode(',', array_fill(0, count($infraIds), '?'));
 $stmt = $pdo->prepare(
     "SELECT i.*, e.nombre AS empresa_nombre
      FROM infraestructuras i
      INNER JOIN empresas e ON i.empresa_id = e.id
-     WHERE i.id = :id AND i.empresa_id = :emp_id"
+     WHERE i.id IN ($placeholders) AND i.empresa_id = ?
+     ORDER BY i.codigo_unico ASC"
 );
-$stmt->execute([':id' => $infraId, ':emp_id' => $empresaId]);
-$infra = $stmt->fetch();
+$stmt->execute([...$infraIds, $empresaId]);
+$infras = $stmt->fetchAll();
 
-if (!$infra) {
+if (empty($infras)) {
     http_response_code(404);
     echo 'Infraestructura no encontrada';
     exit;
 }
 
 // ---------------------------------------------------------------
-// Obtener todos los registros
+// Cargar y calcular los datos de una infraestructura concreta
 // ---------------------------------------------------------------
-$stmt = $pdo->prepare(
-    "SELECT r.*, u.nombre AS usuario_nombre, uo.nombre AS unidad_obra_nombre
-     FROM registros r
-     INNER JOIN usuarios u ON r.usuario_id = u.id
-     LEFT JOIN unidades_obra uo ON r.unidad_obra_id = uo.id
-     WHERE r.infra_id = :infra_id
-     ORDER BY r.fecha ASC"
-);
-$stmt->execute([':infra_id' => $infraId]);
-$registros = $stmt->fetchAll();
+function cargarDatosInfra(PDO $pdo, int $infraId): array {
+    $stmt = $pdo->prepare(
+        "SELECT r.*, u.nombre AS usuario_nombre, uo.nombre AS unidad_obra_nombre
+         FROM registros r
+         INNER JOIN usuarios u ON r.usuario_id = u.id
+         LEFT JOIN unidades_obra uo ON r.unidad_obra_id = uo.id
+         WHERE r.infra_id = :infra_id
+         ORDER BY r.fecha ASC"
+    );
+    $stmt->execute([':infra_id' => $infraId]);
+    $registros = $stmt->fetchAll();
 
-// ---------------------------------------------------------------
-// Separar por tipo
-// ---------------------------------------------------------------
-$comparativas = array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') === 'comparativo');
-$aleatorias   = array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') !== 'comparativo');
+    $comparativas = array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') === 'comparativo');
+    $aleatorias   = array_filter($registros, fn($r) => ($r['tipo_foto'] ?? '') !== 'comparativo');
 
-// Agrupar comparativas por visita (día)
-$visitasComp = [];
-foreach ($comparativas as $r) {
-    $dia = date('Y-m-d', strtotime($r['fecha']));
-    $visitasComp[$dia][] = $r;
-}
+    // Agrupar comparativas por visita (día)
+    $visitasComp = [];
+    foreach ($comparativas as $r) {
+        $dia = date('Y-m-d', strtotime($r['fecha']));
+        $visitasComp[$dia][] = $r;
+    }
 
-// ---------------------------------------------------------------
-// Conteo de situaciones
-// ---------------------------------------------------------------
-$conteo = ['antes' => 0, 'durante' => 0, 'despues' => 0];
-foreach ($registros as $r) {
-    $conteo[$r['estado_incidencia']]++;
+    // Conteo de situaciones
+    $conteo = ['antes' => 0, 'durante' => 0, 'despues' => 0];
+    foreach ($registros as $r) {
+        $estado = $r['estado_incidencia'] ?? '';
+        if (isset($conteo[$estado])) {
+            $conteo[$estado]++;
+        }
+    }
+
+    return compact('registros', 'comparativas', 'aleatorias', 'visitasComp', 'conteo');
 }
 
 $fechaGeneracion = date('d/m/Y H:i');
-$codigoInfra     = htmlspecialchars($infra['codigo_unico']);
-$nombreInfra     = htmlspecialchars($infra['nombre']);
-$empresaNombre   = htmlspecialchars($infra['empresa_nombre']);
-$tipoInfra       = htmlspecialchars($infra['tipo'] ?? 'N/A');
-$totalRegistros  = count($registros);
-$totalComp       = count($comparativas);
-$totalAlea       = count($aleatorias);
+$empresaNombre   = htmlspecialchars($infras[0]['empresa_nombre']);
+// Título global del documento
+$tituloDoc = count($infras) === 1
+    ? htmlspecialchars($infras[0]['codigo_unico'])
+    : (count($infras) . ' infraestructuras');
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Informe <?= $codigoInfra ?> - FotoGPS.app</title>
+<title>Informe <?= $tituloDoc ?> - FotoGPS.app</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
     /* ============================================
@@ -626,7 +638,7 @@ $totalAlea       = count($aleatorias);
 <div class="toolbar">
     <div class="toolbar-title">
         <i class="bi bi-file-earmark-pdf"></i>
-        <span>Informe de Inspección &mdash; <?= $codigoInfra ?></span>
+        <span>Informe de Inspección &mdash; <?= $tituloDoc ?></span>
     </div>
     <div class="toolbar-actions">
         <a href="javascript:history.back()" class="toolbar-btn toolbar-btn--back">
@@ -674,6 +686,25 @@ $totalAlea       = count($aleatorias);
             <input type="text" id="inputTitulo" placeholder="Título personalizado del informe...">
         </div>
     </div>
+
+    <?php foreach ($infras as $infraIdx => $infra):
+        $datos        = cargarDatosInfra($pdo, (int) $infra['id']);
+        $registros    = $datos['registros'];
+        $comparativas = $datos['comparativas'];
+        $aleatorias   = $datos['aleatorias'];
+        $visitasComp  = $datos['visitasComp'];
+        $conteo       = $datos['conteo'];
+
+        $codigoInfra    = htmlspecialchars($infra['codigo_unico']);
+        $nombreInfra    = htmlspecialchars($infra['nombre']);
+        $tipoInfra      = htmlspecialchars($infra['tipo'] ?? 'N/A');
+        $totalRegistros = count($registros);
+        $totalComp      = count($comparativas);
+        $totalAlea      = count($aleatorias);
+
+        if ($infraIdx > 0): ?>
+            <div class="page-break"></div>
+        <?php endif; ?>
 
     <!-- Datos de la infraestructura -->
     <div class="section">
@@ -913,6 +944,8 @@ $totalAlea       = count($aleatorias);
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
+
+    <?php endforeach; // fin bucle infraestructuras ?>
 
     <!-- Footer -->
     <div class="report-footer">

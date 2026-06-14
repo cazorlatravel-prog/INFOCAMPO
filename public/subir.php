@@ -95,6 +95,9 @@ $secuenciaComparativa  = isset($_POST['secuencia_comparativa']) && $_POST['secue
 $nombreArchivo         = isset($_POST['nombre_archivo']) ? trim((string) $_POST['nombre_archivo']) : null;
 $unidadObraId          = isset($_POST['unidad_obra_id']) && $_POST['unidad_obra_id'] !== '' ? (int) $_POST['unidad_obra_id'] : null;
 $tipoTrabajoId         = isset($_POST['tipo_trabajo_id']) && $_POST['tipo_trabajo_id'] !== '' ? (int) $_POST['tipo_trabajo_id'] : null;
+// Token de idempotencia (evita registros duplicados al reintentar una subida)
+$clientToken           = isset($_POST['client_token']) ? substr(trim((string) $_POST['client_token']), 0, 64) : null;
+if ($clientToken === '') $clientToken = null;
 
 // Validar enum de situación
 $situacionesPermitidas = ['antes', 'durante', 'despues'];
@@ -125,6 +128,34 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 }
 
 // ---------------------------------------------------------------
+// 1b. Idempotencia: si ya existe un registro con este client_token,
+//     devolver éxito sin volver a subir la imagen (evita duplicados)
+// ---------------------------------------------------------------
+if ($clientToken !== null) {
+    try {
+        $pdo = getDB();
+        $dupStmt = $pdo->prepare(
+            "SELECT id, url_cloudinary, nombre_archivo FROM registros WHERE client_token = :tk LIMIT 1"
+        );
+        $dupStmt->execute([':tk' => $clientToken]);
+        $dupRow = $dupStmt->fetch();
+        if ($dupRow) {
+            echo json_encode([
+                'ok'            => true,
+                'registro_id'   => (int) $dupRow['id'],
+                'url_imagen'    => $dupRow['url_cloudinary'],
+                'nombre_archivo'=> $dupRow['nombre_archivo'],
+                'duplicado'     => true,
+            ]);
+            exit;
+        }
+    } catch (\PDOException $e) {
+        // Si la columna client_token no existe todavía (migración pendiente),
+        // continuar sin deduplicar en lugar de fallar
+    }
+}
+
+// ---------------------------------------------------------------
 // 2. Generar nombre de archivo según formato configurado por la empresa
 // ---------------------------------------------------------------
 try {
@@ -132,7 +163,7 @@ try {
 
     // Obtener código de infraestructura y empresa_id
     $stmtInfra = $pdo->prepare(
-        "SELECT i.codigo, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
+        "SELECT i.codigo_unico, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
     );
     $stmtInfra->execute([':id' => $infraId]);
     $infraRow = $stmtInfra->fetch();
@@ -143,7 +174,7 @@ try {
         exit;
     }
 
-    $infraCodigo = $infraRow['codigo'] ?: $infraRow['nombre'];
+    $infraCodigo = $infraRow['codigo_unico'] ?: $infraRow['nombre'];
     $infraEmpresaId = (int) $infraRow['empresa_id'];
 
     // Obtener formato de nombre configurado para la empresa
@@ -319,14 +350,13 @@ try {
     $sql = "INSERT INTO registros
                 (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
                  url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
-                 tipo_foto, secuencia_comparativa, nombre_archivo)
+                 tipo_foto, secuencia_comparativa, nombre_archivo, client_token)
             VALUES
                 (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
                  :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
-                 :tipo_foto, :secuencia_comp, :nombre_archivo)";
+                 :tipo_foto, :secuencia_comp, :nombre_archivo, :client_token)";
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
+    $params = [
         ':infra_id'          => $infraId,
         ':unidad_obra_id'    => $unidadObraId,
         ':tipo_trabajo_id'   => $tipoTrabajoId,
@@ -340,7 +370,30 @@ try {
         ':tipo_foto'         => $tipoFoto,
         ':secuencia_comp'    => $secuenciaComparativa,
         ':nombre_archivo'    => $nombreArchivo,
-    ]);
+        ':client_token'      => $clientToken,
+    ];
+
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+    } catch (\PDOException $e) {
+        // Fallback si la columna client_token aún no existe (migración pendiente)
+        if (stripos($e->getMessage(), 'client_token') !== false) {
+            $sqlFallback = "INSERT INTO registros
+                    (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
+                     url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
+                     tipo_foto, secuencia_comparativa, nombre_archivo)
+                VALUES
+                    (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
+                     :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
+                     :tipo_foto, :secuencia_comp, :nombre_archivo)";
+            unset($params[':client_token']);
+            $stmt = $pdo->prepare($sqlFallback);
+            $stmt->execute($params);
+        } else {
+            throw $e;
+        }
+    }
 
     $registroId = (int) $pdo->lastInsertId();
 

@@ -37,5 +37,5 @@ ALTER TABLE registros
 
 -- Indices
 ALTER TABLE registros
-    ADD INDEX IF NOT EXISTS idx_reg_tipo_foto (tipo_foto),
-    ADD INDEX IF NOT EXISTS idx_reg_unidad_obra (unidad_obra_id);
+    ADD INDEX idx_reg_tipo_foto (tipo_foto),
+    ADD INDEX idx_reg_unidad_obra (unidad_obra_id);

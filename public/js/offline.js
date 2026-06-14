@@ -272,6 +272,9 @@
         const fd = item.formData;
 
         const formData = new FormData();
+        // CSRF e idempotencia (para evitar duplicados al reintentar)
+        if (fd.csrf_token) formData.append('csrf_token', fd.csrf_token);
+        if (fd.client_token) formData.append('client_token', fd.client_token);
         formData.append('imagen', blob, (fd.nombre_archivo || 'foto') + '.jpg');
         formData.append('infra_id', fd.infra_id);
         formData.append('usuario_id', fd.usuario_id);
@@ -471,7 +474,8 @@
     function revokeBlobUrls(items) {
         if (!Array.isArray(items)) return;
         items.forEach(item => {
-            const url = item.blobUrl || item;
+            // El blob URL puede venir en blobUrl, url_cloudinary, o ser el propio string
+            const url = (item && (item.blobUrl || item.url_cloudinary)) || item;
             if (typeof url === 'string' && url.startsWith('blob:')) {
                 URL.revokeObjectURL(url);
             }

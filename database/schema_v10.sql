@@ -23,4 +23,4 @@ CREATE TABLE IF NOT EXISTS tipos_trabajo (
 
 -- Añadir columna tipo_trabajo_id a registros
 ALTER TABLE registros ADD COLUMN IF NOT EXISTS tipo_trabajo_id INT UNSIGNED DEFAULT NULL AFTER unidad_obra_id;
-ALTER TABLE registros ADD INDEX IF NOT EXISTS idx_reg_tipo_trabajo (tipo_trabajo_id);
+ALTER TABLE registros ADD INDEX idx_reg_tipo_trabajo (tipo_trabajo_id);

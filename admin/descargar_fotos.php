@@ -22,12 +22,13 @@ if ($infraId <= 0) {
 }
 
 $pdo = getDB();
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
-// Obtener info de la infraestructura
+// Obtener info de la infraestructura (scoped por empresa)
 $stmt = $pdo->prepare(
-    "SELECT codigo_unico FROM infraestructuras WHERE id = :id"
+    "SELECT codigo_unico FROM infraestructuras WHERE id = :id AND empresa_id = :emp"
 );
-$stmt->execute([':id' => $infraId]);
+$stmt->execute([':id' => $infraId, ':emp' => $empresaId]);
 $infra = $stmt->fetch();
 
 if (!$infra) {
@@ -36,15 +37,16 @@ if (!$infra) {
     exit;
 }
 
-// Obtener todos los registros con fotos
+// Obtener todos los registros con fotos (scoped por empresa)
 $stmt = $pdo->prepare(
     "SELECT r.url_cloudinary, r.fecha, r.estado_incidencia, u.nombre AS usuario_nombre
      FROM registros r
      INNER JOIN usuarios u ON r.usuario_id = u.id
-     WHERE r.infra_id = :infra_id
+     INNER JOIN infraestructuras i ON r.infra_id = i.id
+     WHERE r.infra_id = :infra_id AND i.empresa_id = :emp
      ORDER BY r.fecha ASC"
 );
-$stmt->execute([':infra_id' => $infraId]);
+$stmt->execute([':infra_id' => $infraId, ':emp' => $empresaId]);
 $registros = $stmt->fetchAll();
 
 if (empty($registros)) {
@@ -64,28 +66,28 @@ if ($zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) {
 }
 
 $idx = 1;
+$added = 0;
 foreach ($registros as $reg) {
     $url = $reg['url_cloudinary'];
     if (empty($url)) {
         continue;
     }
 
-    // Descargar imagen desde Cloudinary
-    $imageData = @file_get_contents($url);
-    if ($imageData === false) {
-        // Reintentar con cURL si file_get_contents falla
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-        $imageData = curl_exec($ch);
-        curl_close($ch);
-    }
+    // Descargar imagen vía cURL verificando que la respuesta sea 200 OK
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_FAILONERROR    => true, // devuelve false en respuestas >= 400
+    ]);
+    $imageData = curl_exec($ch);
+    $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-    if ($imageData === false) {
+    // Solo aceptar datos reales de una respuesta 200 OK
+    if ($imageData === false || $httpCode !== 200 || $imageData === '') {
         continue;
     }
 
@@ -101,9 +103,18 @@ foreach ($registros as $reg) {
 
     $zip->addFromString($filename, $imageData);
     $idx++;
+    $added++;
 }
 
 $zip->close();
+
+// Si no se pudo descargar ninguna foto, no servir un ZIP vacío
+if ($added === 0) {
+    @unlink($tmpFile);
+    http_response_code(502);
+    echo 'No se pudo descargar ninguna foto (las imágenes remotas no están disponibles).';
+    exit;
+}
 
 // Enviar ZIP al navegador
 $zipName = $infra['codigo_unico'] . '_fotos_' . date('Ymd') . '.zip';

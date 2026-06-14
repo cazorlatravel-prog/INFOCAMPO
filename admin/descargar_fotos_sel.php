@@ -57,24 +57,25 @@ if ($zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) {
 }
 
 $idx = 1;
+$added = 0;
 foreach ($registros as $reg) {
     $url = $reg['url_cloudinary'];
     if (empty($url)) continue;
 
-    $imageData = @file_get_contents($url);
-    if ($imageData === false) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-        $imageData = curl_exec($ch);
-        curl_close($ch);
-    }
+    // Descargar vía cURL verificando respuesta 200 OK
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_FAILONERROR    => true,
+    ]);
+    $imageData = curl_exec($ch);
+    $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-    if ($imageData === false) continue;
+    if ($imageData === false || $httpCode !== 200 || $imageData === '') continue;
 
     $fecha = date('Ymd_His', strtotime($reg['fecha']));
     $filename = sprintf(
@@ -87,9 +88,17 @@ foreach ($registros as $reg) {
 
     $zip->addFromString($filename, $imageData);
     $idx++;
+    $added++;
 }
 
 $zip->close();
+
+if ($added === 0) {
+    @unlink($tmpFile);
+    http_response_code(502);
+    echo 'No se pudo descargar ninguna foto (las imágenes remotas no están disponibles).';
+    exit;
+}
 
 $zipName = 'fotos_seleccionadas_' . date('Ymd_His') . '.zip';
 

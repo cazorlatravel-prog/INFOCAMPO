@@ -12,6 +12,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Parámetros del operador (URL > sesión > 0)
 if (session_status() === PHP_SESSION_NONE) {
@@ -667,6 +668,7 @@ if ($initials === '') $initials = 'OP';
             empresaId: <?= $empresaId ?>,
             userName: <?= json_encode($userName) ?>,
             empresaName: <?= json_encode($empresaName) ?>,
+            csrfToken: <?= json_encode(csrfToken()) ?>,
             endpoints: {
                 upload: 'subir.php',
                 infraestructuras: 'api/infraestructuras.php',

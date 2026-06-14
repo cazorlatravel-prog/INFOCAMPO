@@ -160,11 +160,30 @@
     // ===================================================================
     // EXIT CONFIRMATION — prevent accidental close with unsaved data
     // ===================================================================
+    // Marca de navegación intencional (logout, enlaces) para no mostrar el aviso
+    let intentionalNavigation = false;
+
+    // ¿Hay datos de visita sin finalizar que se perderían?
+    function hasUnsavedData() {
+        return Array.isArray(state.photos) && state.photos.length > 0;
+    }
+
     function initExitConfirmation() {
+        // Permitir salir sin aviso al pulsar "Cerrar sesión" u otros enlaces de salida
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a[href]');
+            if (link && (link.classList.contains('user-menu-logout') || link.dataset.allowExit === '1')) {
+                intentionalNavigation = true;
+            }
+        }, true);
+
         window.addEventListener('beforeunload', (e) => {
-            // Always ask before leaving the app
+            // Solo avisar si hay fotos sin finalizar y no es una salida intencional
+            if (intentionalNavigation || !hasUnsavedData()) {
+                return;
+            }
             e.preventDefault();
-            e.returnValue = '¿Seguro que quieres salir de INFOCAMPO?';
+            e.returnValue = '¿Seguro que quieres salir? Tienes fotos sin finalizar.';
             return e.returnValue;
         });
 
@@ -178,12 +197,14 @@
                     showScreen('ficha');
                     return;
                 }
-                // On ficha screen, ask before leaving the app
-                if (!confirm('¿Quieres salir de INFOCAMPO? Asegúrate de haber guardado tus datos antes de cerrar.')) {
+                // En la ficha: solo preguntar si hay datos sin guardar
+                if (hasUnsavedData() &&
+                    !confirm('¿Quieres salir de INFOCAMPO? Tienes fotos sin finalizar.')) {
                     history.pushState(null, '', location.href);
                     return;
                 }
                 // Allow navigation out
+                intentionalNavigation = true;
                 history.back();
             });
         }
@@ -569,6 +590,10 @@
     function initGPS() {
         if (!('geolocation' in navigator)) {
             camGpsText.textContent = 'UTM: Sin GPS';
+            return;
+        }
+        // Evitar duplicar el watch si ya está activo
+        if (state.gpsWatchId !== null) {
             return;
         }
 
@@ -991,6 +1016,9 @@
     async function openCamera(mode) {
         state.currentMode = mode;
 
+        // Reactivar el seguimiento GPS (closeCamera lo detiene para ahorrar batería)
+        initGPS();
+
         // Update UI
         camInfraName.textContent = state.infraName;
         camModeBadge.textContent = mode === 'aleatorio' ? 'ALEATORIO' : 'COMPARATIVO';
@@ -1068,6 +1096,12 @@
     // ===================================================================
     async function checkPreviousPhotos() {
         if (!state.infraId) return;
+
+        // Liberar blob URLs del lote anterior para evitar fugas de memoria
+        if (state.prevPhotos && state.prevPhotos.length > 0 &&
+            window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
+            window.InfocampoOffline.revokeBlobUrls(state.prevPhotos);
+        }
 
         // Try cached photos first when offline
         if (!navigator.onLine && window.InfocampoOffline) {
@@ -1347,8 +1381,16 @@
         const captureLat = state.capturedGps.lat || state.gps.lat || 0;
         const captureLon = state.capturedGps.lon || state.gps.lon || 0;
 
+        // Token de idempotencia: identifica esta captura de forma única para
+        // evitar registros duplicados si la subida se reintenta tras un fallo de red
+        const clientToken = (self.crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ('t' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
         // Build upload data
         const uploadData = {
+            csrf_token: CFG.csrfToken,
+            client_token: clientToken,
             infra_id: state.infraId,
             usuario_id: CFG.usuarioId,
             lat_real: captureLat,
@@ -1413,6 +1455,8 @@
 
         // Online — upload directly
         const formData = new FormData();
+        formData.append('csrf_token', uploadData.csrf_token || '');
+        formData.append('client_token', uploadData.client_token || '');
         formData.append('imagen', blob, filename + '.jpg');
         formData.append('infra_id', uploadData.infra_id);
         formData.append('usuario_id', uploadData.usuario_id);
@@ -1796,9 +1840,8 @@
             roundRect(ctx, mapX, mapY, mapSize, mapSize, borderRadius);
             ctx.clip();
 
-            // Draw the tile composite, cropped and scaled to mapSize
-            const half = mapSize / 2;
-            const srcSize = mapSize * (256 / mapSize); // Keep 1:1 scale ratio
+            // Recortar exactamente mapSize px de los tiles (escala 1:1, sin reescalado borroso)
+            const srcSize = mapSize;
             ctx.drawImage(tileCanvas,
                 centerX - srcSize / 2, centerY - srcSize / 2, srcSize, srcSize,
                 mapX, mapY, mapSize, mapSize
@@ -3298,13 +3341,13 @@
      * Retake photo: undo counters, resume camera.
      */
     function retakePhoto() {
-        // Undo the counters incremented in captureFrame
-        state.countTotal--;
+        // Undo the counters incremented in captureFrame (sin bajar de 0)
+        state.countTotal = Math.max(0, state.countTotal - 1);
         if (state.currentMode === 'comparativo') {
-            state.seqComparativa--;
-            state.countComparativas--;
+            state.seqComparativa = Math.max(0, state.seqComparativa - 1);
+            state.countComparativas = Math.max(0, state.countComparativas - 1);
         } else {
-            state.countAleatorias--;
+            state.countAleatorias = Math.max(0, state.countAleatorias - 1);
         }
 
         // Persist decremented counter
