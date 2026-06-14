@@ -39,7 +39,7 @@ if (empty($infraIds)) {
 }
 
 $pdo = getDB();
-$empresaId = $_SESSION['empresa_id'];
+$empresaId = getEmpresaIdSeguro();
 
 // ---------------------------------------------------------------
 // Cargar infraestructuras (scoped by empresa_id)

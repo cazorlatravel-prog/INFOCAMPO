@@ -441,15 +441,20 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
         renderLightbox();
     }
 
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
     function renderLightbox() {
         var d = lightboxData[currentLightboxIdx];
         if (!d) return;
         document.getElementById('lightbox-img').src = d.url;
         document.getElementById('lightbox-meta').innerHTML =
-            '<strong>' + d.fecha + '</strong> | ' +
-            '<span style="text-transform:uppercase;">' + d.estado + '</span> | ' +
-            d.operador +
-            (d.obs ? '<br><em style="opacity:0.7;">' + d.obs.substring(0, 120) + '</em>' : '') +
+            '<strong>' + esc(d.fecha) + '</strong> | ' +
+            '<span style="text-transform:uppercase;">' + esc(d.estado) + '</span> | ' +
+            esc(d.operador) +
+            (d.obs ? '<br><em style="opacity:0.7;">' + esc(d.obs.substring(0, 120)) + '</em>' : '') +
             '<br><small style="opacity:0.5;">' + (currentLightboxIdx + 1) + ' / ' + lightboxData.length + '</small>';
         document.getElementById('lightbox-actions').innerHTML =
             '<a href="' + d.download + '" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Descargar</a>' +

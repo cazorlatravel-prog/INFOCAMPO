@@ -755,6 +755,11 @@ const Fotos = (() => {
         render();
     }
 
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
     // Lightbox
     function openLightbox(idx) {
         lightboxIdx = idx;
@@ -762,8 +767,8 @@ const Fotos = (() => {
         const lb = document.getElementById('lightbox');
         document.getElementById('lightbox-img').src = f.url;
         document.getElementById('lightbox-info').innerHTML =
-            `<strong>${f.codigo} - ${f.infra}</strong> | ${f.operador} | ${f.fecha_fmt} | ${f.estado.toUpperCase()}` +
-            (f.obs ? `<br>${f.obs}` : '');
+            `<strong>${esc(f.codigo)} - ${esc(f.infra)}</strong> | ${esc(f.operador)} | ${esc(f.fecha_fmt)} | ${esc(String(f.estado).toUpperCase())}` +
+            (f.obs ? `<br>${esc(f.obs)}` : '');
         document.getElementById('lightbox-download').href = f.url;
         lb.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -779,8 +784,8 @@ const Fotos = (() => {
         const f = filtered[lightboxIdx];
         document.getElementById('lightbox-img').src = f.url;
         document.getElementById('lightbox-info').innerHTML =
-            `<strong>${f.codigo} - ${f.infra}</strong> | ${f.operador} | ${f.fecha_fmt} | ${f.estado.toUpperCase()}` +
-            (f.obs ? `<br>${f.obs}` : '');
+            `<strong>${esc(f.codigo)} - ${esc(f.infra)}</strong> | ${esc(f.operador)} | ${esc(f.fecha_fmt)} | ${esc(String(f.estado).toUpperCase())}` +
+            (f.obs ? `<br>${esc(f.obs)}` : '');
         document.getElementById('lightbox-download').href = f.url;
     }
 
@@ -838,18 +843,18 @@ const Fotos = (() => {
         document.getElementById('comp-col-1').innerHTML = `
             <img src="${f1.url}" alt="">
             <div class="comp-info">
-                <strong>${f1.codigo} - ${f1.infra}</strong><br>
-                ${f1.operador} | ${f1.fecha_fmt}<br>
-                <span style="text-transform:uppercase;font-weight:700;">${f1.estado}</span>
-                ${f1.obs ? '<br><em>' + f1.obs + '</em>' : ''}
+                <strong>${esc(f1.codigo)} - ${esc(f1.infra)}</strong><br>
+                ${esc(f1.operador)} | ${esc(f1.fecha_fmt)}<br>
+                <span style="text-transform:uppercase;font-weight:700;">${esc(f1.estado)}</span>
+                ${f1.obs ? '<br><em>' + esc(f1.obs) + '</em>' : ''}
             </div>`;
         document.getElementById('comp-col-2').innerHTML = `
             <img src="${f2.url}" alt="">
             <div class="comp-info">
-                <strong>${f2.codigo} - ${f2.infra}</strong><br>
-                ${f2.operador} | ${f2.fecha_fmt}<br>
-                <span style="text-transform:uppercase;font-weight:700;">${f2.estado}</span>
-                ${f2.obs ? '<br><em>' + f2.obs + '</em>' : ''}
+                <strong>${esc(f2.codigo)} - ${esc(f2.infra)}</strong><br>
+                ${esc(f2.operador)} | ${esc(f2.fecha_fmt)}<br>
+                <span style="text-transform:uppercase;font-weight:700;">${esc(f2.estado)}</span>
+                ${f2.obs ? '<br><em>' + esc(f2.obs) + '</em>' : ''}
             </div>`;
     }
 
@@ -857,8 +862,8 @@ const Fotos = (() => {
         const [f1, f2] = compareList;
         document.getElementById('slider-img-1').src = f1.url;
         document.getElementById('slider-img-2').src = f2.url;
-        document.getElementById('slider-info-1').innerHTML = `<strong>${f1.codigo}</strong> ${f1.fecha_fmt} - ${f1.estado.toUpperCase()}`;
-        document.getElementById('slider-info-2').innerHTML = `<strong>${f2.codigo}</strong> ${f2.fecha_fmt} - ${f2.estado.toUpperCase()}`;
+        document.getElementById('slider-info-1').innerHTML = `<strong>${esc(f1.codigo)}</strong> ${esc(f1.fecha_fmt)} - ${esc(String(f1.estado).toUpperCase())}`;
+        document.getElementById('slider-info-2').innerHTML = `<strong>${esc(f2.codigo)}</strong> ${esc(f2.fecha_fmt)} - ${esc(String(f2.estado).toUpperCase())}`;
 
         // Init slider drag
         const container = document.getElementById('slider-container');

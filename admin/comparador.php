@@ -308,6 +308,11 @@ if ($infra) {
         updateComparison();
     }
 
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
     function updateComparison() {
         var leftIdx = parseInt(document.getElementById('select-left').value);
         var rightIdx = parseInt(document.getElementById('select-right').value);
@@ -337,8 +342,8 @@ if ($infra) {
                 html += '<div class="compare-label right">' + right.fecha_display + '</div>';
                 html += '</div>';
                 html += '<div class="d-flex justify-content-between mt-1 small text-muted">';
-                if (fotoL.obs) html += '<em>' + fotoL.obs.substring(0, 60) + '</em>';
-                if (fotoR.obs) html += '<em>' + fotoR.obs.substring(0, 60) + '</em>';
+                if (fotoL.obs) html += '<em>' + esc(fotoL.obs.substring(0, 60)) + '</em>';
+                if (fotoR.obs) html += '<em>' + esc(fotoR.obs.substring(0, 60)) + '</em>';
                 html += '</div>';
                 html += '</div>';
             } else {

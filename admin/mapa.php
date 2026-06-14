@@ -669,6 +669,11 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             }, { enableHighAccuracy: true, maximumAge: 5000 });
         });
 
+        function esc(s) {
+            if (s == null) return '';
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
         function renderMarkers(data) {
             if (clusterGroup) { map.removeLayer(clusterGroup); }
             clusterGroup = L.markerClusterGroup({
@@ -704,14 +709,14 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '<div class="popup-photo">' +
                     '<img src="' + r.url + '" alt="" loading="lazy">' +
                     '<div class="popup-meta">' +
-                    '<strong>' + r.infra + '</strong> <code style="font-size:0.7rem;color:#2d6a9f;">' + r.codigo + '</code><br>' +
-                    '<span class="popup-badge ' + r.estado + '">' + r.estado.toUpperCase() + '</span> ' +
-                    '<span class="popup-badge ' + r.tipo + '">' + (isComp ? 'COMP W' + r.seq : 'ALEA') + '</span><br>' +
-                    '<i class="bi bi-person"></i> ' + r.operador + '<br>' +
-                    '<i class="bi bi-calendar3"></i> ' + r.fecha + '<br>' +
+                    '<strong>' + esc(r.infra) + '</strong> <code style="font-size:0.7rem;color:#2d6a9f;">' + esc(r.codigo) + '</code><br>' +
+                    '<span class="popup-badge ' + esc(r.estado) + '">' + esc(String(r.estado).toUpperCase()) + '</span> ' +
+                    '<span class="popup-badge ' + esc(r.tipo) + '">' + (isComp ? 'COMP W' + esc(r.seq) : 'ALEA') + '</span><br>' +
+                    '<i class="bi bi-person"></i> ' + esc(r.operador) + '<br>' +
+                    '<i class="bi bi-calendar3"></i> ' + esc(r.fecha) + '<br>' +
                     '<i class="bi bi-geo-alt"></i> ' + r.lat.toFixed(7) + ', ' + r.lon.toFixed(7) +
-                    (r.uo_nombre ? '<br><i class="bi bi-tools"></i> ' + r.uo_nombre : '') +
-                    (r.obs ? '<br><em style="color:#999;">' + r.obs.substring(0, 80) + '</em>' : '') +
+                    (r.uo_nombre ? '<br><i class="bi bi-tools"></i> ' + esc(r.uo_nombre) : '') +
+                    (r.obs ? '<br><em style="color:#999;">' + esc(r.obs.substring(0, 80)) + '</em>' : '') +
                     '</div>' +
                     '<div class="popup-actions">' +
                     '<a href="' + downloadUrl + '" class="btn btn-sm btn-outline-success" style="font-size:0.7rem;"><i class="bi bi-download"></i> Descargar</a> ' +

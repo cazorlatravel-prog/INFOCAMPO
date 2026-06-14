@@ -22,7 +22,7 @@ if (empty($ids)) {
 }
 
 $pdo = getDB();
-$empresaId = $_SESSION['empresa_id'];
+$empresaId = getEmpresaIdSeguro();
 
 // Build placeholders for IN clause
 $placeholders = implode(',', array_fill(0, count($ids), '?'));
