@@ -371,7 +371,12 @@ if ($initials === '') $initials = 'OP';
                 <span id="cam-infra-name">--</span>
                 <span id="cam-mode-badge" class="cam-mode-badge">ALEATORIO</span>
             </div>
-            <span id="cam-time">--:--</span>
+            <div class="cam-topbar-right">
+                <button type="button" id="btn-torch" class="cam-btn-back cam-btn-sm cam-btn-torch hidden" title="Linterna" aria-label="Activar linterna" aria-pressed="false">
+                    <i class="bi bi-lightning-charge-fill" aria-hidden="true"></i>
+                </button>
+                <span id="cam-time">--:--</span>
+            </div>
         </div>
 
         <div class="cam-gps" role="status" aria-live="polite" aria-label="Estado del GPS">
@@ -382,6 +387,7 @@ if ($initials === '') $initials = 'OP';
         <video id="cam-video" autoplay playsinline></video>
         <img id="cam-ghost" src="" alt="" class="cam-ghost">
         <canvas id="cam-capture" class="hidden-canvas"></canvas>
+        <div id="cam-focus-ring" class="cam-focus-ring hidden" aria-hidden="true"></div>
 
         <div id="cam-seq-counter" class="cam-seq hidden">
             <span id="cam-seq-label">W1</span>

@@ -45,6 +45,10 @@
         bearing: null, // degrees 0-360, null if unavailable
         // Reverse geocoding cache
         geoLocation: null, // { city, province, postcode, country }
+        // High-quality capture
+        videoTrack: null,   // active MediaStreamTrack (capabilities/torch/focus)
+        imageCapture: null, // ImageCapture instance for full-resolution stills
+        torchOn: false,     // estado de la linterna (torch)
     };
 
     const SITUACIONES = ['antes', 'durante', 'despues'];
@@ -98,6 +102,8 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
+    const btnTorch       = $('#btn-torch');
+    const camFocusRing   = $('#cam-focus-ring');
     const ghostOpacityBar    = $('#ghost-opacity-bar');
     const ghostOpacitySlider = $('#ghost-opacity-slider');
     const ghostOpacityValue  = $('#ghost-opacity-value');
@@ -1109,15 +1115,23 @@
                 state.stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: { ideal: 'environment' },
-                        width: { ideal: 3264 },
-                        height: { ideal: 2448 },
-                        aspectRatio: { ideal: 3 / 4 },
+                        // Pedimos resolución muy alta; el navegador la limita a la
+                        // máxima soportada. El recorte 3:4 se hace en captureFrame.
+                        width: { ideal: 4096 },
+                        height: { ideal: 3072 },
                     },
                     audio: false,
                 });
             }
             camVideo.srcObject = state.stream;
             await camVideo.play();
+
+            // Configuración de captura de alta calidad (best-effort, con fallbacks)
+            const track = state.stream.getVideoTracks()[0] || null;
+            state.videoTrack = track;
+            await applyBestCameraConstraints(track);
+            setupImageCapture(track);
+            setupTorchUI(track);
         } catch (err) {
             // Limpiar stream si fue adquirido pero play() falló
             if (state.stream) {
@@ -1125,11 +1139,163 @@
                 state.stream = null;
             }
             camVideo.srcObject = null;
+            state.videoTrack = null;
+            state.imageCapture = null;
             alert('No se pudo acceder a la cámara: ' + err.message);
             return;
         }
 
         showScreen('camera');
+    }
+
+    // ===================================================================
+    // HIGH-QUALITY CAPTURE HELPERS (resolución, enfoque, linterna)
+    // ===================================================================
+
+    /**
+     * Aplica la resolución máxima real del dispositivo y modos continuos de
+     * enfoque/exposición/balance de blancos. Todo best-effort: si el navegador
+     * no soporta getCapabilities/applyConstraints, no hace nada (sin romper).
+     */
+    async function applyBestCameraConstraints(track) {
+        if (!track || typeof track.getCapabilities !== 'function') return;
+        try {
+            const caps = track.getCapabilities();
+            const constraints = {};
+            const advanced = [];
+
+            if (caps.width && caps.width.max)  constraints.width  = { ideal: caps.width.max };
+            if (caps.height && caps.height.max) constraints.height = { ideal: caps.height.max };
+
+            if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+                advanced.push({ focusMode: 'continuous' });
+            }
+            if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes('continuous')) {
+                advanced.push({ exposureMode: 'continuous' });
+            }
+            if (Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes('continuous')) {
+                advanced.push({ whiteBalanceMode: 'continuous' });
+            }
+            if (advanced.length) constraints.advanced = advanced;
+
+            if (Object.keys(constraints).length) {
+                await track.applyConstraints(constraints);
+            }
+        } catch (_e) {
+            // Best-effort: ignorar si el dispositivo no lo soporta
+        }
+    }
+
+    /**
+     * Crea un ImageCapture para sacar fotos a resolución completa del sensor
+     * (Android Chrome). En iOS Safari no existe → fallback a frame de vídeo.
+     */
+    function setupImageCapture(track) {
+        state.imageCapture = null;
+        if (track && typeof window.ImageCapture === 'function') {
+            try {
+                state.imageCapture = new ImageCapture(track);
+            } catch (_e) {
+                state.imageCapture = null;
+            }
+        }
+    }
+
+    /**
+     * Muestra el botón de linterna solo si el dispositivo tiene torch.
+     */
+    function setupTorchUI(track) {
+        state.torchOn = false;
+        if (btnTorch) {
+            btnTorch.classList.remove('active');
+            btnTorch.setAttribute('aria-pressed', 'false');
+        }
+        let hasTorch = false;
+        try {
+            if (track && typeof track.getCapabilities === 'function') {
+                const caps = track.getCapabilities();
+                hasTorch = !!caps.torch;
+            }
+        } catch (_e) { hasTorch = false; }
+        if (btnTorch) btnTorch.classList.toggle('hidden', !hasTorch);
+    }
+
+    /**
+     * Enciende/apaga la linterna (torch) vía applyConstraints.
+     */
+    async function toggleTorch() {
+        const track = state.videoTrack;
+        if (!track || typeof track.applyConstraints !== 'function') return;
+        const next = !state.torchOn;
+        try {
+            await track.applyConstraints({ advanced: [{ torch: next }] });
+            state.torchOn = next;
+            if (btnTorch) {
+                btnTorch.classList.toggle('active', next);
+                btnTorch.setAttribute('aria-pressed', String(next));
+            }
+        } catch (_e) {
+            // No soportado en este dispositivo
+        }
+    }
+
+    /**
+     * Apaga la linterna si estaba encendida (al cerrar/detener la cámara).
+     */
+    async function turnOffTorch() {
+        if (!state.torchOn) return;
+        const track = state.videoTrack;
+        if (track && typeof track.applyConstraints === 'function') {
+            try { await track.applyConstraints({ advanced: [{ torch: false }] }); } catch (_e) {}
+        }
+        state.torchOn = false;
+        if (btnTorch) {
+            btnTorch.classList.remove('active');
+            btnTorch.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    /**
+     * Toca-para-enfocar: muestra un anillo de feedback y, si el dispositivo lo
+     * soporta, fija el punto de enfoque (pointsOfInterest).
+     */
+    function tapToFocus(evt) {
+        const rect = camVideo.getBoundingClientRect();
+        const clientX = (evt.touches && evt.touches[0]) ? evt.touches[0].clientX : evt.clientX;
+        const clientY = (evt.touches && evt.touches[0]) ? evt.touches[0].clientY : evt.clientY;
+        if (clientX == null || clientY == null) return;
+
+        // Feedback visual del anillo en el punto tocado
+        if (camFocusRing) {
+            camFocusRing.style.left = (clientX) + 'px';
+            camFocusRing.style.top  = (clientY) + 'px';
+            camFocusRing.classList.remove('hidden');
+            // reiniciar animación
+            void camFocusRing.offsetWidth;
+            clearTimeout(camFocusRing._hideTimer);
+            camFocusRing._hideTimer = setTimeout(() => camFocusRing.classList.add('hidden'), 700);
+        }
+
+        // Intentar fijar el punto de enfoque (soporte muy limitado)
+        const track = state.videoTrack;
+        if (track && typeof track.getCapabilities === 'function' &&
+            typeof track.applyConstraints === 'function') {
+            try {
+                const caps = track.getCapabilities();
+                if (caps.pointsOfInterest || (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot'))) {
+                    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+                    const adv = {};
+                    if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
+                        adv.focusMode = 'single-shot';
+                    }
+                    if (caps.pointsOfInterest) {
+                        adv.pointsOfInterest = [{ x, y }];
+                    }
+                    track.applyConstraints({ advanced: [adv] }).catch(() => {});
+                }
+            } catch (_e) { /* no soportado */ }
+        }
     }
 
     function closeCamera() {
@@ -1268,38 +1434,76 @@
         }
 
         try {
-            const vw = camVideo.videoWidth;
-            const vh = camVideo.videoHeight;
+            // Adquirir el mejor fotograma disponible:
+            //  - ImageCapture.takePhoto() → foto a resolución completa del sensor
+            //  - fallback: fotograma del vídeo en directo (iOS Safari, etc.)
+            let photoSource = camVideo;
+            let fullW = camVideo.videoWidth;
+            let fullH = camVideo.videoHeight;
+            let bitmap = null;
 
-            if (!vw || !vh) {
-                console.warn('captureFrame: video not ready (dimensions 0)');
+            if (state.imageCapture && typeof state.imageCapture.takePhoto === 'function') {
+                try {
+                    const photoBlob = await state.imageCapture.takePhoto();
+                    bitmap = await createImageBitmap(photoBlob, { imageOrientation: 'from-image' });
+                    photoSource = bitmap;
+                    fullW = bitmap.width;
+                    fullH = bitmap.height;
+                } catch (_e) {
+                    // Fallback al fotograma de vídeo
+                    bitmap = null;
+                    photoSource = camVideo;
+                    fullW = camVideo.videoWidth;
+                    fullH = camVideo.videoHeight;
+                }
+            }
+
+            if (!fullW || !fullH) {
+                console.warn('captureFrame: fuente no lista (dimensiones 0)');
+                if (bitmap) bitmap.close();
                 _capturing = false;
                 if (btnShutter) { btnShutter.disabled = false; btnShutter.style.opacity = ''; }
                 return;
             }
 
-            // Force 3:4 portrait crop from center of video frame
-            let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
-            const targetRatio = 3 / 4; // width / height
-            const videoRatio = vw / vh;
+            // Recorte 3:4 vertical desde el centro de la fuente
+            let srcX = 0, srcY = 0, srcW = fullW, srcH = fullH;
+            const targetRatio = 3 / 4; // ancho / alto
+            const sourceRatio = fullW / fullH;
 
-            if (videoRatio > targetRatio) {
-                srcW = Math.round(vh * targetRatio);
-                srcX = Math.round((vw - srcW) / 2);
-            } else if (videoRatio < targetRatio) {
-                srcH = Math.round(vw / targetRatio);
-                srcY = Math.round((vh - srcH) / 2);
+            if (sourceRatio > targetRatio) {
+                srcW = Math.round(fullH * targetRatio);
+                srcX = Math.round((fullW - srcW) / 2);
+            } else if (sourceRatio < targetRatio) {
+                srcH = Math.round(fullW / targetRatio);
+                srcY = Math.round((fullH - srcH) / 2);
             }
 
             // Free previous canvas memory before allocating new
             state.baseImageData = null;
             state.capturedBlob = null;
 
-            camCapture.width = srcW;
-            camCapture.height = srcH;
+            // Tope de resolución: evita OOM con sensores muy grandes (p. ej. 108 MP).
+            // 4096 px de lado largo ≈ 12,6 MP, sobrado para documentación de campo.
+            // El path de fallback (vídeo ≤1080p) no se ve afectado (no se reescala).
+            const MAX_LONG = 4096;
+            let dstW = srcW, dstH = srcH;
+            if (srcH > MAX_LONG) {
+                const scale = MAX_LONG / srcH;
+                dstW = Math.round(srcW * scale);
+                dstH = MAX_LONG;
+            }
+
+            camCapture.width = dstW;
+            camCapture.height = dstH;
 
             const ctx = camCapture.getContext('2d');
-            ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(photoSource, srcX, srcY, srcW, srcH, 0, 0, dstW, dstH);
+
+            // Liberar el bitmap de alta resolución cuanto antes
+            if (bitmap) bitmap.close();
 
             camVideo.pause();
 
@@ -1439,8 +1643,8 @@
     // PROCESS, UPLOAD & RETURN TO FICHA
     // ===================================================================
     async function processAndUploadPhoto(filename) {
-        // Convert preview canvas to blob
-        const blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.85);
+        // Convert preview canvas to blob (0.92: detalle alto para documentación de campo)
+        const blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.92);
         if (!blob) {
             alert('Error al procesar la foto.');
             camVideo.play();
@@ -1613,10 +1817,15 @@
     }
 
     function stopCameraStream() {
+        // Apagar la linterna antes de soltar el track (best-effort)
+        turnOffTorch();
         if (state.stream) {
             state.stream.getTracks().forEach(t => t.stop());
             state.stream = null;
         }
+        state.videoTrack = null;
+        state.imageCapture = null;
+        if (btnTorch) btnTorch.classList.add('hidden');
         camVideo.pause();
         camVideo.srcObject = null;
     }
@@ -2211,6 +2420,16 @@
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
+
+        // Linterna (torch)
+        if (btnTorch) {
+            btnTorch.addEventListener('click', toggleTorch);
+        }
+
+        // Toca-para-enfocar sobre el vídeo
+        if (camVideo) {
+            camVideo.addEventListener('click', tapToFocus);
+        }
 
         // Ghost toggle
         btnGhostToggle.addEventListener('click', () => {
