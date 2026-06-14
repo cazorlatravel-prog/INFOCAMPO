@@ -98,10 +98,12 @@ if ($initials === '') $initials = 'OP';
     <link rel="stylesheet" href="css/operador.css">
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Saltar al contenido</a>
     <!-- ========================================================
          PANTALLA 1: FICHA DE VISITA
          ======================================================== -->
     <div id="screen-ficha" class="screen active">
+        <h1 class="sr-only">FotoGPS &mdash; Ficha de visita</h1>
         <!-- Banner: Instalar App (sticky top) -->
         <div id="install-banner" class="install-banner hidden">
             <div class="install-banner-inner">
@@ -153,7 +155,7 @@ if ($initials === '') $initials = 'OP';
         </div>
 
         <!-- Body -->
-        <div class="ficha-body">
+        <div class="ficha-body" id="main-content" role="main">
 
             <!-- Card: Ubicacion -->
             <div class="card">
@@ -372,8 +374,8 @@ if ($initials === '') $initials = 'OP';
             <span id="cam-time">--:--</span>
         </div>
 
-        <div class="cam-gps">
-            <div class="cam-gps-dot" id="cam-gps-dot"></div>
+        <div class="cam-gps" role="status" aria-live="polite" aria-label="Estado del GPS">
+            <div class="cam-gps-dot" id="cam-gps-dot" aria-hidden="true"></div>
             <span id="cam-gps-text">ETRS89: --</span>
         </div>
 

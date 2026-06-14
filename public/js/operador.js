@@ -605,13 +605,16 @@
                 state.gps.lat = pos.coords.latitude;
                 state.gps.lon = pos.coords.longitude;
                 camGpsDot.classList.add('active');
+                camGpsDot.classList.remove('error');
                 const utm = latLonToUTM(state.gps.lat, state.gps.lon);
                 camGpsText.textContent = `UTM: ${utm.str}`;
                 // Trigger reverse geocoding in background (throttled internally)
                 reverseGeocode(state.gps.lat, state.gps.lon);
             },
             () => {
-                camGpsText.textContent = 'UTM: Error GPS';
+                camGpsDot.classList.remove('active');
+                camGpsDot.classList.add('error');
+                camGpsText.textContent = 'UTM: Sin señal GPS';
             },
             { enableHighAccuracy: true, maximumAge: 3000 }
         );
@@ -2070,9 +2073,21 @@
     // EVENTS
     // ===================================================================
     function bindEvents() {
+        // Confirmar antes de descartar fotos sin finalizar al cambiar de filtro
+        function confirmDiscardUnsaved() {
+            if (!hasUnsavedData()) return true;
+            return confirm('Tienes fotos sin finalizar. Si cambias el filtro se descartarán. ¿Continuar?');
+        }
+        // Guardar el valor previo de cada select para poder revertir si se cancela
+        [filterProvincia, filterMunicipio, filterMonte].forEach((sel) => {
+            if (sel) sel.addEventListener('focus', () => { sel.dataset.prev = sel.value; });
+        });
+
         // Provincia / municipio / monte filters
         if (filterProvincia) {
             filterProvincia.addEventListener('change', () => {
+                if (!confirmDiscardUnsaved()) { filterProvincia.value = filterProvincia.dataset.prev || ''; return; }
+                filterProvincia.dataset.prev = filterProvincia.value;
                 loadMunicipios(filterProvincia.value);
                 loadMontes();
                 clearInfra();
@@ -2080,12 +2095,16 @@
         }
         if (filterMunicipio) {
             filterMunicipio.addEventListener('change', () => {
+                if (!confirmDiscardUnsaved()) { filterMunicipio.value = filterMunicipio.dataset.prev || ''; return; }
+                filterMunicipio.dataset.prev = filterMunicipio.value;
                 loadMontes();
                 clearInfra();
             });
         }
         if (filterMonte) {
             filterMonte.addEventListener('change', () => {
+                if (!confirmDiscardUnsaved()) { filterMonte.value = filterMonte.dataset.prev || ''; return; }
+                filterMonte.dataset.prev = filterMonte.value;
                 clearInfra();
             });
         }
@@ -2093,7 +2112,7 @@
         // Infrastructure search
         infraSearch.addEventListener('input', (e) => searchInfra(e.target.value.trim()));
         infraSearch.addEventListener('focus', () => searchInfra(infraSearch.value.trim()));
-        infraClear.addEventListener('click', clearInfra);
+        infraClear.addEventListener('click', () => { if (confirmDiscardUnsaved()) clearInfra(); });
 
         // Close search results on outside click
         document.addEventListener('click', (e) => {

@@ -1107,6 +1107,13 @@ select.input-field {
     box-shadow: 0 0 8px rgba(34,197,94,0.5);
 }
 
+/* Estado de error: distinto por forma (anillo hueco), no solo color */
+.cam-gps-dot.error {
+    background: transparent;
+    border: 2px solid #f87171;
+    box-shadow: none;
+}
+
 .cam-seq {
     position: absolute;
     top: 64px;
