@@ -183,118 +183,12 @@ function csrfField(): string
 }
 
 /**
- * Iniciar suplantación de usuario (impersonation).
- * Solo disponible para superadmin.
- */
-function startImpersonation(int $userId): bool
-{
-    if (($_SESSION['user_rol'] ?? '') !== 'superadmin') {
-        return false;
-    }
-
-    $pdo = getDB();
-    $stmt = $pdo->prepare(
-        "SELECT u.*, e.nombre AS empresa_nombre
-         FROM usuarios u
-         INNER JOIN empresas e ON u.empresa_id = e.id
-         WHERE u.id = :id
-         LIMIT 1"
-    );
-    $stmt->execute([':id' => $userId]);
-    $target = $stmt->fetch();
-
-    if (!$target) {
-        return false;
-    }
-
-    // Guardar sesión original del superadmin
-    $_SESSION['impersonating_from'] = [
-        'user_id'        => $_SESSION['user_id'],
-        'user_name'      => $_SESSION['user_name'],
-        'user_email'     => $_SESSION['user_email'],
-        'user_rol'       => $_SESSION['user_rol'],
-        'empresa_id'     => $_SESSION['empresa_id'],
-        'empresa_nombre' => $_SESSION['empresa_nombre'],
-    ];
-    $_SESSION['impersonation_start'] = time();
-
-    // Regenerar ID de sesión para prevenir session fixation
-    session_regenerate_id(true);
-
-    // Cambiar a la sesión del usuario objetivo
-    $_SESSION['user_id']        = (int) $target['id'];
-    $_SESSION['user_name']      = $target['nombre'];
-    $_SESSION['user_email']     = $target['email'];
-    $_SESSION['user_rol']       = $target['rol'];
-    $_SESSION['empresa_id']     = (int) $target['empresa_id'];
-    $_SESSION['empresa_nombre'] = $target['empresa_nombre'];
-
-    return true;
-}
-
-/**
- * Detener suplantación y volver al superadmin.
- */
-function stopImpersonation(): bool
-{
-    if (!isImpersonating()) {
-        return false;
-    }
-
-    $original = $_SESSION['impersonating_from'];
-
-    // Regenerar ID de sesión al detener suplantación
-    session_regenerate_id(true);
-
-    $_SESSION['user_id']        = $original['user_id'];
-    $_SESSION['user_name']      = $original['user_name'];
-    $_SESSION['user_email']     = $original['user_email'];
-    $_SESSION['user_rol']       = $original['user_rol'];
-    $_SESSION['empresa_id']     = $original['empresa_id'];
-    $_SESSION['empresa_nombre'] = $original['empresa_nombre'];
-
-    unset($_SESSION['impersonating_from'], $_SESSION['impersonation_start']);
-    return true;
-}
-
-/**
- * Obtener empresa_id de forma segura.
- * Solo superadmins pueden especificar un empresa_id diferente al de su sesión.
- * Admins y supervisores siempre obtienen el de su sesión.
+ * Obtener el empresa_id de la sesión.
+ *
+ * Aplicación single-tenant (TRAGSA): todos los roles operan siempre sobre
+ * la empresa de su sesión. No existe selección de empresa entre inquilinos.
  */
 function getEmpresaIdSeguro(): int
 {
-    $sessionEmpId = (int) ($_SESSION['empresa_id'] ?? 0);
-    $userRol = $_SESSION['user_rol'] ?? '';
-
-    // Solo superadmins pueden ver/modificar datos de otra empresa
-    if ($userRol === 'superadmin') {
-        $requested = $_GET['empresa_id'] ?? $_POST['empresa_id'] ?? null;
-        if ($requested !== null) {
-            return (int) $requested;
-        }
-    }
-
-    return $sessionEmpId;
-}
-
-/**
- * Verificar si estamos en modo suplantación.
- * Auto-detiene si ha superado el tiempo máximo (1 hora).
- */
-function isImpersonating(): bool
-{
-    if (!isset($_SESSION['impersonating_from'])) {
-        return false;
-    }
-
-    // Timeout: máximo 1 hora de suplantación
-    $maxDuration = 3600;
-    $start = $_SESSION['impersonation_start'] ?? 0;
-    if ($start > 0 && (time() - $start) > $maxDuration) {
-        stopImpersonation();
-        return false;
-    }
-
-    return true;
+    return (int) ($_SESSION['empresa_id'] ?? 0);
 }

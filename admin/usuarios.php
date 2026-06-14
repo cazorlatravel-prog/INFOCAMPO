@@ -85,19 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             }
 
             if (!$duplicado) {
-                // Verificar límite de usuarios de la empresa
-                $empStmt = $pdo->prepare("SELECT max_usuarios FROM empresas WHERE id = :id");
-                $empStmt->execute([':id' => $empresaId]);
-                $empresa = $empStmt->fetch();
-
-                $countStmt = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE empresa_id = :id AND rol != 'superadmin'");
-                $countStmt->execute([':id' => $empresaId]);
-                $currentCount = (int) $countStmt->fetchColumn();
-
-                if ($empresa && $currentCount >= (int) $empresa['max_usuarios']) {
-                    $msg = 'Se ha alcanzado el límite máximo de usuarios (' . $empresa['max_usuarios'] . ').';
-                    $msgType = 'warning';
-                } else {
+                {
                     $hash = hashPassword($password);
                     $stmt = $pdo->prepare(
                         "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
@@ -194,17 +182,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     }
 }
 
-// ---------------------------------------------------------------
-// Cargar empresas (solo superadmin)
-// ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
 
 // ---------------------------------------------------------------
 // Cargar datos de la empresa y usuarios
@@ -255,19 +232,6 @@ foreach ($usuarios as $u) {
             <h4 class="mb-0"><i class="bi bi-people me-2"></i>Usuarios</h4>
 
             <div class="d-flex gap-2 align-items-center">
-                <?php if ($isSuperadmin): ?>
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <label class="fw-semibold small text-nowrap">Empresa:</label>
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Seleccionar --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formUsuario">
                         <i class="bi bi-plus-lg"></i> Nuevo Usuario
@@ -287,28 +251,16 @@ foreach ($usuarios as $u) {
 
             <!-- Estadísticas rápidas -->
             <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
+                <div class="col-6">
                     <div class="stat-card">
                         <div class="stat-number"><?= count($usuarios) ?></div>
                         <div class="stat-label">Total Usuarios</div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
+                <div class="col-6">
                     <div class="stat-card">
                         <div class="stat-number"><?= $countActivos ?></div>
                         <div class="stat-label">Activos</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-number"><?= $empresaData ? $empresaData['max_usuarios'] : '-' ?></div>
-                        <div class="stat-label">Límite Plan</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-number"><?= $empresaData ? ((int)$empresaData['max_usuarios'] - $countActivos) : '-' ?></div>
-                        <div class="stat-label">Disponibles</div>
                     </div>
                 </div>
             </div>

@@ -89,18 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 }
 
 // ---------------------------------------------------------------
-// Cargar empresas (solo superadmin)
-// ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
-
-// ---------------------------------------------------------------
 // Cargar tipos de trabajo
 // ---------------------------------------------------------------
 $tipos = [];
@@ -145,19 +133,6 @@ if (isset($_GET['edit'])) {
             <h4 class="mb-0"><i class="bi bi-briefcase me-2"></i>Tipos de Trabajo</h4>
 
             <div class="d-flex gap-2 align-items-center">
-                <?php if ($isSuperadmin): ?>
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <label class="fw-semibold small text-nowrap">Empresa:</label>
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Seleccionar --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formTipo">
                         <i class="bi bi-plus-lg"></i> Nuevo Tipo

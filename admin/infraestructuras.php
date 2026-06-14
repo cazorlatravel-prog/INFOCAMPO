@@ -50,19 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             }
 
             if ($action === 'create') {
-                // Verificar límite de infraestructuras
-                $empStmt = $pdo->prepare("SELECT max_infraestructuras FROM empresas WHERE id = :id");
-                $empStmt->execute([':id' => $empresaId]);
-                $empresaData = $empStmt->fetch();
-
-                $countStmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id");
-                $countStmt->execute([':id' => $empresaId]);
-                $currentCount = (int) $countStmt->fetchColumn();
-
-                if ($empresaData && $currentCount >= (int) $empresaData['max_infraestructuras']) {
-                    $msg = 'Límite de infraestructuras alcanzado (' . $empresaData['max_infraestructuras'] . ').';
-                    $msgType = 'warning';
-                } else {
+                {
                     $stmt = $pdo->prepare(
                         "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
                          VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
@@ -133,15 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 // ---------------------------------------------------------------
 // Cargar datos
 // ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
-
 $infraestructuras = [];
 $empresaNombre = '';
 if ($empresaId > 0) {
@@ -213,18 +192,6 @@ if (isset($_GET['edit'])) {
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h4 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Infraestructuras</h4>
             <div class="d-flex gap-2 align-items-center">
-                <?php if ($isSuperadmin): ?>
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Empresa --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <a href="exportar_csv.php?tipo=infraestructuras&empresa_id=<?= $empresaId ?>" class="btn btn-outline-secondary btn-sm" title="Exportar a CSV/Excel">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV

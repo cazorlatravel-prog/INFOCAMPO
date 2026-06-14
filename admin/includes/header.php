@@ -6,9 +6,6 @@
  * Variables esperadas: $empresaId, $currentPage (string con nombre de la pagina activa)
  */
 
-// Detectar si estamos en modo suplantacion
-$impersonating = isImpersonating();
-
 // Determinar empresa para la navegacion
 $_navEmpresaId = $empresaId ?? ($_SESSION['empresa_id'] ?? 0);
 $_navEmpresaNombre = $_SESSION['empresa_nombre'] ?? '';
@@ -49,19 +46,6 @@ if ($_navEmpresaId > 0) {
         </button>
     </div>
 </div>
-
-<?php if ($impersonating): ?>
-<div class="impersonate-bar" style="background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-size:0.85rem;position:sticky;top:0;z-index:9999;">
-    <div>
-        <i class="bi bi-eye" style="margin-right:6px;"></i>
-        Viendo como: <strong><?= htmlspecialchars($_SESSION['user_name']) ?></strong>
-        (<?= htmlspecialchars($_SESSION['user_rol']) ?> - <?= htmlspecialchars($_SESSION['empresa_nombre']) ?>)
-    </div>
-    <a href="/superadmin/impersonate.php?stop=1" class="btn btn-sm btn-light fw-semibold" style="color:#92400e;">
-        <i class="bi bi-box-arrow-left"></i> Volver
-    </a>
-</div>
-<?php endif; ?>
 
 <!-- Header -->
 <div class="brand-bar d-flex align-items-center justify-content-between">
@@ -116,11 +100,9 @@ if ($_navEmpresaId > 0) {
             <i class="bi bi-download"></i> <span class="d-none d-md-inline">Instalar</span>
         </button>
 
-        <?php if (!$impersonating): ?>
-            <a href="/login.php?logout=1" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;" aria-label="Cerrar sesion">
-                <i class="bi bi-box-arrow-left"></i>
-            </a>
-        <?php endif; ?>
+        <a href="/login.php?logout=1" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;" aria-label="Cerrar sesion">
+            <i class="bi bi-box-arrow-left"></i>
+        </a>
     </div>
 </div>
 
@@ -257,27 +239,6 @@ if ($_navEmpresaId > 0) {
         <li role="none"><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>" role="menuitem">
             <i class="bi bi-sliders2"></i> <span>Ajustes</span>
         </a></li>
-        <?php endif; ?>
-        <?php if ($_navUserRol === 'superadmin'): ?>
-        <li class="nav-item" style="position:relative;" role="none">
-            <a href="#" class="nav-link <?= in_array($currentPage, ['empresas', 'usuarios_global', 'campos_global', 'impersonate'], true) ? 'active' : '' ?>" onclick="document.getElementById('submenu-plataforma').classList.toggle('d-none');return false;" role="menuitem" aria-haspopup="true">
-                <i class="bi bi-gear"></i> <span>Plataforma</span> <i class="bi bi-chevron-down" style="font-size:0.6rem;"></i>
-            </a>
-            <ul id="submenu-plataforma" class="<?= in_array($currentPage, ['empresas', 'usuarios_global', 'campos_global', 'impersonate'], true) ? '' : 'd-none' ?>" style="list-style:none;padding:0;margin:0;background:rgba(0,0,0,0.03);border-radius:6px;" role="menu">
-                <li role="none"><a href="/superadmin/empresas.php" class="nav-link <?= $currentPage === 'empresas' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-building"></i> Empresas
-                </a></li>
-                <li role="none"><a href="/superadmin/usuarios.php" class="nav-link <?= $currentPage === 'usuarios_global' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-people-fill"></i> Usuarios Globales
-                </a></li>
-                <li role="none"><a href="/superadmin/campos.php" class="nav-link <?= $currentPage === 'campos_global' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-sliders"></i> Campos Globales
-                </a></li>
-                <li role="none"><a href="/superadmin/impersonate.php" class="nav-link <?= $currentPage === 'impersonate' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-eye"></i> Impersonar
-                </a></li>
-            </ul>
-        </li>
         <?php endif; ?>
     </ul>
 </nav>

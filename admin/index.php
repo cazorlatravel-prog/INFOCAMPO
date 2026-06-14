@@ -25,24 +25,6 @@ $filtroUsuario  = isset($_GET['usuario_id']) ? (int) $_GET['usuario_id'] : 0;
 $filtroFechaDesde = $_GET['fecha_desde'] ?? '';
 $filtroFechaHasta = $_GET['fecha_hasta'] ?? '';
 
-$impersonating = isImpersonating();
-
-if ($impersonating && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
-    $empresaId = (int) $_SESSION['empresa_id'];
-}
-
-// ---------------------------------------------------------------
-// Cargar empresas para filtro (solo superadmin)
-// ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
-
 // ---------------------------------------------------------------
 // Cargar infraestructuras + contadores de incidencias
 // ---------------------------------------------------------------
@@ -144,25 +126,6 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
 
             <!-- COLUMNA IZQUIERDA: Filtros -->
             <div class="col-lg-3">
-                <?php if ($isSuperadmin): ?>
-                <!-- Selector de empresa (solo superadmin) -->
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h6 class="card-title text-muted mb-3"><i class="bi bi-building me-1"></i>Empresa</h6>
-                        <form method="get">
-                            <select name="empresa_id" class="form-select form-select-sm" onchange="this.form.submit()">
-                                <option value="">-- Seleccionar empresa --</option>
-                                <?php foreach ($empresas as $emp): ?>
-                                    <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($emp['nombre']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </form>
-                    </div>
-                </div>
-                <?php endif; ?>
-
                 <!-- Lista de infraestructuras -->
                 <?php if ($infraestructuras): ?>
                 <div class="card">

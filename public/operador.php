@@ -13,8 +13,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/auth.php';
 
-$usuarioId = isset($_GET['user']) ? (int) $_GET['user'] : (int) ($_SESSION['user_id'] ?? 0);
-$empresaId = isset($_GET['empresa']) ? (int) $_GET['empresa'] : (int) ($_SESSION['empresa_id'] ?? 0);
+// Single-tenant (TRAGSA): usuario y empresa provienen siempre de la sesión.
+$usuarioId = (int) ($_SESSION['user_id'] ?? 0);
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
 // Si no hay usuario/empresa válidos, redirigir al login
 if ($usuarioId <= 0 || $empresaId <= 0) {
