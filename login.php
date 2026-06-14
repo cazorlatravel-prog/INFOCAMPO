@@ -263,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .field-input::placeholder {
-            color: #c7cbd0;
+            color: #8b919a;
         }
 
         .btn-toggle-pass {
@@ -363,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?= csrfField() ?>
 
                 <div class="field-group">
-                    <label class="field-label" for="identifier">Email o Telefono</label>
+                    <label class="field-label" for="identifier">Email o Teléfono</label>
                     <div class="field-input-wrap">
                         <i class="bi bi-person"></i>
                         <input type="text" name="identifier" id="identifier" class="field-input"
@@ -374,14 +374,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="field-group">
-                    <label class="field-label" for="password">Contrasena</label>
+                    <label class="field-label" for="password">Contraseña</label>
                     <div class="field-input-wrap">
                         <i class="bi bi-lock"></i>
                         <input type="password" name="password" id="password" class="field-input"
-                               placeholder="Tu contrasena" required
+                               placeholder="Tu contraseña" required
                                autocomplete="current-password"
                                style="padding-right:44px;">
-                        <button type="button" class="btn-toggle-pass" id="toggle-pass" aria-label="Mostrar contrasena">
+                        <button type="button" class="btn-toggle-pass" id="toggle-pass" aria-label="Mostrar contraseña" aria-pressed="false">
                             <i class="bi bi-eye"></i>
                         </button>
                     </div>
@@ -401,14 +401,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     document.getElementById('toggle-pass').addEventListener('click', function() {
         const input = document.getElementById('password');
         const icon = this.querySelector('i');
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.className = 'bi bi-eye-slash';
-        } else {
-            input.type = 'password';
-            icon.className = 'bi bi-eye';
-        }
+        const showing = input.type === 'password';
+        input.type = showing ? 'text' : 'password';
+        icon.className = showing ? 'bi bi-eye-slash' : 'bi bi-eye';
+        this.setAttribute('aria-pressed', String(showing));
+        this.setAttribute('aria-label', showing ? 'Ocultar contraseña' : 'Mostrar contraseña');
     });
+    // Foco al alert de error para anunciar a lectores de pantalla
+    const alertEl = document.querySelector('.login-alert');
+    if (alertEl) alertEl.setAttribute('tabindex', '-1'), alertEl.focus();
     </script>
 </body>
 </html>
