@@ -70,7 +70,11 @@ if (!in_array($userRole, ['admin', 'superadmin'], true)) {
     exit;
 }
 
-validateCsrf();
+if (!validateCsrf()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+    exit;
+}
 
 $action = $_POST['action'] ?? '';
 // empresa_id siempre desde la sesión (el superadmin puede pasar uno explícito)

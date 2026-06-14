@@ -64,8 +64,9 @@ if ($infraId > 0) {
     $sql = "SELECT r.*, u.nombre AS usuario_nombre
             FROM registros r
             INNER JOIN usuarios u ON r.usuario_id = u.id
-            WHERE r.infra_id = :infra_id";
-    $params = [':infra_id' => $infraId];
+            INNER JOIN infraestructuras i ON r.infra_id = i.id
+            WHERE r.infra_id = :infra_id AND i.empresa_id = :empresa_id";
+    $params = [':infra_id' => $infraId, ':empresa_id' => $empresaId];
 
     if ($filtroEstado !== '' && in_array($filtroEstado, ['antes', 'durante', 'despues'], true)) {
         $sql .= " AND r.estado_incidencia = :estado";
@@ -95,9 +96,9 @@ if ($infraId > 0) {
         "SELECT i.*, e.nombre AS empresa_nombre
          FROM infraestructuras i
          INNER JOIN empresas e ON i.empresa_id = e.id
-         WHERE i.id = :id"
+         WHERE i.id = :id AND i.empresa_id = :empresa_id"
     );
-    $stmt2->execute([':id' => $infraId]);
+    $stmt2->execute([':id' => $infraId, ':empresa_id' => $empresaId]);
     $infraSeleccionada = $stmt2->fetch();
 }
 
@@ -268,7 +269,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                 <?php
                                 $badgeClass2 = $reg['estado_incidencia'];
                                 ?>
-                                <div class="gallery-item" onclick="openLightbox(<?= $idx ?>)">
+                                <div class="gallery-item" onclick="openLightbox(<?= $idx ?>)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                                     <img src="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
                                          alt="Inspección <?= date('d/m/Y', strtotime($reg['fecha'])) ?>" loading="lazy">
                                     <div class="gallery-item-info">

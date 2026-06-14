@@ -853,9 +853,11 @@
         // Reset situación selector in Ficha
         const sitSel = $('#situacion-selector');
         if (sitSel) {
-            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-            const firstBtn = sitSel.querySelector('[data-sit="0"]');
-            if (firstBtn) firstBtn.classList.add('active');
+            sitSel.querySelectorAll('.situacion-option').forEach(b => {
+                const isFirst = b.dataset.sit === '0';
+                b.classList.toggle('active', isFirst);
+                b.setAttribute('aria-checked', isFirst ? 'true' : 'false');
+            });
         }
         const obsField = $('#observaciones-general');
         if (obsField) obsField.value = '';
@@ -2228,8 +2230,11 @@
                 btn.addEventListener('click', () => {
                     const sitIdx = parseInt(btn.dataset.sit);
                     state.situacionIdx = sitIdx;
-                    situacionSelector.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
+                    situacionSelector.querySelectorAll('.situacion-option').forEach(b => {
+                        const isActive = b === btn;
+                        b.classList.toggle('active', isActive);
+                        b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+                    });
                 });
             });
         }
@@ -3186,6 +3191,10 @@
         // Stop navigation if active
         if (navActive) stopNavigation();
 
+        // Detener el watch GPS del mapa para no dejar dos watches activos
+        // (el de la cámara se inicia en openCamera) — ahorra batería.
+        stopMapGpsTracking();
+
         // Select the infrastructure in the ficha
         selectInfra(mapSelectedInfra.id, mapSelectedInfra.nombre, mapSelectedInfra.codigo);
 
@@ -3653,7 +3662,8 @@
             if (outcome === 'accepted') {
                 const menuBtn = document.getElementById('btn-install-menu');
                 if (menuBtn) menuBtn.style.display = 'none';
-                banner.classList.add('hidden');
+                const installBanner = document.getElementById('install-banner');
+                if (installBanner) installBanner.classList.add('hidden');
                 showNotification('App instalada correctamente');
             }
         } else {
@@ -3791,9 +3801,11 @@
         // Reset situación selector in Ficha
         const sitSel = $('#situacion-selector');
         if (sitSel) {
-            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-            const firstBtn = sitSel.querySelector('[data-sit="0"]');
-            if (firstBtn) firstBtn.classList.add('active');
+            sitSel.querySelectorAll('.situacion-option').forEach(b => {
+                const isFirst = b.dataset.sit === '0';
+                b.classList.toggle('active', isFirst);
+                b.setAttribute('aria-checked', isFirst ? 'true' : 'false');
+            });
         }
 
         updateButtonState();
@@ -3916,9 +3928,11 @@
             // Update situación selector UI
             const sitSel = $('#situacion-selector');
             if (sitSel) {
-                sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-                const activeBtn = sitSel.querySelector(`[data-sit="${sitIdx}"]`);
-                if (activeBtn) activeBtn.classList.add('active');
+                sitSel.querySelectorAll('.situacion-option').forEach(b => {
+                    const isActive = b.dataset.sit === String(sitIdx);
+                    b.classList.toggle('active', isActive);
+                    b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+                });
             }
         }
 

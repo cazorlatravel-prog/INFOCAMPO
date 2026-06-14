@@ -89,7 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    validateCsrf();
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     $action = $_POST['action'] ?? '';
 
     // --- Crear campos por defecto ---
@@ -237,6 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nombre = trim($_POST['nombre'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $tipo = $_POST['tipo'] ?? 'texto';
+        if (!in_array($tipo, ['texto', 'numero', 'select', 'checkbox', 'textarea', 'fecha'], true)) {
+            $tipo = 'texto';
+        }
         $opciones = trim($_POST['opciones'] ?? '');
         $obligatorio = isset($_POST['obligatorio']) ? 1 : 0;
         $orden = (int) ($_POST['orden'] ?? 0);
@@ -282,6 +289,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nombre = trim($_POST['nombre'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $tipo = $_POST['tipo'] ?? 'texto';
+        if (!in_array($tipo, ['texto', 'numero', 'select', 'checkbox', 'textarea', 'fecha'], true)) {
+            $tipo = 'texto';
+        }
         $opciones = trim($_POST['opciones'] ?? '');
         $obligatorio = isset($_POST['obligatorio']) ? 1 : 0;
         $orden = (int) ($_POST['orden'] ?? 0);

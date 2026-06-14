@@ -204,51 +204,55 @@
      * Process the entire upload queue sequentially
      */
     async function syncQueue() {
+        // Guard sincronizado: marcar antes de cualquier await para evitar
+        // que dos disparadores (timer de reintento, evento online, botón manual)
+        // entren a la vez y suban el mismo item dos veces.
         if (isSyncing || !navigator.onLine) return;
         isSyncing = true;
 
-        const items = await getQueueItems();
-        if (items.length === 0) {
-            isSyncing = false;
-            return;
-        }
-
         const results = [];
-        let synced = 0;
-
-        for (const item of items) {
-            if (!navigator.onLine) break;
-
-            if (callbacks.onSyncProgress) {
-                callbacks.onSyncProgress({
-                    synced: synced,
-                    total: items.length,
-                    current: item.formData.nombre_archivo || 'foto',
-                });
+        try {
+            const items = await getQueueItems();
+            if (items.length === 0) {
+                return;
             }
 
-            try {
-                await updateQueueItem(item.id, {
-                    status: 'uploading',
-                    lastAttempt: Date.now(),
-                    attempts: item.attempts + 1,
-                });
+            let synced = 0;
 
-                const result = await uploadSingle(item);
-                await removeFromQueue(item.id);
-                synced++;
-                results.push({ id: item.id, ok: true, result: result });
-            } catch (err) {
-                console.warn('Sync failed for item', item.id, err);
-                await updateQueueItem(item.id, { status: 'failed' });
-                results.push({ id: item.id, ok: false, error: err.message });
-
-                // If network error, stop trying
+            for (const item of items) {
                 if (!navigator.onLine) break;
-            }
-        }
 
-        isSyncing = false;
+                if (callbacks.onSyncProgress) {
+                    callbacks.onSyncProgress({
+                        synced: synced,
+                        total: items.length,
+                        current: item.formData.nombre_archivo || 'foto',
+                    });
+                }
+
+                try {
+                    await updateQueueItem(item.id, {
+                        status: 'uploading',
+                        lastAttempt: Date.now(),
+                        attempts: item.attempts + 1,
+                    });
+
+                    const result = await uploadSingle(item);
+                    await removeFromQueue(item.id);
+                    synced++;
+                    results.push({ id: item.id, ok: true, result: result });
+                } catch (err) {
+                    console.warn('Sync failed for item', item.id, err);
+                    await updateQueueItem(item.id, { status: 'failed' });
+                    results.push({ id: item.id, ok: false, error: err.message });
+
+                    // If network error, stop trying
+                    if (!navigator.onLine) break;
+                }
+            }
+        } finally {
+            isSyncing = false;
+        }
 
         if (callbacks.onSyncComplete) {
             callbacks.onSyncComplete(results);
@@ -260,6 +264,7 @@
 
         // If there are failures and we're still online, retry after delay
         if (remaining > 0 && navigator.onLine) {
+            clearTimeout(syncRetryTimer);
             syncRetryTimer = setTimeout(() => syncQueue(), 30000);
         }
     }
@@ -290,6 +295,9 @@
         }
         if (fd.unidad_obra_id) {
             formData.append('unidad_obra_id', fd.unidad_obra_id);
+        }
+        if (fd.tipo_trabajo_id) {
+            formData.append('tipo_trabajo_id', fd.tipo_trabajo_id);
         }
         if (fd.datos_tecnicos) {
             formData.append('datos_tecnicos',

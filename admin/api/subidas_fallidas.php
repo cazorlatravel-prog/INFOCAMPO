@@ -12,6 +12,9 @@ require_once __DIR__ . '/../../includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+// Solo personal del panel (no operadores)
+requireRole(['admin', 'supervisor', 'superadmin']);
+
 $pdo = getDB();
 
 // Verificar que la tabla existe

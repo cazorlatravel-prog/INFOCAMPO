@@ -366,6 +366,26 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
     } catch (\PDOException $e) {
+        // Duplicado por client_token (índice único): otra pasada de sync ya
+        // insertó esta foto. Tratar como éxito idempotente, no como error.
+        if ($clientToken !== null && (int) $e->getCode() === 23000) {
+            $dupStmt = $pdo->prepare(
+                "SELECT id, url_cloudinary, nombre_archivo FROM registros WHERE client_token = :tk LIMIT 1"
+            );
+            $dupStmt->execute([':tk' => $clientToken]);
+            $dupRow = $dupStmt->fetch();
+            if ($dupRow) {
+                echo json_encode([
+                    'ok'             => true,
+                    'registro_id'    => (int) $dupRow['id'],
+                    'url_imagen'     => $dupRow['url_cloudinary'],
+                    'nombre_archivo' => $dupRow['nombre_archivo'],
+                    'duplicado'      => true,
+                ]);
+                exit;
+            }
+            throw $e;
+        }
         // Fallback si la columna client_token aún no existe (migración pendiente)
         if (stripos($e->getMessage(), 'client_token') !== false) {
             $sqlFallback = "INSERT INTO registros

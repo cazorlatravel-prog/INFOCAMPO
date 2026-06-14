@@ -127,6 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+        exit;
+    }
     $action = $_POST['action'] ?? '';
     $registroId = isset($_POST['registro_id']) ? (int) $_POST['registro_id'] : 0;
     $usuarioId = (int) ($_SESSION['user_id'] ?? 0);

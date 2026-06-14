@@ -28,6 +28,13 @@ if (!isLoggedIn()) {
     exit;
 }
 
+// Protección CSRF
+if (!validateCsrf()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+    exit;
+}
+
 // Validar campo obligatorio
 $infraId = isset($_POST['infra_id']) ? (int) $_POST['infra_id'] : 0;
 if ($infraId <= 0) {

@@ -192,51 +192,51 @@ if ($_navEmpresaId > 0) {
 
 <!-- Navigation -->
 <nav class="nav-admin" aria-label="Navegacion principal">
-    <button class="nav-mobile-toggle" onclick="this.nextElementSibling.classList.toggle('show')" aria-expanded="false" aria-controls="main-nav">
+    <button class="nav-mobile-toggle" onclick="this.nextElementSibling.classList.toggle('show');this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('show'))" aria-expanded="false" aria-controls="main-nav">
         <i class="bi bi-list"></i> Menu
     </button>
-    <ul class="nav" id="main-nav" role="menubar">
-        <li role="none"><a href="/admin/dashboard.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'dashboard' ? 'active' : '' ?>" role="menuitem">
+    <ul class="nav" id="main-nav">
+        <li><a href="/admin/dashboard.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'dashboard' ? 'active' : '' ?>">
             <i class="bi bi-speedometer2"></i> <span>Dashboard</span>
         </a></li>
-        <li role="none"><a href="/admin/index.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'infraestructuras' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/index.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'infraestructuras' ? 'active' : '' ?>">
             <i class="bi bi-geo-alt"></i> <span>Infraestructuras</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/tipos_trabajo.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'tipos_trabajo' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/tipos_trabajo.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'tipos_trabajo' ? 'active' : '' ?>">
             <i class="bi bi-briefcase"></i> <span>Trabajos</span>
         </a></li>
-        <li role="none"><a href="/admin/unidades_obra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'unidades_obra' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/unidades_obra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'unidades_obra' ? 'active' : '' ?>">
             <i class="bi bi-tools"></i> <span>Unidades</span>
         </a></li>
         <?php endif; ?>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/usuarios.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'usuarios' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/usuarios.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'usuarios' ? 'active' : '' ?>">
             <i class="bi bi-people"></i> <span>Usuarios</span>
         </a></li>
         <?php endif; ?>
-        <li role="none"><a href="/admin/fotos.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'fotos' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/fotos.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'fotos' ? 'active' : '' ?>">
             <i class="bi bi-images"></i> <span>Fotos</span>
         </a></li>
-        <li role="none"><a href="/admin/mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'mapa' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'mapa' ? 'active' : '' ?>">
             <i class="bi bi-map"></i> <span>Mapa</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/campos.php" class="nav-link <?= $currentPage === 'campos' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/campos.php" class="nav-link <?= $currentPage === 'campos' ? 'active' : '' ?>">
             <i class="bi bi-ui-checks-grid"></i> <span>Campos</span>
         </a></li>
         <?php endif; ?>
-        <li role="none"><a href="/admin/informes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'informes' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/informes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'informes' ? 'active' : '' ?>">
             <i class="bi bi-file-earmark-text"></i> <span>Informes</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/capas_infra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'capas_infra' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/capas_infra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'capas_infra' ? 'active' : '' ?>">
             <i class="bi bi-layers"></i> <span>Capas</span>
         </a></li>
-        <li role="none"><a href="/admin/puntos_mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'puntos_mapa' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/puntos_mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'puntos_mapa' ? 'active' : '' ?>">
             <i class="bi bi-geo-fill"></i> <span>Puntos</span>
         </a></li>
-        <li role="none"><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>">
             <i class="bi bi-sliders2"></i> <span>Ajustes</span>
         </a></li>
         <?php endif; ?>

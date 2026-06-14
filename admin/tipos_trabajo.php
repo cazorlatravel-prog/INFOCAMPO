@@ -53,13 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             } else {
                 $stmt = $pdo->prepare(
                     "UPDATE tipos_trabajo SET nombre = :nombre, codigo = :codigo, descripcion = :descripcion
-                     WHERE id = :id"
+                     WHERE id = :id AND empresa_id = :emp_id"
                 );
                 $stmt->execute([
                     ':nombre'      => $nombre,
                     ':codigo'      => $codigo ?: null,
                     ':descripcion' => $descripcion ?: null,
                     ':id'          => $id,
+                    ':emp_id'      => $empresaId,
                 ]);
                 $msg = 'Tipo de trabajo actualizado.';
                 $msgType = 'success';
@@ -70,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     if ($action === 'toggle') {
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0) {
-            $pdo->prepare("UPDATE tipos_trabajo SET activa = NOT activa WHERE id = :id")
-                ->execute([':id' => $id]);
+            $pdo->prepare("UPDATE tipos_trabajo SET activa = NOT activa WHERE id = :id AND empresa_id = :emp_id")
+                ->execute([':id' => $id, ':emp_id' => $empresaId]);
             $msg = 'Estado actualizado.';
             $msgType = 'info';
         }
@@ -110,8 +111,8 @@ if ($empresaId > 0) {
 $editTipo = null;
 if (isset($_GET['edit'])) {
     $editId = (int) $_GET['edit'];
-    $stmt = $pdo->prepare("SELECT * FROM tipos_trabajo WHERE id = :id");
-    $stmt->execute([':id' => $editId]);
+    $stmt = $pdo->prepare("SELECT * FROM tipos_trabajo WHERE id = :id AND empresa_id = :emp_id");
+    $stmt->execute([':id' => $editId, ':emp_id' => $empresaId]);
     $editTipo = $stmt->fetch();
 }
 ?>

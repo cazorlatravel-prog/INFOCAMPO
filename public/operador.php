@@ -85,7 +85,7 @@ if ($initials === '') $initials = 'OP';
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4f6ef7">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -130,9 +130,9 @@ if ($initials === '') $initials = 'OP';
                 </div>
             </div>
             <div class="ficha-header-right">
-                <div id="offline-indicator" class="offline-indicator online">
-                    <div id="offline-dot" class="offline-dot online"></div>
-                    <span id="offline-text">En linea</span>
+                <div id="offline-indicator" class="offline-indicator online" role="status" aria-live="polite">
+                    <div id="offline-dot" class="offline-dot online" aria-hidden="true"></div>
+                    <span id="offline-text">En línea</span>
                 </div>
                 <button type="button" class="user-avatar" id="btn-user-menu" title="<?= htmlspecialchars($userName) ?>" aria-label="Menu de usuario">
                     <?= $initials ?>
@@ -161,13 +161,13 @@ if ($initials === '') $initials = 'OP';
                     <i class="bi bi-pin-map-fill"></i> Ubicacion
                 </div>
                 <div class="filter-row">
-                    <select id="filter-provincia" class="input-field">
+                    <select id="filter-provincia" class="input-field" aria-label="Provincia">
                         <option value="">Todas las provincias</option>
                     </select>
-                    <select id="filter-municipio" class="input-field" disabled>
+                    <select id="filter-municipio" class="input-field" disabled aria-label="Municipio">
                         <option value="">Todos los municipios</option>
                     </select>
-                    <select id="filter-monte" class="input-field">
+                    <select id="filter-monte" class="input-field" aria-label="Monte">
                         <option value="">Todos los montes</option>
                     </select>
                 </div>
@@ -182,7 +182,7 @@ if ($initials === '') $initials = 'OP';
                     <div class="search-input-wrap">
                         <i class="bi bi-search search-icon-left"></i>
                         <input type="text" id="infra-search" placeholder="Buscar o crear infraestructura..."
-                               autocomplete="off" spellcheck="false" class="input-field input-with-icon">
+                               autocomplete="off" spellcheck="false" class="input-field input-with-icon" aria-label="Buscar o crear infraestructura">
                     </div>
                     <div id="infra-results" class="search-results hidden"></div>
                 </div>
@@ -192,8 +192,8 @@ if ($initials === '') $initials = 'OP';
                         <i class="bi bi-check-circle-fill"></i>
                         <span id="infra-selected-name"></span>
                     </div>
-                    <button type="button" id="infra-clear" class="clear-btn">
-                        <i class="bi bi-x-lg"></i>
+                    <button type="button" id="infra-clear" class="clear-btn" aria-label="Quitar infraestructura seleccionada">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div id="precache-indicator" class="precache-indicator hidden">
@@ -209,7 +209,7 @@ if ($initials === '') $initials = 'OP';
                 <div class="card-label">
                     <i class="bi bi-briefcase"></i> Tipo de Trabajo
                 </div>
-                <select id="tipo-trabajo" class="input-field">
+                <select id="tipo-trabajo" class="input-field" aria-label="Tipo de trabajo">
                     <option value="">Seleccionar tipo de trabajo</option>
                 </select>
             </div>
@@ -219,7 +219,7 @@ if ($initials === '') $initials = 'OP';
                 <div class="card-label">
                     <i class="bi bi-tools"></i> Unidad de Obra
                 </div>
-                <select id="unidad-obra" class="input-field">
+                <select id="unidad-obra" class="input-field" aria-label="Unidad de obra">
                     <option value="">Seleccionar unidad de obra</option>
                 </select>
             </div>
@@ -234,7 +234,7 @@ if ($initials === '') $initials = 'OP';
                 </div>
                 <div class="card-separator"></div>
                 <div class="card-label"><i class="bi bi-chat-text"></i> Observaciones</div>
-                <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="input-field input-textarea"></textarea>
+                <textarea id="observaciones-general" placeholder="Notas generales de la visita..." rows="2" class="input-field input-textarea" aria-label="Observaciones"></textarea>
             </div>
 
             <!-- Card: Campos dinámicos del formulario -->
@@ -246,15 +246,15 @@ if ($initials === '') $initials = 'OP';
             <!-- Card: Situación de la obra -->
             <div class="card" id="card-situacion" <?= !$opMostrarSituacion ? 'style="display:none;"' : '' ?>>
                 <div class="card-label"><i class="bi bi-flag-fill"></i> Situación de la obra</div>
-                <div class="situacion-selector" id="situacion-selector">
-                    <button type="button" class="situacion-option active" data-sit="0">
-                        <i class="bi bi-clock"></i> Antes
+                <div class="situacion-selector" id="situacion-selector" role="radiogroup" aria-label="Situación de la obra">
+                    <button type="button" class="situacion-option active" data-sit="0" role="radio" aria-checked="true">
+                        <i class="bi bi-clock" aria-hidden="true"></i> Antes
                     </button>
-                    <button type="button" class="situacion-option" data-sit="1">
-                        <i class="bi bi-exclamation-triangle"></i> Durante
+                    <button type="button" class="situacion-option" data-sit="1" role="radio" aria-checked="false">
+                        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Durante
                     </button>
-                    <button type="button" class="situacion-option" data-sit="2">
-                        <i class="bi bi-check-circle"></i> Después
+                    <button type="button" class="situacion-option" data-sit="2" role="radio" aria-checked="false">
+                        <i class="bi bi-check-circle" aria-hidden="true"></i> Después
                     </button>
                 </div>
             </div>
@@ -362,8 +362,8 @@ if ($initials === '') $initials = 'OP';
          ======================================================== -->
     <div id="screen-camera" class="screen">
         <div class="cam-topbar">
-            <button type="button" id="btn-cam-back" class="cam-btn-back">
-                <i class="bi bi-arrow-left"></i>
+            <button type="button" id="btn-cam-back" class="cam-btn-back" aria-label="Volver">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
             </button>
             <div class="cam-info">
                 <span id="cam-infra-name">--</span>
@@ -389,23 +389,23 @@ if ($initials === '') $initials = 'OP';
         <div id="ghost-opacity-bar" class="ghost-opacity-bar hidden">
             <i class="bi bi-eye-slash" style="font-size:12px;opacity:0.7;"></i>
             <input type="range" id="ghost-opacity-slider" min="0" max="100" value="50" step="5"
-                   class="ghost-opacity-slider" title="Transparencia ghost">
+                   class="ghost-opacity-slider" title="Transparencia ghost" aria-label="Transparencia de la foto fantasma">
             <i class="bi bi-eye" style="font-size:12px;opacity:0.7;"></i>
             <span id="ghost-opacity-value" class="ghost-opacity-value">50%</span>
         </div>
 
         <div class="cam-controls">
             <div class="cam-controls-left">
-                <button type="button" id="btn-ghost-toggle" class="cam-ctrl hidden" title="Toggle Ghost">
-                    <i class="bi bi-layers-half"></i>
+                <button type="button" id="btn-ghost-toggle" class="cam-ctrl hidden" title="Toggle Ghost" aria-label="Activar o desactivar foto fantasma">
+                    <i class="bi bi-layers-half" aria-hidden="true"></i>
                 </button>
             </div>
-            <button type="button" id="btn-shutter" class="cam-shutter">
+            <button type="button" id="btn-shutter" class="cam-shutter" aria-label="Capturar foto">
                 <div class="shutter-ring"><div class="shutter-inner"></div></div>
             </button>
             <div class="cam-controls-right">
-                <button type="button" id="btn-load-prev" class="cam-ctrl hidden" title="Cargar fotos anteriores">
-                    <i class="bi bi-clock-history"></i>
+                <button type="button" id="btn-load-prev" class="cam-ctrl hidden" title="Cargar fotos anteriores" aria-label="Cargar foto anterior">
+                    <i class="bi bi-clock-history" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
@@ -423,13 +423,13 @@ if ($initials === '') $initials = 'OP';
             <div id="annotation-input-wrap" class="annotation-input-wrap hidden">
                 <i class="bi bi-exclamation-triangle-fill annotation-warning-icon"></i>
                 <input type="text" id="annotation-text" placeholder="¿Qué quieres señalar?" maxlength="80" class="annotation-input">
-                <button type="button" id="btn-annotation-clear" class="annotation-clear-btn" title="Borrar anotación">
-                    <i class="bi bi-x-lg"></i>
+                <button type="button" id="btn-annotation-clear" class="annotation-clear-btn" title="Borrar anotación" aria-label="Borrar anotaciones">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
                 </button>
             </div>
             <div id="annotation-size-wrap" class="annotation-size-wrap hidden">
                 <i class="bi bi-circle annotation-size-icon"></i>
-                <input type="range" id="annotation-size" min="1" max="10" value="4" step="1" class="annotation-size-slider">
+                <input type="range" id="annotation-size" min="1" max="10" value="4" step="1" class="annotation-size-slider" aria-label="Tamaño del marcador">
                 <i class="bi bi-circle annotation-size-icon annotation-size-icon--lg"></i>
             </div>
         </div>
@@ -451,15 +451,15 @@ if ($initials === '') $initials = 'OP';
          ======================================================== -->
     <div id="screen-mapa" class="screen">
         <div class="mapa-topbar">
-            <button type="button" id="btn-mapa-back" class="cam-btn-back">
-                <i class="bi bi-arrow-left"></i>
+            <button type="button" id="btn-mapa-back" class="cam-btn-back" aria-label="Volver">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
             </button>
             <div class="mapa-title">
                 <strong>Mapa de Visitas</strong>
                 <span id="mapa-subtitle">Todas las infraestructuras</span>
             </div>
-            <button type="button" id="btn-mapa-search-toggle" class="cam-btn-back" title="Buscar infraestructura" style="font-size:1rem;">
-                <i class="bi bi-search"></i>
+            <button type="button" id="btn-mapa-search-toggle" class="cam-btn-back" title="Buscar infraestructura" style="font-size:1rem;" aria-label="Buscar en el mapa">
+                <i class="bi bi-search" aria-hidden="true"></i>
             </button>
         </div>
 
@@ -501,7 +501,7 @@ if ($initials === '') $initials = 'OP';
 
         <div id="mapa-detail-panel" class="mapa-detail-panel hidden">
             <div class="mapa-detail-header">
-                <button type="button" id="btn-close-detail" class="modal-close"><i class="bi bi-x-lg"></i></button>
+                <button type="button" id="btn-close-detail" class="modal-close" aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 <h4 id="detail-infra-name">--</h4>
                 <code id="detail-infra-code">--</code>
                 <span id="detail-infra-distance" class="detail-distance hidden"></span>
@@ -526,8 +526,8 @@ if ($initials === '') $initials = 'OP';
          ======================================================== -->
     <div id="screen-visitas" class="screen">
         <div class="visitas-topbar">
-            <button type="button" id="btn-visitas-back" class="cam-btn-back">
-                <i class="bi bi-arrow-left"></i>
+            <button type="button" id="btn-visitas-back" class="cam-btn-back" aria-label="Volver">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
             </button>
             <div class="visitas-title">
                 <strong>Mis Visitas</strong>
@@ -553,8 +553,8 @@ if ($initials === '') $initials = 'OP';
          ======================================================== -->
     <div id="screen-editar-visita" class="screen">
         <div class="visitas-topbar">
-            <button type="button" id="btn-editar-back" class="cam-btn-back">
-                <i class="bi bi-arrow-left"></i>
+            <button type="button" id="btn-editar-back" class="cam-btn-back" aria-label="Volver">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
             </button>
             <div class="visitas-title">
                 <strong>Editar Registro</strong>
@@ -645,7 +645,7 @@ if ($initials === '') $initials = 'OP';
 
     <div id="sync-notification" class="sync-notification hidden">
         <span class="sync-notif-text"></span>
-        <button type="button" id="sync-notif-close" class="sync-notif-close"><i class="bi bi-x"></i></button>
+        <button type="button" id="sync-notif-close" class="sync-notif-close" aria-label="Cerrar"><i class="bi bi-x" aria-hidden="true"></i></button>
     </div>
 
     <!-- Banner persistente de cola offline -->
@@ -663,8 +663,8 @@ if ($initials === '') $initials = 'OP';
             <div id="oq-banner-progress" class="oq-banner-progress" style="display:none;">
                 <div id="oq-banner-progress-fill" class="oq-banner-progress-fill"></div>
             </div>
-            <button type="button" id="oq-banner-sync" class="oq-banner-btn" onclick="InfocampoOffline.syncQueue()" title="Sincronizar ahora">
-                <i class="bi bi-arrow-repeat"></i>
+            <button type="button" id="oq-banner-sync" class="oq-banner-btn" onclick="InfocampoOffline.syncQueue()" title="Sincronizar ahora" aria-label="Sincronizar ahora">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
             </button>
         </div>
     </div>
