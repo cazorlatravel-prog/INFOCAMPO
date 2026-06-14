@@ -87,10 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             if (!$duplicado) {
                 {
                     $hash = hashPassword($password);
-                    $stmt = $pdo->prepare(
+                    $stmt = $pdo->prepare(dbReturningId(
                         "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
                          VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
-                    );
+                    ));
                     $stmt->execute([
                         ':emp_id'    => $empresaId,
                         ':nombre'    => $nombre,
@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                         ':password'  => $hash,
                         ':rol'       => $rol,
                     ]);
-                    $newUserId = (int) $pdo->lastInsertId();
+                    $newUserId = dbLastId($pdo, $stmt);
                     $msg = 'Usuario creado correctamente.';
                     $msgType = 'success';
 

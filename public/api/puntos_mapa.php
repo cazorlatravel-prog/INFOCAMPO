@@ -105,10 +105,10 @@ try {
                 exit;
             }
 
-            $stmt = $pdo->prepare(
+            $stmt = $pdo->prepare(dbReturningId(
                 "INSERT INTO puntos_mapa (empresa_id, nombre, descripcion, lat, lon, icono, color, created_by)
                  VALUES (:empresa_id, :nombre, :descripcion, :lat, :lon, :icono, :color, :created_by)"
-            );
+            ));
             $stmt->execute([
                 ':empresa_id' => $empresaId,
                 ':nombre' => $nombre,
@@ -120,7 +120,7 @@ try {
                 ':created_by' => (int) ($_SESSION['user_id'] ?? 0),
             ]);
 
-            echo json_encode(['ok' => true, 'id' => (int) $pdo->lastInsertId()]);
+            echo json_encode(['ok' => true, 'id' => dbLastId($pdo, $stmt)]);
             break;
 
         case 'editar':

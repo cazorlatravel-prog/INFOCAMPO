@@ -55,9 +55,9 @@ if ($empresaId > 0) {
     $stmt = $pdo->prepare(
         "SELECT
             COUNT(*) AS total_registros,
-            SUM(r.estado_incidencia = 'durante' AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS durante_24h,
-            SUM(r.fecha >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS registros_7d,
-            SUM(r.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS registros_30d
+            SUM(CASE WHEN r.estado_incidencia = 'durante' AND r.fecha >= NOW() - INTERVAL '24 HOUR' THEN 1 ELSE 0 END) AS durante_24h,
+            SUM(CASE WHEN r.fecha >= NOW() - INTERVAL '7 DAY' THEN 1 ELSE 0 END) AS registros_7d,
+            SUM(CASE WHEN r.fecha >= NOW() - INTERVAL '30 DAY' THEN 1 ELSE 0 END) AS registros_30d
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id"
@@ -81,12 +81,12 @@ if ($empresaId > 0) {
     // Actividad diaria últimos 14 días (desglosada por fase)
     $stmt = $pdo->prepare(
         "SELECT DATE(r.fecha) AS dia,
-                SUM(r.estado_incidencia = 'antes') AS fot_antes,
-                SUM(r.estado_incidencia = 'durante') AS fot_durante,
-                SUM(r.estado_incidencia = 'despues') AS fot_despues
+                SUM(CASE WHEN r.estado_incidencia = 'antes' THEN 1 ELSE 0 END) AS fot_antes,
+                SUM(CASE WHEN r.estado_incidencia = 'durante' THEN 1 ELSE 0 END) AS fot_durante,
+                SUM(CASE WHEN r.estado_incidencia = 'despues' THEN 1 ELSE 0 END) AS fot_despues
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+         WHERE i.empresa_id = :id AND r.fecha >= NOW() - INTERVAL '14 DAY'
          GROUP BY DATE(r.fecha)
          ORDER BY dia ASC"
     );

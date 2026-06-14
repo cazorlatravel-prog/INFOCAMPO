@@ -168,10 +168,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $grosor = isset($_POST['grosor']) ? max(1, min(10, (int) $_POST['grosor'])) : 3;
     $opacidad = isset($_POST['opacidad']) ? max(0.0, min(1.0, (float) $_POST['opacidad'])) : 0.80;
 
-    $stmt = $pdo->prepare(
+    $stmt = $pdo->prepare(dbReturningId(
         "INSERT INTO capas_kml (empresa_id, nombre, contenido_kml, color, grosor, opacidad)
          VALUES (:emp, :nombre, :kml, :color, :grosor, :opacidad)"
-    );
+    ));
     $stmt->execute([
         ':emp' => $empresaId,
         ':nombre' => $nombre,
@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ':opacidad' => $opacidad,
     ]);
 
-    $newId = (int) $pdo->lastInsertId();
+    $newId = dbLastId($pdo, $stmt);
 
     echo json_encode([
         'ok' => true,

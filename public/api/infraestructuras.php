@@ -192,10 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($hasLocationCols) {
         if ($hasMonteCols) {
-            $stmt = $pdo->prepare(
+            $stmt = $pdo->prepare(dbReturningId(
                 "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, activa)
                  VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, :provincia, :municipio, :monte, 1)"
-            );
+            ));
             $stmt->execute([
                 ':emp_id'    => $empresaId,
                 ':nombre'    => $nombre,
@@ -207,10 +207,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':monte'     => $monte ?: null,
             ]);
         } else {
-            $stmt = $pdo->prepare(
+            $stmt = $pdo->prepare(dbReturningId(
                 "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, activa)
                  VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, :provincia, :municipio, 1)"
-            );
+            ));
             $stmt->execute([
                 ':emp_id'    => $empresaId,
                 ':nombre'    => $nombre,
@@ -222,10 +222,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
     } else {
-        $stmt = $pdo->prepare(
+        $stmt = $pdo->prepare(dbReturningId(
             "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, activa)
              VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, 1)"
-        );
+        ));
         $stmt->execute([
             ':emp_id'  => $empresaId,
             ':nombre'  => $nombre,
@@ -235,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     }
 
-    $newId = (int) $pdo->lastInsertId();
+    $newId = dbLastId($pdo, $stmt);
 
     echo json_encode([
         'ok' => true,

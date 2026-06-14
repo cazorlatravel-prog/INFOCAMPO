@@ -336,14 +336,14 @@ try {
 try {
     if (!isset($pdo)) $pdo = getDB();
 
-    $sql = "INSERT INTO registros
+    $sql = dbReturningId("INSERT INTO registros
                 (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
                  url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
                  tipo_foto, secuencia_comparativa, nombre_archivo, client_token)
             VALUES
                 (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
                  :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
-                 :tipo_foto, :secuencia_comp, :nombre_archivo, :client_token)";
+                 :tipo_foto, :secuencia_comp, :nombre_archivo, :client_token)");
 
     $params = [
         ':infra_id'          => $infraId,
@@ -388,14 +388,14 @@ try {
         }
         // Fallback si la columna client_token aún no existe (migración pendiente)
         if (stripos($e->getMessage(), 'client_token') !== false) {
-            $sqlFallback = "INSERT INTO registros
+            $sqlFallback = dbReturningId("INSERT INTO registros
                     (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
                      url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
                      tipo_foto, secuencia_comparativa, nombre_archivo)
                 VALUES
                     (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
                      :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
-                     :tipo_foto, :secuencia_comp, :nombre_archivo)";
+                     :tipo_foto, :secuencia_comp, :nombre_archivo)");
             unset($params[':client_token']);
             $stmt = $pdo->prepare($sqlFallback);
             $stmt->execute($params);
@@ -404,7 +404,7 @@ try {
         }
     }
 
-    $registroId = (int) $pdo->lastInsertId();
+    $registroId = dbLastId($pdo, $stmt);
 
     // ---------------------------------------------------------------
     // 5. Guardar campos dinámicos (si existen)

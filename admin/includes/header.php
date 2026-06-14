@@ -22,7 +22,7 @@ if ($_navEmpresaId > 0) {
              INNER JOIN infraestructuras i ON r.infra_id = i.id
              WHERE i.empresa_id = :emp_id
                AND r.estado_incidencia = 'durante'
-               AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+               AND r.fecha >= NOW() - INTERVAL '24 HOUR'"
         );
         $stmtAlert->execute([':emp_id' => $_navEmpresaId]);
         $_alertCount = (int) $stmtAlert->fetchColumn();

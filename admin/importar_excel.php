@@ -167,10 +167,10 @@ $opcionDuplicados = $_POST['duplicados'] ?? 'omitir';
 // ---------------------------------------------------------------
 // Insertar filas
 // ---------------------------------------------------------------
-$insertStmt = $pdo->prepare(
+$insertStmt = $pdo->prepare(dbReturningId(
     "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
      VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
-);
+));
 
 $importados = 0;
 $omitidos   = 0;
@@ -254,7 +254,7 @@ try {
         ];
 
         $existentes[] = [
-            'id'            => $pdo->lastInsertId(),
+            'id'            => dbLastId($pdo, $insertStmt),
             'nombre'        => $nombre,
             'codigo_unico'  => $codigo,
         ];

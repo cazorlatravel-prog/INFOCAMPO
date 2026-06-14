@@ -81,14 +81,14 @@ try {
     }
 
     // Insertar registro de visita sin foto
-    $sql = "INSERT INTO registros
+    $sql = dbReturningId("INSERT INTO registros
                 (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha,
                  lat_real, lon_real, url_cloudinary, estado_incidencia,
                  observaciones, tipo_foto, es_visita_sin_foto)
             VALUES
                 (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(),
                  :lat_real, :lon_real, NULL, :estado_incidencia,
-                 :observaciones, 'aleatorio', 1)";
+                 :observaciones, 'aleatorio', 1)");
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
@@ -102,7 +102,7 @@ try {
         ':observaciones'     => $observaciones,
     ]);
 
-    $registroId = (int) $pdo->lastInsertId();
+    $registroId = dbLastId($pdo, $stmt);
 
     // Guardar campos dinámicos
     $camposDinamicos = $_POST['campos'] ?? [];

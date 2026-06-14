@@ -265,10 +265,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $stmt = $pdo->prepare(
+        $stmt = $pdo->prepare(dbReturningId(
             "INSERT INTO campos_formulario (empresa_id, nombre, slug, tipo, opciones, obligatorio, orden)
              VALUES (:emp, :nombre, :slug, :tipo, :opciones, :obligatorio, :orden)"
-        );
+        ));
         $stmt->execute([
             ':emp' => $empresaId,
             ':nombre' => $nombre,
@@ -279,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':orden' => $orden,
         ]);
 
-        echo json_encode(['ok' => true, 'id' => (int) $pdo->lastInsertId()], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'id' => dbLastId($pdo, $stmt)], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

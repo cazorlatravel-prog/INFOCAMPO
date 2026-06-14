@@ -74,6 +74,8 @@ if ($dbPass === '') {
 }
 define('DB_PASS', $dbPass);
 define('DB_CHARSET', 'utf8mb4');
+define('DB_DRIVER', env('DB_DRIVER') ?: 'mysql');
+define('DB_PORT', env('DB_PORT') ?: (DB_DRIVER === 'pgsql' ? '5432' : '3306'));
 
 // -----------------------------------------------------------
 // ImageKit.io
@@ -105,21 +107,53 @@ define('APP_URL', $_appUrl);
 define('APP_NAME', 'FotoGPS.app');
 
 // -----------------------------------------------------------
-// Conexión PDO (singleton simple)
+// Conexión PDO (singleton simple — soporta MySQL y PostgreSQL)
 // -----------------------------------------------------------
 function getDB(): PDO
 {
     static $pdo = null;
     if ($pdo === null) {
-        $dsn = sprintf(
-            'mysql:host=%s;dbname=%s;charset=%s',
-            DB_HOST, DB_NAME, DB_CHARSET
-        );
+        if (DB_DRIVER === 'pgsql') {
+            $dsn = sprintf(
+                'pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
+                DB_HOST, DB_PORT, DB_NAME
+            );
+        } else {
+            $dsn = sprintf(
+                'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+                DB_HOST, DB_PORT, DB_NAME, DB_CHARSET
+            );
+        }
         $pdo = new PDO($dsn, DB_USER, DB_PASS, [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
+        if (DB_DRIVER === 'pgsql') {
+            $pdo->exec("SET client_encoding TO 'UTF8'");
+        }
     }
     return $pdo;
+}
+
+function dbIsPostgres(): bool
+{
+    return DB_DRIVER === 'pgsql';
+}
+
+function dbReturningId(string $sql): string
+{
+    if (dbIsPostgres()) {
+        $sql = rtrim($sql, "; \t\n\r") . ' RETURNING id';
+    }
+    return $sql;
+}
+
+function dbLastId(PDO $pdo, PDOStatement $stmt): int
+{
+    if (dbIsPostgres()) {
+        $row = $stmt->fetch();
+        return $row ? (int) $row['id'] : 0;
+    }
+    return (int) $pdo->lastInsertId();
 }
