@@ -373,7 +373,7 @@ FROM registros r
 -- Seed: empresa TRAGSA + superadmin
 -- -----------------------------------------------------------
 INSERT INTO empresas (id, nombre, plan_suscripcion, email_contacto, activa, licencia_inicio, licencia_fin, max_usuarios, max_infraestructuras)
-VALUES (9999, 'INFOCAMPO Platform', 'enterprise', 'admin@infocampo.app', 1, '2024-01-01', '2099-12-31', 999, 9999)
+VALUES (9999, 'TRAGSA', 'enterprise', 'admin@fotogps.app', 1, '2024-01-01', '2099-12-31', 999, 9999)
 ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre;
 
 INSERT INTO usuarios (empresa_id, nombre, email, password, rol, activo)
