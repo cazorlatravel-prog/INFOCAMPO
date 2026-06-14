@@ -232,6 +232,37 @@ try {
 }
 
 // ---------------------------------------------------------------
+// 2b. Derivar secuencia comparativa en el servidor (fuente de verdad)
+//     El contador del cliente puede no ser fiable (sync offline, continuar
+//     visita, varios operadores). Si la secuencia recibida es nula o ya existe
+//     para esta infraestructura, asignar MAX(secuencia)+1.
+// ---------------------------------------------------------------
+if ($tipoFoto === 'comparativo') {
+    try {
+        $needsDerive = ($secuenciaComparativa === null);
+        if (!$needsDerive) {
+            $chkSeq = $pdo->prepare(
+                "SELECT COUNT(*) FROM registros
+                  WHERE infra_id = :infra AND tipo_foto = 'comparativo'
+                    AND secuencia_comparativa = :seq"
+            );
+            $chkSeq->execute([':infra' => $infraId, ':seq' => $secuenciaComparativa]);
+            $needsDerive = ((int) $chkSeq->fetchColumn() > 0);
+        }
+        if ($needsDerive) {
+            $maxSeq = $pdo->prepare(
+                "SELECT COALESCE(MAX(secuencia_comparativa), 0) FROM registros
+                  WHERE infra_id = :infra AND tipo_foto = 'comparativo'"
+            );
+            $maxSeq->execute([':infra' => $infraId]);
+            $secuenciaComparativa = (int) $maxSeq->fetchColumn() + 1;
+        }
+    } catch (\PDOException $e) {
+        // Si falla la derivación, conservar el valor recibido del cliente
+    }
+}
+
+// ---------------------------------------------------------------
 // 3. Subir imagen a ImageKit (o Cloudinary legacy, o local)
 // ---------------------------------------------------------------
 $cloudinaryUrl = '';
@@ -428,9 +459,11 @@ try {
     }
 
     echo json_encode([
-        'ok'          => true,
-        'registro_id' => $registroId,
-        'url_imagen'  => $cloudinaryUrl,
+        'ok'                    => true,
+        'registro_id'           => $registroId,
+        'url_imagen'            => $cloudinaryUrl,
+        'nombre_archivo'        => $nombreArchivo,
+        'secuencia_comparativa' => $secuenciaComparativa,
     ]);
 
 } catch (\PDOException $e) {

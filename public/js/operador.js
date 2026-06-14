@@ -161,9 +161,10 @@
     }
 
     function initCsrfRefresh() {
+        const url = (CFG.endpoints && CFG.endpoints.csrfRefresh) || 'api/csrf_refresh.php';
         setInterval(async () => {
             try {
-                const r = await fetch(CFG.baseUrl + '/api/csrf_refresh.php', { credentials: 'same-origin' });
+                const r = await fetch(url, { credentials: 'same-origin' });
                 if (r.ok) {
                     const d = await r.json();
                     if (d.ok && d.token) CFG.csrfToken = d.token;
@@ -232,6 +233,7 @@
         if (!window.InfocampoOffline) return;
 
         window.InfocampoOffline.init({
+            csrfUrl: (CFG.endpoints && CFG.endpoints.csrfRefresh) || 'api/csrf_refresh.php',
             onStatusChange: (online) => {
                 const indicator = $('#offline-indicator');
                 const dot = $('#offline-dot');
@@ -337,11 +339,19 @@
                 if (progressWrap) progressWrap.style.display = 'none';
                 if (btnSync) btnSync.classList.remove('spinning');
 
-                // Reload gallery with synced photos
+                // Marcar como sincronizadas las fotos que ya están en la galería
+                // como pendientes (empareja por client_token). Solo si no se
+                // encuentra el item (p.ej. la página se recargó) se añade uno nuevo,
+                // con la etiqueta correcta según su tipo.
                 results.forEach(r => {
-                    if (r.ok && r.result) {
-                        addToGallery(r.result.url_imagen, 'synced', r.result.nombre_archivo || 'foto', null);
-                    }
+                    if (!r.ok || !r.result) return;
+                    // Secuencia final: la que asignó el servidor manda
+                    const seq = (r.result.secuencia_comparativa != null)
+                        ? r.result.secuencia_comparativa
+                        : (r.secuencia_comparativa != null ? r.secuencia_comparativa : null);
+                    if (markGalleryItemSynced(r.client_token, seq)) return;
+                    const tipo = r.tipo_foto === 'comparativo' ? 'comparativo' : 'aleatorio';
+                    addToGallery(r.result.url_imagen, tipo, r.result.nombre_archivo || 'foto', seq);
                 });
             },
             onPrecacheProgress: ({ loaded, total }) => {
@@ -1517,7 +1527,7 @@
                 uploadOverlay.classList.add('hidden');
 
                 const localUrl = URL.createObjectURL(blob);
-                addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
+                addToGallery(localUrl, state.currentMode + ' pending', filename, seq, uploadData.client_token);
                 updateCounters(seq);
 
                 showScreen('ficha');
@@ -1569,8 +1579,10 @@
             uploadOverlay.classList.add('hidden');
 
             if (data.ok) {
-                addToGallery(data.url_imagen, state.currentMode, filename, seq);
-                updateCounters(seq);
+                // El servidor es la fuente de verdad de la secuencia comparativa
+                const finalSeq = (data.secuencia_comparativa != null) ? data.secuencia_comparativa : seq;
+                addToGallery(data.url_imagen, state.currentMode, data.nombre_archivo || filename, finalSeq);
+                updateCounters(finalSeq);
                 showScreen('ficha');
                 showNotification('Foto subida correctamente');
             } else {
@@ -1585,7 +1597,7 @@
                 try {
                     await window.InfocampoOffline.enqueue(blob, uploadData);
                     const localUrl = URL.createObjectURL(blob);
-                    addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
+                    addToGallery(localUrl, state.currentMode + ' pending', filename, seq, uploadData.client_token);
                     updateCounters(seq);
                     showScreen('ficha');
                     showNotification('Foto guardada (pendiente de sincronizar)');
@@ -1637,16 +1649,25 @@
     // ===================================================================
     // GALLERY
     // ===================================================================
-    function addToGallery(url, type, name, seq) {
+    function addToGallery(url, type, name, seq, clientToken) {
         gallerySection.classList.remove('hidden');
 
         const isPending = type.includes('pending');
         const baseType = type.replace(' pending', '').replace(' synced', '');
-        let label = baseType === 'comparativo' ? 'W' + seq : 'ALEA';
+        // Para comparativas usamos 'W'+secuencia; si no hay secuencia válida,
+        // numeramos por orden de aparición para no mostrar "Wnull".
+        let label;
+        if (baseType === 'comparativo') {
+            const n = (seq != null && seq !== '') ? seq : (state.countComparativas || state.photos.filter(p => p.type === 'comparativo').length + 1);
+            label = 'W' + n;
+        } else {
+            label = 'ALEA';
+        }
         if (isPending) label += ' *';
 
         const div = document.createElement('div');
         div.className = 'gallery-item';
+        if (clientToken) div.dataset.clientToken = clientToken;
         div.innerHTML = `
             <img src="${escHtml(url)}" alt="${escHtml(name)}" loading="lazy">
             <span class="gallery-type ${baseType}${isPending ? ' pending' : ''}">${label}</span>
@@ -1654,8 +1675,32 @@
         `;
         galleryGrid.appendChild(div);
 
-        state.photos.push({ url, type: baseType, seq, name, pending: isPending });
+        state.photos.push({ url, type: baseType, seq, name, pending: isPending, clientToken: clientToken || null });
         updateButtonState();
+    }
+
+    // Marca un item pendiente (offline) como sincronizado: quita el asterisco
+    // y la clase 'pending'. Si el servidor asignó otra secuencia comparativa,
+    // corrige la etiqueta W. Devuelve true si encontró y actualizó el item.
+    function markGalleryItemSynced(clientToken, serverSeq) {
+        if (!clientToken) return false;
+        const item = galleryGrid.querySelector(`.gallery-item[data-client-token="${CSS.escape(clientToken)}"]`);
+        if (!item) return false;
+        const badge = item.querySelector('.gallery-type');
+        if (badge) {
+            badge.classList.remove('pending');
+            if (serverSeq != null && badge.classList.contains('comparativo')) {
+                badge.textContent = 'W' + serverSeq;
+            } else {
+                badge.textContent = badge.textContent.replace(/\s*\*$/, '');
+            }
+        }
+        const photo = state.photos.find(p => p.clientToken === clientToken);
+        if (photo) {
+            photo.pending = false;
+            if (serverSeq != null) photo.seq = serverSeq;
+        }
+        return true;
     }
 
     // ===================================================================

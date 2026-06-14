@@ -1,4 +1,17 @@
 <?php
+/**
+ * FotoGPS - Refresco de token CSRF / keep-alive de sesión
+ *
+ * El operador puede tener la app abierta durante horas. Esta llamada
+ * periódica (cada ~15 min desde operador.js):
+ *   1. Mantiene viva la sesión PHP (evita expiración a mitad de jornada)
+ *   2. Devuelve el token CSRF vigente para que el cliente siempre tenga uno válido
+ *
+ * IMPORTANTE: NO se regenera el token. Rotarlo invalidaría las fotos
+ * encoladas offline (que guardan el token en el momento de la captura y se
+ * suben más tarde). Devolvemos siempre el token actual de la sesión.
+ */
+
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
@@ -12,6 +25,5 @@ if (!isLoggedIn()) {
     exit;
 }
 
-$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-
-echo json_encode(['ok' => true, 'token' => $_SESSION['csrf_token']]);
+// csrfToken() devuelve el token existente o crea uno si no hay (no rota)
+echo json_encode(['ok' => true, 'token' => csrfToken()]);

@@ -693,6 +693,7 @@ if ($initials === '') $initials = 'OP';
                 puntosMapa: 'api/puntos_mapa.php',
                 campos: 'api/campos.php',
                 guardarVisita: 'api/guardar_visita.php',
+                csrfRefresh: 'api/csrf_refresh.php',
             },
             formatoNombreFoto: <?= $formatoNombreFoto ?>,
             opMostrarEmpresa: <?= $opMostrarEmpresa ?>,

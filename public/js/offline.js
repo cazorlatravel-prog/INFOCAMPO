@@ -18,6 +18,8 @@
     let db = null;
     let isSyncing = false;
     let syncRetryTimer = null;
+    let csrfUrl = null;          // URL para refrescar el token CSRF antes de sincronizar
+    let freshCsrfToken = null;   // Token vigente obtenido al inicio de cada sync
 
     // ===================================================================
     // CALLBACKS — set by the main app
@@ -35,7 +37,10 @@
     // INIT
     // ===================================================================
     async function init(opts) {
-        if (opts) Object.assign(callbacks, opts);
+        if (opts) {
+            if (opts.csrfUrl) csrfUrl = opts.csrfUrl;
+            Object.assign(callbacks, opts);
+        }
 
         db = await openDB();
         setupConnectivityListeners();
@@ -210,6 +215,11 @@
         if (isSyncing || !navigator.onLine) return;
         isSyncing = true;
 
+        // Obtener un token CSRF vigente antes de subir: las fotos encoladas
+        // guardaron el token del momento de captura, que puede haber expirado
+        // si la sesión se renovó. Usamos el token actual para toda la tanda.
+        freshCsrfToken = await fetchFreshCsrf();
+
         const results = [];
         try {
             const items = await getQueueItems();
@@ -240,7 +250,17 @@
                     const result = await uploadSingle(item);
                     await removeFromQueue(item.id);
                     synced++;
-                    results.push({ id: item.id, ok: true, result: result });
+                    // Adjuntar datos originales para que la galería empareje el
+                    // item pendiente y lo etiquete correctamente (comparativa vs aleatoria)
+                    results.push({
+                        id: item.id,
+                        ok: true,
+                        result: result,
+                        client_token: item.formData && item.formData.client_token || null,
+                        tipo_foto: item.formData && item.formData.tipo_foto || null,
+                        secuencia_comparativa: item.formData && item.formData.secuencia_comparativa != null
+                            ? item.formData.secuencia_comparativa : null,
+                    });
                 } catch (err) {
                     console.warn('Sync failed for item', item.id, err);
                     await updateQueueItem(item.id, { status: 'failed' });
@@ -270,6 +290,22 @@
     }
 
     /**
+     * Pide al servidor el token CSRF vigente. Devuelve null si falla
+     * (sin red o sesión caducada): en ese caso se usa el token almacenado.
+     */
+    async function fetchFreshCsrf() {
+        if (!csrfUrl) return null;
+        try {
+            const r = await fetch(csrfUrl, { credentials: 'same-origin' });
+            if (!r.ok) return null;
+            const d = await r.json();
+            return (d && d.ok && d.token) ? d.token : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    /**
      * Upload a single queued item to the server
      */
     async function uploadSingle(item) {
@@ -277,8 +313,10 @@
         const fd = item.formData;
 
         const formData = new FormData();
-        // CSRF e idempotencia (para evitar duplicados al reintentar)
-        if (fd.csrf_token) formData.append('csrf_token', fd.csrf_token);
+        // CSRF e idempotencia (para evitar duplicados al reintentar).
+        // Preferimos el token vigente; si no se pudo obtener, el almacenado.
+        const csrf = freshCsrfToken || fd.csrf_token;
+        if (csrf) formData.append('csrf_token', csrf);
         if (fd.client_token) formData.append('client_token', fd.client_token);
         formData.append('imagen', blob, (fd.nombre_archivo || 'foto') + '.jpg');
         formData.append('infra_id', fd.infra_id);
