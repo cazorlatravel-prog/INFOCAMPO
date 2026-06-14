@@ -73,48 +73,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             // Verificar email único (si se proporcionó)
             $duplicado = false;
             if ($email !== null) {
-                $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email");
+                $check = $pdo->prepare("SELECT id, nombre, empresa_id, rol FROM usuarios WHERE email = :email");
                 $check->execute([':email' => $email]);
-                if ($check->fetch()) {
-                    $msg = 'Ya existe un usuario con ese email.';
+                $existing = $check->fetch();
+                if ($existing) {
+                    if ((int) $existing['empresa_id'] !== $empresaId) {
+                        $msg = 'Ya existe un usuario con ese email asignado a otra empresa '
+                             . '(<strong>' . htmlspecialchars($existing['nombre']) . '</strong>). '
+                             . 'Puedes reclamarlo usando el botón en la sección "Usuarios huérfanos" más abajo.';
+                    } else {
+                        $msg = 'Ya existe un usuario con ese email en esta empresa.';
+                    }
                     $msgType = 'danger';
                     $duplicado = true;
                 }
             }
             // Verificar teléfono único (si se proporcionó)
             if (!$duplicado && $telefono !== null) {
-                $check = $pdo->prepare("SELECT id FROM usuarios WHERE telefono = :tel");
+                $check = $pdo->prepare("SELECT id, nombre, empresa_id FROM usuarios WHERE telefono = :tel");
                 $check->execute([':tel' => $telefono]);
-                if ($check->fetch()) {
-                    $msg = 'Ya existe un usuario con ese teléfono.';
+                $existing = $check->fetch();
+                if ($existing) {
+                    if ((int) $existing['empresa_id'] !== $empresaId) {
+                        $msg = 'Ya existe un usuario con ese teléfono asignado a otra empresa '
+                             . '(<strong>' . htmlspecialchars($existing['nombre']) . '</strong>). '
+                             . 'Puedes reclamarlo usando el botón en la sección "Usuarios huérfanos" más abajo.';
+                    } else {
+                        $msg = 'Ya existe un usuario con ese teléfono en esta empresa.';
+                    }
                     $msgType = 'danger';
                     $duplicado = true;
                 }
             }
 
             if (!$duplicado) {
-                {
-                    $hash = hashPassword($password);
-                    $stmt = $pdo->prepare(dbReturningId(
-                        "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
-                         VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
-                    ));
-                    $stmt->execute([
-                        ':emp_id'    => $empresaId,
-                        ':nombre'    => $nombre,
-                        ':email'     => $email,
-                        ':telefono'  => $telefono,
-                        ':password'  => $hash,
-                        ':rol'       => $rol,
-                    ]);
-                    $newUserId = dbLastId($pdo, $stmt);
-                    $msg = 'Usuario creado correctamente.';
-                    $msgType = 'success';
+                $hash = hashPassword($password);
+                $stmt = $pdo->prepare(dbReturningId(
+                    "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
+                     VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
+                ));
+                $stmt->execute([
+                    ':emp_id'    => $empresaId,
+                    ':nombre'    => $nombre,
+                    ':email'     => $email,
+                    ':telefono'  => $telefono,
+                    ':password'  => $hash,
+                    ':rol'       => $rol,
+                ]);
+                $newUserId = dbLastId($pdo, $stmt);
+                $msg = 'Usuario creado correctamente.';
+                $msgType = 'success';
 
-                    if ($rol === 'operador') {
-                        $msg .= ' El operador puede acceder desde <code>' . htmlspecialchars(APP_URL . '/login.php') . '</code>';
-                    }
+                if ($rol === 'operador') {
+                    $msg .= ' El operador puede acceder desde <code>' . htmlspecialchars(APP_URL . '/login.php') . '</code>';
                 }
+            }
+        }
+    }
+
+    // --- Reclamar usuario huérfano (reasignar a esta empresa) ---
+    if ($action === 'claim_user') {
+        $targetId = (int) ($_POST['user_id'] ?? 0);
+        if ($targetId > 0 && $empresaId > 0) {
+            $stmt = $pdo->prepare("SELECT id, nombre, empresa_id FROM usuarios WHERE id = :id AND empresa_id != :emp_id AND rol != 'superadmin'");
+            $stmt->execute([':id' => $targetId, ':emp_id' => $empresaId]);
+            $orphan = $stmt->fetch();
+            if ($orphan) {
+                $pdo->prepare("UPDATE usuarios SET empresa_id = :emp_id WHERE id = :id")
+                    ->execute([':emp_id' => $empresaId, ':id' => $targetId]);
+                $msg = 'Usuario <strong>' . htmlspecialchars($orphan['nombre']) . '</strong> reasignado a esta empresa correctamente.';
+                $msgType = 'success';
+            } else {
+                $msg = 'No se pudo reclamar el usuario.';
+                $msgType = 'danger';
+            }
+        }
+    }
+
+    // --- Eliminar usuario huérfano ---
+    if ($action === 'delete_orphan') {
+        $targetId = (int) ($_POST['user_id'] ?? 0);
+        if ($targetId > 0 && $empresaId > 0) {
+            $stmt = $pdo->prepare("SELECT id, nombre, empresa_id FROM usuarios WHERE id = :id AND empresa_id != :emp_id AND rol != 'superadmin'");
+            $stmt->execute([':id' => $targetId, ':emp_id' => $empresaId]);
+            $orphan = $stmt->fetch();
+            if ($orphan) {
+                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE usuario_id = :uid)")
+                    ->execute([':uid' => $targetId]);
+                $pdo->prepare("DELETE FROM registros WHERE usuario_id = :uid")
+                    ->execute([':uid' => $targetId]);
+                $pdo->prepare("DELETE FROM usuarios WHERE id = :id")
+                    ->execute([':id' => $targetId]);
+                $msg = 'Usuario huérfano <strong>' . htmlspecialchars($orphan['nombre']) . '</strong> eliminado.';
+                $msgType = 'success';
+            } else {
+                $msg = 'No se pudo eliminar el usuario.';
+                $msgType = 'danger';
             }
         }
     }
@@ -214,6 +268,18 @@ if ($empresaId > 0) {
 $countActivos = 0;
 foreach ($usuarios as $u) {
     if ($u['activo']) $countActivos++;
+}
+
+// Buscar usuarios huérfanos (existen en la BD con otra empresa_id, no superadmin)
+$huerfanos = [];
+if ($empresaId > 0) {
+    $stmt = $pdo->prepare(
+        "SELECT * FROM usuarios
+         WHERE empresa_id != :emp_id AND rol != 'superadmin'
+         ORDER BY nombre ASC"
+    );
+    $stmt->execute([':emp_id' => $empresaId]);
+    $huerfanos = $stmt->fetchAll();
 }
 ?>
 <!DOCTYPE html>
@@ -420,6 +486,75 @@ foreach ($usuarios as $u) {
                     </div>
                 </div>
             </div>
+
+            <?php if (!empty($huerfanos)): ?>
+            <!-- Usuarios huérfanos (existen en BD con otra empresa_id) -->
+            <div class="card mt-4 border-warning">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Usuarios huérfanos (<?= count($huerfanos) ?>)</h5>
+                    <small class="text-muted">Estos usuarios existen en la base de datos pero están asignados a otra empresa. Bloquean la creación de nuevos usuarios con el mismo email/teléfono.</small>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                                <tr class="text-muted small">
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Empresa ID</th>
+                                    <th>Estado</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($huerfanos as $h): ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($h['nombre']) ?></strong>
+                                            <?php if (!empty($h['email'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-envelope"></i> <?= htmlspecialchars($h['email']) ?></small>
+                                            <?php endif; ?>
+                                            <?php if (!empty($h['telefono'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-phone"></i> <?= htmlspecialchars($h['telefono']) ?></small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><span class="badge bg-dark badge-rol"><?= htmlspecialchars($h['rol']) ?></span></td>
+                                        <td><code><?= (int) $h['empresa_id'] ?></code></td>
+                                        <td>
+                                            <?php if ($h['activo']): ?>
+                                                <span class="badge bg-success badge-rol">Activo</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-danger badge-rol">Inactivo</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-flex gap-1 justify-content-end">
+                                                <form method="post" class="d-inline" onsubmit="return confirm('¿Reasignar este usuario a tu empresa? Podrá acceder con sus credenciales actuales.')">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="action" value="claim_user">
+                                                    <input type="hidden" name="user_id" value="<?= $h['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Reclamar para esta empresa">
+                                                        <i class="bi bi-person-plus"></i> Reclamar
+                                                    </button>
+                                                </form>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('¿ELIMINAR este usuario huérfano permanentemente? Se borrarán sus registros. Esta acción no se puede deshacer.')">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="action" value="delete_orphan">
+                                                    <input type="hidden" name="user_id" value="<?= $h['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar permanentemente">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
         <?php else: ?>
             <div class="text-center py-5">
