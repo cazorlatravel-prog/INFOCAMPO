@@ -177,6 +177,9 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2">
+                                    <a href="progreso.php?infra_id=<?= $infraId ?>" class="btn btn-outline-warning btn-sm" title="Vista de progreso">
+                                        <i class="bi bi-bar-chart-steps"></i> Progreso
+                                    </a>
                                     <a href="comparador.php?empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?>"
                                        class="btn btn-outline-info btn-sm" title="Comparar fotos entre visitas">
                                         <i class="bi bi-images"></i> Comparar
@@ -184,6 +187,10 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     <a href="exportar_csv.php?tipo=registros&empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?><?= $filtroEstado ? '&estado=' . urlencode($filtroEstado) : '' ?><?= $filtroFechaDesde ? '&fecha_desde=' . urlencode($filtroFechaDesde) : '' ?><?= $filtroFechaHasta ? '&fecha_hasta=' . urlencode($filtroFechaHasta) : '' ?>"
                                        class="btn btn-outline-secondary btn-sm" title="Exportar inspecciones a CSV">
                                         <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                                    </a>
+                                    <a href="exportar_registros.php?infra_id=<?= $infraId ?><?= $filtroEstado ? '&estado=' . urlencode($filtroEstado) : '' ?><?= $filtroFechaDesde ? '&fecha_desde=' . urlencode($filtroFechaDesde) : '' ?><?= $filtroFechaHasta ? '&fecha_hasta=' . urlencode($filtroFechaHasta) : '' ?><?= $filtroUsuario ? '&usuario_id=' . $filtroUsuario : '' ?>"
+                                       class="btn btn-outline-success btn-sm" title="Exportar a Excel">
+                                        <i class="bi bi-file-earmark-excel"></i> Excel
                                     </a>
                                     <a href="descargar_fotos.php?infra_id=<?= $infraId ?>" class="btn btn-outline-success btn-sm">
                                         <i class="bi bi-file-earmark-zip"></i> ZIP

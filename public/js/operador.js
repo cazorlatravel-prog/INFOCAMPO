@@ -2785,7 +2785,7 @@
         try {
             // Load registros AND all infrastructures in parallel
             const [regRes, infraRes] = await Promise.all([
-                fetch(`${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=500`).then(r => r.json()),
+                fetch(`${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=5000`).then(r => r.json()),
                 fetch(`${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&q=`).then(r => r.json()),
             ]);
 
@@ -3253,20 +3253,56 @@
     }
 
     function doMapSearch(query, resultsEl) {
-        const matches = mapAllInfrasCache.filter(inf => {
+        // Search infrastructure by name/code (max 10)
+        const infraMatches = mapAllInfrasCache.filter(inf => {
             const nombre = (inf.nombre || '').toLowerCase();
             const codigo = (inf.codigo || '').toLowerCase();
             return nombre.includes(query) || codigo.includes(query);
-        }).slice(0, 15);
+        }).slice(0, 10);
 
-        if (matches.length === 0) {
+        // Search photo points by operator name, date, estado, observations, infra name (max 10)
+        const photoMatches = [];
+        for (const inf of mapAllInfrasCache) {
+            if (photoMatches.length >= 10) break;
+            if (!inf.registros) continue;
+            for (const r of inf.registros) {
+                if (photoMatches.length >= 10) break;
+                const lat = parseFloat(r.lat_real);
+                const lon = parseFloat(r.lon_real);
+                if (!lat || !lon) continue;
+
+                const operador = (r.usuario_nombre || '').toLowerCase();
+                const estado = (r.estado_incidencia || '').toLowerCase();
+                const obs = (r.observaciones || '').toLowerCase();
+                const infraNombre = (r.infra_nombre || inf.nombre || '').toLowerCase();
+                const fecha = r.fecha ? new Date(r.fecha).toLocaleString('es-ES', {
+                    timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                }) : '';
+                const fechaLower = fecha.toLowerCase();
+
+                if (operador.includes(query) || estado.includes(query) || obs.includes(query) || infraNombre.includes(query) || fechaLower.includes(query)) {
+                    photoMatches.push({
+                        ...r,
+                        _infraNombre: r.infra_nombre || inf.nombre || '',
+                        _fecha: fecha,
+                        _lat: lat,
+                        _lon: lon,
+                    });
+                }
+            }
+        }
+
+        if (infraMatches.length === 0 && photoMatches.length === 0) {
             resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.82rem;">Sin resultados</div>';
             resultsEl.classList.remove('hidden');
             return;
         }
 
         let html = '';
-        matches.forEach(inf => {
+
+        // Infrastructure results
+        infraMatches.forEach(inf => {
             const hasPhotos = inf.registros && inf.registros.length > 0;
             const dotColor = hasPhotos ? '#22c55e' : '#9ca3af';
             let distHtml = '';
@@ -3284,17 +3320,59 @@
             </div>`;
         });
 
+        // Photo results section
+        if (photoMatches.length > 0) {
+            if (infraMatches.length > 0) {
+                html += '<div style="border-top:1px solid #e5e7eb;margin:4px 0;"></div>';
+                html += '<div style="padding:4px 12px 2px;font-size:0.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Fotos</div>';
+            }
+            photoMatches.forEach(p => {
+                const estado = (p.estado_incidencia || '').toUpperCase();
+                html += `<div class="mapa-search-item photo-result" data-lat="${p._lat}" data-lon="${p._lon}" data-reg-id="${p.id}">
+                    <span class="search-dot" style="background:#f59e0b;display:flex;align-items:center;justify-content:center;"><i class="bi bi-camera-fill" style="font-size:8px;color:#fff;"></i></span>
+                    <div class="search-info">
+                        <strong>${escHtml(p._infraNombre)}</strong>
+                        <small>${escHtml(p._fecha)} · ${escHtml(p.usuario_nombre || '')} · ${escHtml(estado)}</small>
+                    </div>
+                </div>`;
+            });
+        }
+
         resultsEl.innerHTML = html;
         resultsEl.classList.remove('hidden');
 
-        // Click handler for results
-        resultsEl.querySelectorAll('.mapa-search-item').forEach(el => {
+        // Click handler for infrastructure results
+        resultsEl.querySelectorAll('.mapa-search-item:not(.photo-result)').forEach(el => {
             el.addEventListener('click', () => {
                 const infraId = parseInt(el.dataset.infraId);
                 const infra = mapAllInfrasCache.find(i => i.id === infraId || i.id === String(infraId));
                 if (infra && infra.lat && infra.lon) {
                     leafletMap.setView([infra.lat, infra.lon], 17, { animate: true });
                     showInfraDetail(infra);
+                }
+                resultsEl.classList.add('hidden');
+                document.getElementById('mapa-search-bar').classList.add('hidden');
+                document.getElementById('mapa-search-input').value = '';
+            });
+        });
+
+        // Click handler for photo results
+        resultsEl.querySelectorAll('.mapa-search-item.photo-result').forEach(el => {
+            el.addEventListener('click', () => {
+                const lat = parseFloat(el.dataset.lat);
+                const lon = parseFloat(el.dataset.lon);
+                const regId = el.dataset.regId;
+                if (lat && lon) {
+                    leafletMap.flyTo([lat, lon], 18, { animate: true });
+                    // Try to find and open the photo marker popup
+                    if (mapPhotoPointsLayer) {
+                        mapPhotoPointsLayer.eachLayer(layer => {
+                            const latlng = layer.getLatLng();
+                            if (Math.abs(latlng.lat - lat) < 0.00001 && Math.abs(latlng.lng - lon) < 0.00001) {
+                                setTimeout(() => layer.openPopup(), 600);
+                            }
+                        });
+                    }
                 }
                 resultsEl.classList.add('hidden');
                 document.getElementById('mapa-search-bar').classList.add('hidden');
@@ -3320,6 +3398,46 @@
         // Build detail body
         let html = '';
         const regs = infra.registros;
+
+        // Progress timeline section
+        if (regs.length > 0) {
+            const antes = regs.filter(r => r.estado_incidencia === 'antes');
+            const durante = regs.filter(r => r.estado_incidencia === 'durante');
+            const despues = regs.filter(r => r.estado_incidencia === 'despues');
+            const total = regs.length;
+            const pctAntes = Math.round(antes.length / total * 100);
+            const pctDurante = Math.round(durante.length / total * 100);
+            const pctDespues = Math.round(despues.length / total * 100);
+
+            html += `<div class="progress-timeline">
+                <div class="progress-timeline-bar">
+                    <div class="progress-timeline-segment progress-timeline-antes" style="width:${pctAntes}%"></div>
+                    <div class="progress-timeline-segment progress-timeline-durante" style="width:${pctDurante}%"></div>
+                    <div class="progress-timeline-segment progress-timeline-despues" style="width:${pctDespues}%"></div>
+                </div>
+                <div class="progress-timeline-labels">
+                    <span class="progress-timeline-label" style="color:#3b82f6;">Antes ${antes.length}</span>
+                    <span class="progress-timeline-label" style="color:#f59e0b;">Durante ${durante.length}</span>
+                    <span class="progress-timeline-label" style="color:#22c55e;">Despues ${despues.length}</span>
+                </div>
+                <div class="progress-timeline-scroll">`;
+
+            const groups = [
+                { items: antes, cls: 'antes' },
+                { items: durante, cls: 'durante' },
+                { items: despues, cls: 'despues' }
+            ];
+            groups.forEach(g => {
+                g.items.forEach(r => {
+                    const thumb = r.url_cloudinary || '';
+                    html += `<div class="progress-timeline-thumb progress-timeline-thumb--${g.cls}">
+                        <img src="${escHtml(thumb)}" alt="" loading="lazy">
+                    </div>`;
+                });
+            });
+
+            html += `</div></div>`;
+        }
 
         // Show comparativas first, then aleatorias
         const comparativas = regs.filter(r => r.tipo_foto === 'comparativo');

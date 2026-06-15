@@ -28,7 +28,7 @@ $infraId      = isset($_GET['infra_id']) ? (int) $_GET['infra_id'] : 0;
 $usuarioId    = isset($_GET['usuario_id']) ? (int) $_GET['usuario_id'] : 0;
 $unidadObraId = isset($_GET['unidad_obra_id']) ? (int) $_GET['unidad_obra_id'] : 0;
 $tipoFoto     = $_GET['tipo_foto'] ?? '';
-$limit        = isset($_GET['limit']) ? max(1, min((int) $_GET['limit'], 1000)) : 500;
+$limit        = isset($_GET['limit']) ? max(1, min((int) $_GET['limit'], 10000)) : 5000;
 
 if ($empresaId <= 0) {
     echo json_encode(['ok' => false, 'error' => 'empresa_id requerido']);
