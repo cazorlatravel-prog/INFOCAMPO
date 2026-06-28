@@ -164,6 +164,111 @@
         registerServiceWorker();
         initExitConfirmation();
         initCsrfRefresh();
+        initPhotoLightbox();
+    }
+
+    // ===================================================================
+    // VISOR DE FOTO HD (lightbox con carga progresiva: miniatura → completa)
+    // ===================================================================
+    let _lightboxToken = 0; // evita races si se abren fotos rápidamente
+
+    /**
+     * Devuelve una URL de miniatura ligera para imágenes de Cloudinary
+     * (inserta una transformación tras `/upload/`). Para otras fuentes
+     * (ImageKit, objectURL local, blob) devuelve la URL original.
+     */
+    function cloudinaryThumb(url, width) {
+        if (!url || typeof url !== 'string') return url;
+        if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+        const marker = '/upload/';
+        const i = url.indexOf(marker);
+        if (i === -1 || !url.includes('res.cloudinary.com')) return url;
+        const after = i + marker.length;
+        // No duplicar si ya lleva transformación de ancho
+        if (url.slice(after).startsWith('c_limit,w_')) return url;
+        const t = `c_limit,w_${width},q_auto,f_auto/`;
+        return url.slice(0, after) + t + url.slice(after);
+    }
+
+    function initPhotoLightbox() {
+        const box = $('#photo-lightbox');
+        if (!box) return;
+        const closeBtn = $('#photo-lightbox-close');
+
+        if (closeBtn) closeBtn.addEventListener('click', closePhotoLightbox);
+        // Cerrar al tocar el fondo (no la imagen)
+        box.addEventListener('click', (e) => {
+            if (e.target === box || e.target.classList.contains('photo-lightbox-stage')) {
+                closePhotoLightbox();
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !box.classList.contains('hidden')) closePhotoLightbox();
+        });
+
+        // Delegación: abrir el visor al tocar una miniatura de la galería
+        if (galleryGrid) {
+            galleryGrid.addEventListener('click', (e) => {
+                const item = e.target.closest('.gallery-item');
+                if (!item) return;
+                const full = item.dataset.full || (item.querySelector('img') && item.querySelector('img').src);
+                if (!full) return;
+                const thumb = item.querySelector('img') ? item.querySelector('img').src : full;
+                const caption = item.dataset.caption || '';
+                openPhotoLightbox(full, thumb, caption);
+            });
+        }
+    }
+
+    /**
+     * Abre el visor mostrando primero la miniatura (instantánea) y cargando la
+     * versión a resolución completa en segundo plano; al terminar, la sustituye.
+     * Un token evita condiciones de carrera si el usuario cambia de foto rápido.
+     */
+    function openPhotoLightbox(fullUrl, thumbUrl, caption) {
+        const box = $('#photo-lightbox');
+        const img = $('#photo-lightbox-img');
+        const spinner = $('#photo-lightbox-spinner');
+        const cap = $('#photo-lightbox-caption');
+        if (!box || !img) return;
+
+        const token = ++_lightboxToken;
+
+        // 1) Miniatura al instante (ya suele estar en caché)
+        img.src = thumbUrl || fullUrl;
+        img.classList.add('loading');
+        if (cap) cap.textContent = caption || '';
+        if (spinner && fullUrl && fullUrl !== thumbUrl) spinner.classList.remove('hidden');
+        box.classList.remove('hidden');
+
+        // 2) Cargar la versión HD en segundo plano
+        if (fullUrl && fullUrl !== thumbUrl) {
+            const hd = new Image();
+            hd.onload = () => {
+                if (token !== _lightboxToken) return; // el usuario abrió otra foto
+                img.src = fullUrl;
+                img.classList.remove('loading');
+                if (spinner) spinner.classList.add('hidden');
+            };
+            hd.onerror = () => {
+                if (token !== _lightboxToken) return;
+                img.classList.remove('loading');
+                if (spinner) spinner.classList.add('hidden');
+            };
+            hd.src = fullUrl;
+        } else {
+            img.classList.remove('loading');
+            if (spinner) spinner.classList.add('hidden');
+        }
+    }
+
+    function closePhotoLightbox() {
+        const box = $('#photo-lightbox');
+        const img = $('#photo-lightbox-img');
+        if (!box) return;
+        _lightboxToken++; // cancela cargas HD en vuelo
+        box.classList.add('hidden');
+        if (img) { img.src = ''; img.classList.remove('loading'); }
     }
 
     function initCsrfRefresh() {
@@ -1494,17 +1599,30 @@
             let fullW = camVideo.videoWidth;
             let fullH = camVideo.videoHeight;
             let bitmap = null;
+            let photoObjUrl = null; // objectURL a revocar si usamos el fallback <img>
 
             if (state.imageCapture && typeof state.imageCapture.takePhoto === 'function') {
                 try {
-                    const photoBlob = await state.imageCapture.takePhoto();
-                    bitmap = await createImageBitmap(photoBlob, { imageOrientation: 'from-image' });
-                    photoSource = bitmap;
-                    fullW = bitmap.width;
-                    fullH = bitmap.height;
+                    const photoBlob = await state.imageCapture.takePhoto({ fillLightMode: 'off' });
+                    try {
+                        // Vía preferida: decodifica respetando la orientación EXIF
+                        bitmap = await createImageBitmap(photoBlob, { imageOrientation: 'from-image' });
+                        photoSource = bitmap;
+                        fullW = bitmap.width;
+                        fullH = bitmap.height;
+                    } catch (_bmErr) {
+                        // Fallback: decodificar el blob con <img> (mantiene la
+                        // resolución completa del sensor; el navegador aplica EXIF).
+                        const imgEl = await loadImageFromBlob(photoBlob);
+                        photoSource = imgEl;
+                        photoObjUrl = imgEl._objUrl || null;
+                        fullW = imgEl.naturalWidth;
+                        fullH = imgEl.naturalHeight;
+                    }
                 } catch (_e) {
-                    // Fallback al fotograma de vídeo
+                    // Último recurso: fotograma del vídeo en directo
                     bitmap = null;
+                    photoObjUrl = null;
                     photoSource = camVideo;
                     fullW = camVideo.videoWidth;
                     fullH = camVideo.videoHeight;
@@ -1555,8 +1673,9 @@
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(photoSource, srcX, srcY, srcW, srcH, 0, 0, dstW, dstH);
 
-            // Liberar el bitmap de alta resolución cuanto antes
+            // Liberar el bitmap / objectURL de alta resolución cuanto antes
             if (bitmap) bitmap.close();
+            if (photoObjUrl) { URL.revokeObjectURL(photoObjUrl); photoObjUrl = null; }
 
             // Reducción de ruido (proporcional a la oscuridad) + enfoque en una
             // sola pasada, antes de aplicar el watermark.
@@ -1942,8 +2061,12 @@
         const div = document.createElement('div');
         div.className = 'gallery-item';
         if (clientToken) div.dataset.clientToken = clientToken;
+        // Miniatura ligera para la rejilla; URL completa para el visor HD
+        const thumbUrl = cloudinaryThumb(url, 400);
+        div.dataset.full = url;
+        div.dataset.caption = name;
         div.innerHTML = `
-            <img src="${escHtml(url)}" alt="${escHtml(name)}" loading="lazy">
+            <img src="${escHtml(thumbUrl)}" alt="${escHtml(name)}" loading="lazy">
             <span class="gallery-type ${baseType}${isPending ? ' pending' : ''}">${label}</span>
             <div class="gallery-label">${escHtml(name)}</div>
         `;
@@ -2259,14 +2382,6 @@
             // Center point in the composite canvas
             const centerX = 256 + pixelX;
             const centerY = 256 + pixelY;
-
-            // Verify tileCanvas is not tainted before compositing to main canvas
-            try {
-                tileCanvas.toDataURL();
-            } catch (_taintErr) {
-                console.warn('Mini-map: canvas tainted by tiles, skipping');
-                return;
-            }
 
             // Draw rounded rectangle clip path on mapCanvas
             roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
@@ -4318,6 +4433,24 @@
             img.onload = () => { clearTimeout(timer); resolve(img); };
             img.onerror = () => { clearTimeout(timer); reject(new Error('Image load error')); };
             img.src = src;
+        });
+    }
+
+    // Decodifica un Blob a <img> vía objectURL (fallback cuando createImageBitmap
+    // no está disponible o falla). El objectURL se expone en img._objUrl para
+    // revocarlo tras usarlo y evitar fugas de memoria.
+    function loadImageFromBlob(blob) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            const timer = setTimeout(() => {
+                img.onload = img.onerror = null;
+                URL.revokeObjectURL(url);
+                reject(new Error('Image decode timeout'));
+            }, 8000);
+            img.onload = () => { clearTimeout(timer); img._objUrl = url; resolve(img); };
+            img.onerror = () => { clearTimeout(timer); URL.revokeObjectURL(url); reject(new Error('Image decode error')); };
+            img.src = url;
         });
     }
 

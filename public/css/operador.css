@@ -2958,3 +2958,76 @@ select.input-field {
 .progress-timeline-thumb--antes { border-color: #3b82f6; }
 .progress-timeline-thumb--durante { border-color: #f59e0b; }
 .progress-timeline-thumb--despues { border-color: #22c55e; }
+
+/* ===================================================================
+   VISOR DE FOTO A PANTALLA COMPLETA (lightbox HD, carga progresiva)
+   =================================================================== */
+.photo-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    background: rgba(0, 0, 0, 0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+.photo-lightbox.hidden { display: none; }
+
+.photo-lightbox-stage {
+    position: relative;
+    max-width: 100vw;
+    max-height: 82vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-lightbox-img {
+    max-width: 100vw;
+    max-height: 82vh;
+    object-fit: contain;
+    border-radius: 6px;
+    /* La miniatura ampliada se ve suave hasta que llega la versión HD */
+    transition: filter 0.25s ease;
+}
+.photo-lightbox-img.loading { filter: blur(6px); }
+
+.photo-lightbox-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.photo-lightbox-spinner.hidden { display: none; }
+
+.photo-lightbox-close {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.photo-lightbox-close:active { background: rgba(255, 255, 255, 0.3); }
+
+.photo-lightbox-caption {
+    margin-top: 14px;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 0 16px;
+    max-width: 92vw;
+}
+
+/* Indicar que las miniaturas de la galería son ampliables */
+.gallery-item { cursor: pointer; }

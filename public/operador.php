@@ -656,6 +656,16 @@ if ($initials === '') $initials = 'OP';
         <button type="button" id="sync-notif-close" class="sync-notif-close" aria-label="Cerrar"><i class="bi bi-x" aria-hidden="true"></i></button>
     </div>
 
+    <!-- Visor de foto a pantalla completa (carga progresiva: miniatura → HD) -->
+    <div id="photo-lightbox" class="photo-lightbox hidden">
+        <button type="button" id="photo-lightbox-close" class="photo-lightbox-close" aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+        <div class="photo-lightbox-stage">
+            <img id="photo-lightbox-img" class="photo-lightbox-img" src="" alt="Foto">
+            <div id="photo-lightbox-spinner" class="photo-lightbox-spinner hidden"><div class="spinner"></div></div>
+        </div>
+        <div id="photo-lightbox-caption" class="photo-lightbox-caption"></div>
+    </div>
+
     <!-- Banner persistente de cola offline -->
     <div id="offline-queue-banner" class="offline-queue-banner hidden">
         <div class="oq-banner-left">
