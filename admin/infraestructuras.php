@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Gestión de Infraestructuras (Admin)
+ * INFOCAMPO - Gestión de Infraestructuras (Admin)
  *
  * CRUD completo para que los administradores de empresa
  * gestionen sus infraestructuras directamente.
@@ -25,12 +25,20 @@ $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     $action = $_POST['action'] ?? '';
 
+    // Los supervisores tienen acceso de SOLO LECTURA: bloquear toda escritura
+    // (la UI oculta los botones, pero el endpoint POST es accesible directamente)
+    if (($_SESSION['user_rol'] ?? '') === 'supervisor') {
+        $action = '';
+        $msg = 'Los supervisores tienen acceso de solo lectura. Acción no permitida.';
+        $msgType = 'danger';
+    }
+
     if ($action === 'create' || $action === 'update') {
         $id        = (int) ($_POST['id'] ?? 0);
         $nombre    = trim($_POST['nombre'] ?? '');
         $codigo    = trim($_POST['codigo_unico'] ?? '');
-        $lat       = $_POST['lat_teorica'] !== '' ? (float) $_POST['lat_teorica'] : 0;
-        $lon       = $_POST['lon_teorica'] !== '' ? (float) $_POST['lon_teorica'] : 0;
+        $lat       = ($_POST['lat_teorica'] ?? '') !== '' ? (float) $_POST['lat_teorica'] : 0;
+        $lon       = ($_POST['lon_teorica'] ?? '') !== '' ? (float) $_POST['lon_teorica'] : 0;
         $tipo      = trim($_POST['tipo'] ?? '');
         $provincia = trim($_POST['provincia'] ?? '');
         $municipio = trim($_POST['municipio'] ?? '');
@@ -46,23 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         } else {
             // Auto-generar código si está vacío
             if ($codigo === '') {
-                $codigo = 'INF-' . strtoupper(substr(md5($nombre . time()), 0, 8));
+                $codigo = 'INF-' . strtoupper(substr(md5($nombre . bin2hex(random_bytes(4))), 0, 8));
             }
 
             if ($action === 'create') {
-                // Verificar límite de infraestructuras
-                $empStmt = $pdo->prepare("SELECT max_infraestructuras FROM empresas WHERE id = :id");
-                $empStmt->execute([':id' => $empresaId]);
-                $empresaData = $empStmt->fetch();
-
-                $countStmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id");
-                $countStmt->execute([':id' => $empresaId]);
-                $currentCount = (int) $countStmt->fetchColumn();
-
-                if ($empresaData && $currentCount >= (int) $empresaData['max_infraestructuras']) {
-                    $msg = 'Límite de infraestructuras alcanzado (' . $empresaData['max_infraestructuras'] . ').';
-                    $msgType = 'warning';
-                } else {
+                {
                     $stmt = $pdo->prepare(
                         "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
                          VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
@@ -113,15 +109,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $stmt = $pdo->prepare("SELECT id FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id");
             $stmt->execute([':id' => $id, ':emp_id' => $empresaId]);
             if ($stmt->fetch()) {
-                // Eliminar valores_campo de registros asociados, luego registros, luego infraestructura
-                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id = :iid)")
-                    ->execute([':iid' => $id]);
-                $pdo->prepare("DELETE FROM registros WHERE infra_id = :iid")
-                    ->execute([':iid' => $id]);
-                $pdo->prepare("DELETE FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id")
-                    ->execute([':id' => $id, ':emp_id' => $empresaId]);
-                $msg = 'Infraestructura eliminada correctamente.';
-                $msgType = 'success';
+                $pdo->beginTransaction();
+                try {
+                    $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE infra_id = :iid)")
+                        ->execute([':iid' => $id]);
+                    $pdo->prepare("DELETE FROM registros WHERE infra_id = :iid")
+                        ->execute([':iid' => $id]);
+                    $pdo->prepare("DELETE FROM infraestructuras WHERE id = :id AND empresa_id = :emp_id")
+                        ->execute([':id' => $id, ':emp_id' => $empresaId]);
+                    $pdo->commit();
+                    $msg = 'Infraestructura eliminada correctamente.';
+                    $msgType = 'success';
+                } catch (\Exception $e) {
+                    $pdo->rollBack();
+                    $msg = 'Error al eliminar la infraestructura.';
+                    $msgType = 'danger';
+                }
             } else {
                 $msg = 'No se pudo eliminar la infraestructura.';
                 $msgType = 'danger';
@@ -133,15 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
 // ---------------------------------------------------------------
 // Cargar datos
 // ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
-
 $infraestructuras = [];
 $empresaNombre = '';
 if ($empresaId > 0) {
@@ -198,8 +192,8 @@ if (isset($_GET['edit'])) {
         .coord-text { font-size: 0.75rem; color: #6b7280; font-family: monospace; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
         .status-dot.antes { background: #3b82f6; }
-        .status-dot.durante { background: #f59e0b; animation: pulse-durante 2s infinite; }
-        .status-dot.despues { background: #22c55e; }
+        .status-dot.durante { background: #f59e0b; border-radius: 2px; animation: pulse-durante 2s infinite; }
+        .status-dot.despues { background: #22c55e; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border-radius: 0; }
         .status-dot.none { background: #d1d5db; }
         @keyframes pulse-durante { 0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); } 50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); } }
         .durante-badge { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; background: #fef3c7; color: #d97706; font-weight: 700; }
@@ -213,18 +207,6 @@ if (isset($_GET['edit'])) {
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h4 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Infraestructuras</h4>
             <div class="d-flex gap-2 align-items-center">
-                <?php if ($isSuperadmin): ?>
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Empresa --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <a href="exportar_csv.php?tipo=infraestructuras&empresa_id=<?= $empresaId ?>" class="btn btn-outline-secondary btn-sm" title="Exportar a CSV/Excel">
                         <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV

@@ -1,5 +1,5 @@
 /* ==========================================================
-   FotoGPS.app - Operador de Campo
+   INFOCAMPO - Operador de Campo
    Mobile-first, clean light theme
    ========================================================== */
 
@@ -14,8 +14,9 @@
     --op-bg: #f5f7fa;
     --op-card: #ffffff;
     --op-text: #1a1a2e;
-    --op-text-muted: #8896a6;
-    --op-text-light: #adb5c0;
+    /* Grises oscurecidos para legibilidad al sol (WCAG AA >= 4.5:1) */
+    --op-text-muted: #5a6675;
+    --op-text-light: #737f8c;
     --op-border: #e8ecf1;
     --op-border-light: #f0f2f5;
     --op-input-bg: #f8fafc;
@@ -140,7 +141,7 @@ html, body {
 
 .brand-text span {
     font-size: 0.68rem;
-    color: #8896a6;
+    color: #5a6675;
     font-weight: 500;
 }
 
@@ -287,7 +288,7 @@ html, body {
     align-items: center;
     gap: 6px;
     font-size: 0.8rem;
-    color: #8896a6;
+    color: #5a6675;
 }
 
 
@@ -406,16 +407,16 @@ html, body {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.8rem;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.3px;
-    color: var(--op-text-muted);
+    color: #46505f;
     margin-bottom: 12px;
 }
 
 .card-label i {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: var(--op-primary);
 }
 
@@ -444,7 +445,7 @@ html, body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    color: #8896a6;
+    color: #5a6675;
     margin-bottom: 10px;
 }
 
@@ -456,8 +457,8 @@ html, body {
     border: 1.5px solid var(--op-input-border);
     border-radius: var(--op-radius-md);
     color: var(--op-text);
-    padding: 12px 14px;
-    font-size: 0.9rem;
+    padding: 15px 16px;
+    font-size: 1rem;
     font-family: inherit;
     transition: all var(--op-transition);
     -webkit-appearance: none;
@@ -483,20 +484,20 @@ html, body {
 
 .input-textarea {
     resize: none;
-    min-height: 56px;
+    min-height: 64px;
     line-height: 1.5;
 }
 
 .input-field::placeholder {
-    color: #adb5c0;
+    color: #737f8c;
 }
 
 /* Select arrow */
 select.input-field {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238896a6' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 10 6'%3E%3Cpath fill='%238896a6' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 34px;
+    background-position: right 16px center;
+    padding-right: 38px;
 }
 
 /* Old compat: keep old class names working */
@@ -534,8 +535,8 @@ select.input-field {
 
 .filter-row .input-field {
     flex: 1;
-    font-size: 0.85rem;
-    padding: 11px 12px;
+    font-size: 0.92rem;
+    padding: 13px 12px;
 }
 
 .filter-select {
@@ -575,7 +576,7 @@ select.input-field {
     left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: #adb5c0;
+    color: #737f8c;
     font-size: 0.88rem;
     pointer-events: none;
     z-index: 1;
@@ -624,7 +625,7 @@ select.input-field {
 
 .search-results .result-item .result-code {
     font-size: 0.7rem;
-    color: #8896a6;
+    color: #5a6675;
     margin-left: 8px;
     font-family: monospace;
 }
@@ -632,7 +633,7 @@ select.input-field {
 .search-results .result-item .result-location {
     display: block;
     font-size: 0.68rem;
-    color: #adb5c0;
+    color: #737f8c;
     margin-top: 2px;
 }
 
@@ -681,7 +682,7 @@ select.input-field {
 .clear-btn {
     background: none;
     border: none;
-    color: #8896a6;
+    color: #5a6675;
     cursor: pointer;
     font-size: 1rem;
     padding: 6px;
@@ -713,22 +714,28 @@ select.input-field {
 .hint-box {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     background: #fff8e1;
-    border: 1.5px solid #ffe0a0;
-    border-radius: 12px;
-    padding: 14px 16px;
+    border: 2px solid #ffd980;
+    border-radius: 14px;
+    padding: 16px 18px;
     margin-bottom: 14px;
-    font-size: 0.84rem;
-    font-weight: 500;
-    color: #8b6914;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #7a5c0f;
     line-height: 1.4;
 }
 
 .hint-box i {
-    font-size: 1.1rem;
+    font-size: 1.4rem;
     flex-shrink: 0;
     color: #e5a000;
+    animation: hintPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.18); opacity: 0.75; }
 }
 
 .hint-box.hidden { display: none !important; }
@@ -744,17 +751,17 @@ select.input-field {
 .foto-btn {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     width: 100%;
     background: #ffffff;
-    border: 1.5px solid var(--op-border-light);
+    border: 2px solid var(--op-border-light);
     border-radius: var(--op-radius);
-    padding: 14px 16px;
+    padding: 16px 18px;
     color: var(--op-text);
     cursor: pointer;
     transition: all var(--op-transition);
     text-align: left;
-    min-height: 70px;
+    min-height: 82px;
     -webkit-tap-highlight-color: transparent;
     box-shadow: var(--op-shadow-sm);
 }
@@ -776,37 +783,40 @@ select.input-field {
 }
 
 .foto-btn--aleatorio:not(:disabled) {
-    border-color: #c7d5fc;
-}
-.foto-btn--aleatorio:not(:disabled):hover {
     background: #eef2ff;
     border-color: #9db4f8;
 }
+.foto-btn--aleatorio:not(:disabled):hover {
+    background: #e2e9ff;
+    border-color: #7e9bf5;
+}
 
 .foto-btn--comparativo:not(:disabled) {
-    border-color: #d8ccf8;
-}
-.foto-btn--comparativo:not(:disabled):hover {
     background: #f3efff;
     border-color: #b8a5f0;
 }
+.foto-btn--comparativo:not(:disabled):hover {
+    background: #ece4ff;
+    border-color: #a48ce9;
+}
 
 .foto-btn--mapa:not(:disabled) {
-    border-color: #b5e8cc;
-}
-.foto-btn--mapa:not(:disabled):hover {
     background: #e8faf0;
     border-color: #7fd4a6;
 }
+.foto-btn--mapa:not(:disabled):hover {
+    background: #dbf6e6;
+    border-color: #5fc78e;
+}
 
 .foto-btn-icon {
-    width: 48px;
-    height: 48px;
+    width: 54px;
+    height: 54px;
     border-radius: var(--op-radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 1.45rem;
     flex-shrink: 0;
     transition: all var(--op-transition);
 }
@@ -833,25 +843,25 @@ select.input-field {
 
 .foto-btn-text strong {
     display: block;
-    font-size: 0.92rem;
-    font-weight: 700;
+    font-size: 1.05rem;
+    font-weight: 800;
     color: #1a1a2e;
 }
 
 .foto-btn-text small {
     display: block;
-    font-size: 0.72rem;
-    color: #8896a6;
-    margin-top: 2px;
+    font-size: 0.8rem;
+    color: #4a5563;
+    margin-top: 3px;
 }
 
 .foto-count {
-    background: #f0f2f5;
-    border-radius: 10px;
-    padding: 6px 12px;
-    font-size: 1.05rem;
+    background: rgba(255,255,255,0.75);
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 1.2rem;
     font-weight: 800;
-    min-width: 38px;
+    min-width: 44px;
     text-align: center;
     color: #1a1a2e;
     flex-shrink: 0;
@@ -863,7 +873,7 @@ select.input-field {
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #8896a6;
+    color: #5a6675;
     font-weight: 700;
     margin: 20px 0 10px;
     display: flex;
@@ -1049,9 +1059,10 @@ select.input-field {
 }
 
 .cam-info #cam-infra-name {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
 }
 
 .cam-mode-badge {
@@ -1067,10 +1078,51 @@ select.input-field {
 .cam-mode-badge.aleatorio { background: #4f6ef7; }
 .cam-mode-badge.comparativo { background: #7c5cbf; }
 
+.cam-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cam-btn-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+}
+
+.cam-btn-torch.active {
+    background: #f7c948;
+    color: #1a1a2e;
+    box-shadow: 0 0 14px rgba(247, 201, 72, 0.7);
+}
+
 #cam-time {
     font-size: 0.85rem;
-    opacity: 0.7;
     color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+
+/* Toca-para-enfocar: anillo de feedback */
+.cam-focus-ring {
+    position: absolute;
+    width: 72px;
+    height: 72px;
+    margin-left: -36px;
+    margin-top: -36px;
+    border: 2px solid #f7c948;
+    border-radius: 50%;
+    z-index: 11;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    animation: camFocusPulse 0.6s ease-out;
+}
+
+.cam-focus-ring.hidden { display: none !important; }
+
+@keyframes camFocusPulse {
+    0%   { transform: scale(1.6); opacity: 0; }
+    40%  { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.92); opacity: 0.85; }
 }
 
 .cam-gps {
@@ -1081,11 +1133,13 @@ select.input-field {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.62);
     border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 0.72rem;
+    padding: 7px 13px;
+    font-size: 0.8rem;
+    font-weight: 700;
     color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
 }
@@ -1101,6 +1155,13 @@ select.input-field {
 .cam-gps-dot.active {
     background: #22c55e;
     box-shadow: 0 0 8px rgba(34,197,94,0.5);
+}
+
+/* Estado de error: distinto por forma (anillo hueco), no solo color */
+.cam-gps-dot.error {
+    background: transparent;
+    border: 2px solid #f87171;
+    box-shadow: none;
 }
 
 .cam-seq {
@@ -1166,20 +1227,20 @@ select.input-field {
 
 .cam-controls-left,
 .cam-controls-right {
-    width: 56px;
+    width: 60px;
 }
 
 .cam-ctrl {
     background: rgba(255,255,255,0.18);
     border: none;
     color: #fff;
-    width: 48px;
-    height: 48px;
+    width: 54px;
+    height: 54px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.35rem;
     cursor: pointer;
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
@@ -1193,8 +1254,8 @@ select.input-field {
     background: transparent;
     border: none;
     cursor: pointer;
-    width: 72px;
-    height: 72px;
+    width: 88px;
+    height: 88px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1202,18 +1263,19 @@ select.input-field {
 }
 
 .shutter-ring {
-    width: 68px;
-    height: 68px;
-    border: 4px solid #fff;
+    width: 84px;
+    height: 84px;
+    border: 5px solid #fff;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.35);
 }
 
 .shutter-inner {
-    width: 56px;
-    height: 56px;
+    width: 70px;
+    height: 70px;
     background: #fff;
     border-radius: 50%;
     transition: transform 0.12s;
@@ -1256,21 +1318,24 @@ select.input-field {
     background: rgba(255,255,255,0.12);
     border: none;
     color: #fff;
-    padding: 12px 20px;
-    border-radius: 10px;
-    font-size: 0.88rem;
+    padding: 14px 22px;
+    border-radius: 12px;
+    font-size: 0.96rem;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-height: 44px;
+    justify-content: center;
+    gap: 7px;
+    min-height: 52px;
     transition: background 0.2s;
 }
 
 .preview-btn--primary {
     background: #0d9f5f;
     color: #fff;
+    flex: 1.3;
+    box-shadow: 0 4px 16px rgba(13,159,95,0.45);
 }
 
 .preview-btn--primary:hover { background: #0b8a52; }
@@ -1462,7 +1527,7 @@ select.input-field {
 
 .mapa-title { text-align: center; }
 .mapa-title strong { display: block; font-size: 0.95rem; color: #1a1a2e; }
-.mapa-title span { font-size: 0.68rem; color: #8896a6; }
+.mapa-title span { font-size: 0.68rem; color: #5a6675; }
 
 .op-map {
     position: absolute;
@@ -1669,7 +1734,7 @@ select.input-field {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: #8896a6;
+    color: #5a6675;
 }
 
 .mapa-detail-photo-info .estado-badge {
@@ -1686,7 +1751,7 @@ select.input-field {
 
 .mapa-detail-meta {
     font-size: 0.72rem;
-    color: #8896a6;
+    color: #5a6675;
     margin-bottom: 6px;
 }
 
@@ -1807,7 +1872,7 @@ select.input-field {
 }
 .nav-label {
     font-size: 0.65rem;
-    color: #8896a6;
+    color: #5a6675;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -1954,7 +2019,7 @@ select.input-field {
 .modal-close {
     background: none;
     border: none;
-    color: #8896a6;
+    color: #5a6675;
     font-size: 1.1rem;
     cursor: pointer;
     padding: 6px;
@@ -2019,7 +2084,7 @@ select.input-field {
 }
 
 .text-muted {
-    color: #8896a6;
+    color: #5a6675;
     text-align: center;
     padding: 20px;
 }
@@ -2116,7 +2181,7 @@ select.input-field {
 
 .sync-progress-text {
     font-size: 0.68rem;
-    color: #8896a6;
+    color: #5a6675;
     white-space: nowrap;
 }
 
@@ -2302,7 +2367,7 @@ select.input-field {
 }
 
 .precache-text {
-    color: #8896a6;
+    color: #5a6675;
     font-size: 0.84rem;
     margin: 0;
 }
@@ -2400,11 +2465,12 @@ select.input-field {
    BOTÓN MIS VISITAS
    ========================================================== */
 .foto-btn--visitas:not(:disabled) {
-    border-color: #fde68a;
+    background: #fffbeb;
+    border-color: #fbbf24;
 }
 .foto-btn--visitas:not(:disabled):hover {
-    background: #fefce8;
-    border-color: #fbbf24;
+    background: #fef6d8;
+    border-color: #f59e0b;
 }
 .foto-btn--visitas .foto-btn-icon {
     background: #fef3c7;
@@ -2784,3 +2850,184 @@ select.input-field {
     opacity: 0.4;
     pointer-events: none;
 }
+
+/* Screen-reader only utility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Skip link */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    background: var(--op-primary);
+    color: #fff;
+    padding: 8px 16px;
+    z-index: 9999;
+    font-weight: 600;
+    border-radius: 0 0 8px 0;
+    transition: top 0.2s;
+}
+.skip-link:focus {
+    top: 0;
+}
+
+/* ==========================================================
+   Progress Timeline (infra detail panel)
+   ========================================================== */
+
+.progress-timeline {
+    margin-bottom: 14px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: var(--op-radius-sm);
+    border: 1px solid var(--op-border);
+}
+
+.progress-timeline-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #e8ecf1;
+    margin-bottom: 6px;
+}
+
+.progress-timeline-segment {
+    transition: width 0.3s ease;
+}
+
+.progress-timeline-antes { background: #3b82f6; }
+.progress-timeline-durante { background: #f59e0b; }
+.progress-timeline-despues { background: #22c55e; }
+
+.progress-timeline-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.progress-timeline-label {
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.progress-timeline-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.progress-timeline-scroll::-webkit-scrollbar {
+    height: 4px;
+}
+.progress-timeline-scroll::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 2px;
+}
+
+.progress-timeline-thumb {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2.5px solid transparent;
+}
+
+.progress-timeline-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.progress-timeline-thumb--antes { border-color: #3b82f6; }
+.progress-timeline-thumb--durante { border-color: #f59e0b; }
+.progress-timeline-thumb--despues { border-color: #22c55e; }
+
+/* ===================================================================
+   VISOR DE FOTO A PANTALLA COMPLETA (lightbox HD, carga progresiva)
+   =================================================================== */
+.photo-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    background: rgba(0, 0, 0, 0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+.photo-lightbox.hidden { display: none; }
+
+.photo-lightbox-stage {
+    position: relative;
+    max-width: 100vw;
+    max-height: 82vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-lightbox-img {
+    max-width: 100vw;
+    max-height: 82vh;
+    object-fit: contain;
+    border-radius: 6px;
+    /* La miniatura ampliada se ve suave hasta que llega la versión HD */
+    transition: filter 0.25s ease;
+}
+.photo-lightbox-img.loading { filter: blur(6px); }
+
+.photo-lightbox-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.photo-lightbox-spinner.hidden { display: none; }
+
+.photo-lightbox-close {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.photo-lightbox-close:active { background: rgba(255, 255, 255, 0.3); }
+
+.photo-lightbox-caption {
+    margin-top: 14px;
+    color: #e5e7eb;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 0 16px;
+    max-width: 92vw;
+}
+
+/* Indicar que las miniaturas de la galería son ampliables */
+.gallery-item { cursor: pointer; }

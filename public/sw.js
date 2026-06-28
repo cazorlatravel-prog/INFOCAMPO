@@ -7,22 +7,28 @@
  *   - Fallback page when completely offline
  */
 
-const CACHE_NAME = 'infocampo-v14';
+const CACHE_NAME = 'infocampo-v16';
 const STATIC_ASSETS = [
     'css/operador.css',
     'js/operador.js',
-    'js/watermark.js',
     'js/offline.js',
     'manifest.json',
     'icons/icon-192.png',
     'icons/icon-512.png',
 ];
 
-// Install: pre-cache static assets
+// Install: pre-cache static assets de forma resiliente
+// (un asset que falle —p.ej. un icono ausente— no debe abortar toda la instalación)
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(STATIC_ASSETS);
+            return Promise.all(
+                STATIC_ASSETS.map((asset) =>
+                    cache.add(asset).catch((err) => {
+                        console.warn('[SW] No se pudo cachear:', asset, err);
+                    })
+                )
+            );
         }).then(() => self.skipWaiting())
     );
 });
@@ -58,12 +64,36 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Static assets: cache-first, then network
+    const isSameOrigin = url.origin === self.location.origin;
+    const isAppCode = url.pathname.endsWith('.css') || url.pathname.endsWith('.js');
+
+    // Código propio de la app (JS/CSS del mismo origen): NETWORK-FIRST.
+    // Así las correcciones llegan al instante cuando hay conexión, y la caché
+    // queda solo como respaldo offline. Evita que los usuarios se queden con
+    // JS/CSS obsoleto hasta el siguiente cambio de versión de caché.
+    if (isSameOrigin && isAppCode) {
+        event.respondWith(
+            fetch(event.request).then((response) => {
+                if (response.ok) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                }
+                return response;
+            }).catch(() => caches.match(event.request).then(
+                (cached) => cached || new Response('', { status: 503 })
+            ))
+        );
+        return;
+    }
+
+    // Assets estáticos restantes (CDN, fuentes, iconos, imágenes): CACHE-FIRST.
     if (
-        url.pathname.endsWith('.css') ||
-        url.pathname.endsWith('.js') ||
+        isAppCode ||
         url.pathname.endsWith('.woff2') ||
+        url.pathname.endsWith('.woff') ||
         url.pathname.endsWith('.png') ||
+        url.pathname.endsWith('.jpg') ||
+        url.pathname.endsWith('.svg') ||
         url.pathname.endsWith('.ico')
     ) {
         event.respondWith(

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Timeline de Inspecciones (Admin)
+ * INFOCAMPO - Timeline de Inspecciones (Admin)
  *
  * Lista infraestructuras por empresa. Al seleccionar una,
  * muestra la línea de tiempo con fotos.
@@ -24,24 +24,6 @@ $filtroEstado   = $_GET['estado'] ?? '';
 $filtroUsuario  = isset($_GET['usuario_id']) ? (int) $_GET['usuario_id'] : 0;
 $filtroFechaDesde = $_GET['fecha_desde'] ?? '';
 $filtroFechaHasta = $_GET['fecha_hasta'] ?? '';
-
-$impersonating = isImpersonating();
-
-if ($impersonating && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
-    $empresaId = (int) $_SESSION['empresa_id'];
-}
-
-// ---------------------------------------------------------------
-// Cargar empresas para filtro (solo superadmin)
-// ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
 
 // ---------------------------------------------------------------
 // Cargar infraestructuras + contadores de incidencias
@@ -82,8 +64,9 @@ if ($infraId > 0) {
     $sql = "SELECT r.*, u.nombre AS usuario_nombre
             FROM registros r
             INNER JOIN usuarios u ON r.usuario_id = u.id
-            WHERE r.infra_id = :infra_id";
-    $params = [':infra_id' => $infraId];
+            INNER JOIN infraestructuras i ON r.infra_id = i.id
+            WHERE r.infra_id = :infra_id AND i.empresa_id = :empresa_id";
+    $params = [':infra_id' => $infraId, ':empresa_id' => $empresaId];
 
     if ($filtroEstado !== '' && in_array($filtroEstado, ['antes', 'durante', 'despues'], true)) {
         $sql .= " AND r.estado_incidencia = :estado";
@@ -113,9 +96,9 @@ if ($infraId > 0) {
         "SELECT i.*, e.nombre AS empresa_nombre
          FROM infraestructuras i
          INNER JOIN empresas e ON i.empresa_id = e.id
-         WHERE i.id = :id"
+         WHERE i.id = :id AND i.empresa_id = :empresa_id"
     );
-    $stmt2->execute([':id' => $infraId]);
+    $stmt2->execute([':id' => $infraId, ':empresa_id' => $empresaId]);
     $infraSeleccionada = $stmt2->fetch();
 }
 
@@ -144,25 +127,6 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
 
             <!-- COLUMNA IZQUIERDA: Filtros -->
             <div class="col-lg-3">
-                <?php if ($isSuperadmin): ?>
-                <!-- Selector de empresa (solo superadmin) -->
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h6 class="card-title text-muted mb-3"><i class="bi bi-building me-1"></i>Empresa</h6>
-                        <form method="get">
-                            <select name="empresa_id" class="form-select form-select-sm" onchange="this.form.submit()">
-                                <option value="">-- Seleccionar empresa --</option>
-                                <?php foreach ($empresas as $emp): ?>
-                                    <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($emp['nombre']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </form>
-                    </div>
-                </div>
-                <?php endif; ?>
-
                 <!-- Lista de infraestructuras -->
                 <?php if ($infraestructuras): ?>
                 <div class="card">
@@ -213,6 +177,9 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2">
+                                    <a href="progreso.php?infra_id=<?= $infraId ?>" class="btn btn-outline-warning btn-sm" title="Vista de progreso">
+                                        <i class="bi bi-bar-chart-steps"></i> Progreso
+                                    </a>
                                     <a href="comparador.php?empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?>"
                                        class="btn btn-outline-info btn-sm" title="Comparar fotos entre visitas">
                                         <i class="bi bi-images"></i> Comparar
@@ -220,6 +187,10 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                     <a href="exportar_csv.php?tipo=registros&empresa_id=<?= $empresaId ?>&infra_id=<?= $infraId ?><?= $filtroEstado ? '&estado=' . urlencode($filtroEstado) : '' ?><?= $filtroFechaDesde ? '&fecha_desde=' . urlencode($filtroFechaDesde) : '' ?><?= $filtroFechaHasta ? '&fecha_hasta=' . urlencode($filtroFechaHasta) : '' ?>"
                                        class="btn btn-outline-secondary btn-sm" title="Exportar inspecciones a CSV">
                                         <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+                                    </a>
+                                    <a href="exportar_registros.php?infra_id=<?= $infraId ?><?= $filtroEstado ? '&estado=' . urlencode($filtroEstado) : '' ?><?= $filtroFechaDesde ? '&fecha_desde=' . urlencode($filtroFechaDesde) : '' ?><?= $filtroFechaHasta ? '&fecha_hasta=' . urlencode($filtroFechaHasta) : '' ?><?= $filtroUsuario ? '&usuario_id=' . $filtroUsuario : '' ?>"
+                                       class="btn btn-outline-success btn-sm" title="Exportar a Excel">
+                                        <i class="bi bi-file-earmark-excel"></i> Excel
                                     </a>
                                     <a href="descargar_fotos.php?infra_id=<?= $infraId ?>" class="btn btn-outline-success btn-sm">
                                         <i class="bi bi-file-earmark-zip"></i> ZIP
@@ -305,7 +276,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                                 <?php
                                 $badgeClass2 = $reg['estado_incidencia'];
                                 ?>
-                                <div class="gallery-item" onclick="openLightbox(<?= $idx ?>)">
+                                <div class="gallery-item" onclick="openLightbox(<?= $idx ?>)" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
                                     <img src="<?= htmlspecialchars($reg['url_cloudinary']) ?>"
                                          alt="Inspección <?= date('d/m/Y', strtotime($reg['fecha'])) ?>" loading="lazy">
                                     <div class="gallery-item-info">
@@ -328,7 +299,7 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
                         <div class="timeline" id="view-timeline">
                             <?php foreach ($registros as $reg): ?>
                                 <div class="timeline-item">
-                                    <div class="timeline-dot <?= $reg['estado_incidencia'] ?>"></div>
+                                    <div class="timeline-dot <?= $reg['estado_incidencia'] ?>" aria-hidden="true" title="<?= ucfirst($reg['estado_incidencia']) ?>"></div>
                                     <div class="card">
                                         <div class="card-body">
                                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -477,15 +448,20 @@ $baseQuery = 'empresa_id=' . $empresaId . '&infra_id=' . $infraId;
         renderLightbox();
     }
 
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
     function renderLightbox() {
         var d = lightboxData[currentLightboxIdx];
         if (!d) return;
         document.getElementById('lightbox-img').src = d.url;
         document.getElementById('lightbox-meta').innerHTML =
-            '<strong>' + d.fecha + '</strong> | ' +
-            '<span style="text-transform:uppercase;">' + d.estado + '</span> | ' +
-            d.operador +
-            (d.obs ? '<br><em style="opacity:0.7;">' + d.obs.substring(0, 120) + '</em>' : '') +
+            '<strong>' + esc(d.fecha) + '</strong> | ' +
+            '<span style="text-transform:uppercase;">' + esc(d.estado) + '</span> | ' +
+            esc(d.operador) +
+            (d.obs ? '<br><em style="opacity:0.7;">' + esc(d.obs.substring(0, 120)) + '</em>' : '') +
             '<br><small style="opacity:0.5;">' + (currentLightboxIdx + 1) + ' / ' + lightboxData.length + '</small>';
         document.getElementById('lightbox-actions').innerHTML =
             '<a href="' + d.download + '" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>Descargar</a>' +

@@ -1,13 +1,10 @@
 <?php
 /**
- * INFOCAMPO SaaS - Header compartido para el panel de administracion
+ * INFOCAMPO - Header compartido para el panel de administracion
  *
  * Incluir al inicio de cada pagina admin, despues de cargar auth.php y obtener $empresaId.
  * Variables esperadas: $empresaId, $currentPage (string con nombre de la pagina activa)
  */
-
-// Detectar si estamos en modo suplantacion
-$impersonating = isImpersonating();
 
 // Determinar empresa para la navegacion
 $_navEmpresaId = $empresaId ?? ($_SESSION['empresa_id'] ?? 0);
@@ -20,14 +17,15 @@ $currentPage = $currentPage ?? '';
 $_alertCount = 0;
 if ($_navEmpresaId > 0) {
     try {
+        $_alertCut24 = (new DateTime('-24 hours'))->format('Y-m-d H:i:s');
         $stmtAlert = getDB()->prepare(
             "SELECT COUNT(*) FROM registros r
              INNER JOIN infraestructuras i ON r.infra_id = i.id
              WHERE i.empresa_id = :emp_id
                AND r.estado_incidencia = 'durante'
-               AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+               AND r.fecha >= :cut24"
         );
-        $stmtAlert->execute([':emp_id' => $_navEmpresaId]);
+        $stmtAlert->execute([':emp_id' => $_navEmpresaId, ':cut24' => $_alertCut24]);
         $_alertCount = (int) $stmtAlert->fetchColumn();
     } catch (Exception $e) {}
 }
@@ -49,19 +47,6 @@ if ($_navEmpresaId > 0) {
         </button>
     </div>
 </div>
-
-<?php if ($impersonating): ?>
-<div class="impersonate-bar" style="background:linear-gradient(90deg,#f59e0b,#d97706);color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-size:0.85rem;position:sticky;top:0;z-index:9999;">
-    <div>
-        <i class="bi bi-eye" style="margin-right:6px;"></i>
-        Viendo como: <strong><?= htmlspecialchars($_SESSION['user_name']) ?></strong>
-        (<?= htmlspecialchars($_SESSION['user_rol']) ?> - <?= htmlspecialchars($_SESSION['empresa_nombre']) ?>)
-    </div>
-    <a href="/superadmin/impersonate.php?stop=1" class="btn btn-sm btn-light fw-semibold" style="color:#92400e;">
-        <i class="bi bi-box-arrow-left"></i> Volver
-    </a>
-</div>
-<?php endif; ?>
 
 <!-- Header -->
 <div class="brand-bar d-flex align-items-center justify-content-between">
@@ -116,11 +101,9 @@ if ($_navEmpresaId > 0) {
             <i class="bi bi-download"></i> <span class="d-none d-md-inline">Instalar</span>
         </button>
 
-        <?php if (!$impersonating): ?>
-            <a href="/login.php?logout=1" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;" aria-label="Cerrar sesion">
-                <i class="bi bi-box-arrow-left"></i>
-            </a>
-        <?php endif; ?>
+        <a href="/login.php?logout=1" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);font-size:0.72rem;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;" aria-label="Cerrar sesion">
+            <i class="bi bi-box-arrow-left"></i>
+        </a>
     </div>
 </div>
 
@@ -210,74 +193,53 @@ if ($_navEmpresaId > 0) {
 
 <!-- Navigation -->
 <nav class="nav-admin" aria-label="Navegacion principal">
-    <button class="nav-mobile-toggle" onclick="this.nextElementSibling.classList.toggle('show')" aria-expanded="false" aria-controls="main-nav">
+    <button class="nav-mobile-toggle" onclick="this.nextElementSibling.classList.toggle('show');this.setAttribute('aria-expanded', this.nextElementSibling.classList.contains('show'))" aria-expanded="false" aria-controls="main-nav">
         <i class="bi bi-list"></i> Menu
     </button>
-    <ul class="nav" id="main-nav" role="menubar">
-        <li role="none"><a href="/admin/dashboard.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'dashboard' ? 'active' : '' ?>" role="menuitem">
+    <ul class="nav" id="main-nav">
+        <li><a href="/admin/dashboard.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'dashboard' ? 'active' : '' ?>">
             <i class="bi bi-speedometer2"></i> <span>Dashboard</span>
         </a></li>
-        <li role="none"><a href="/admin/index.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'infraestructuras' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/index.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'infraestructuras' ? 'active' : '' ?>">
             <i class="bi bi-geo-alt"></i> <span>Infraestructuras</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/tipos_trabajo.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'tipos_trabajo' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/tipos_trabajo.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'tipos_trabajo' ? 'active' : '' ?>">
             <i class="bi bi-briefcase"></i> <span>Trabajos</span>
         </a></li>
-        <li role="none"><a href="/admin/unidades_obra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'unidades_obra' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/unidades_obra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'unidades_obra' ? 'active' : '' ?>">
             <i class="bi bi-tools"></i> <span>Unidades</span>
         </a></li>
         <?php endif; ?>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/usuarios.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'usuarios' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/usuarios.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'usuarios' ? 'active' : '' ?>">
             <i class="bi bi-people"></i> <span>Usuarios</span>
         </a></li>
         <?php endif; ?>
-        <li role="none"><a href="/admin/fotos.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'fotos' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/fotos.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'fotos' ? 'active' : '' ?>">
             <i class="bi bi-images"></i> <span>Fotos</span>
         </a></li>
-        <li role="none"><a href="/admin/mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'mapa' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'mapa' ? 'active' : '' ?>">
             <i class="bi bi-map"></i> <span>Mapa</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/campos.php" class="nav-link <?= $currentPage === 'campos' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/campos.php" class="nav-link <?= $currentPage === 'campos' ? 'active' : '' ?>">
             <i class="bi bi-ui-checks-grid"></i> <span>Campos</span>
         </a></li>
         <?php endif; ?>
-        <li role="none"><a href="/admin/informes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'informes' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/informes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'informes' ? 'active' : '' ?>">
             <i class="bi bi-file-earmark-text"></i> <span>Informes</span>
         </a></li>
         <?php if (in_array($_navUserRol, ['admin', 'superadmin'], true)): ?>
-        <li role="none"><a href="/admin/capas_infra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'capas_infra' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/capas_infra.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'capas_infra' ? 'active' : '' ?>">
             <i class="bi bi-layers"></i> <span>Capas</span>
         </a></li>
-        <li role="none"><a href="/admin/puntos_mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'puntos_mapa' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/puntos_mapa.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'puntos_mapa' ? 'active' : '' ?>">
             <i class="bi bi-geo-fill"></i> <span>Puntos</span>
         </a></li>
-        <li role="none"><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>" role="menuitem">
+        <li><a href="/admin/ajustes.php<?= $_navEmpresaId ? '?empresa_id=' . $_navEmpresaId : '' ?>" class="nav-link <?= $currentPage === 'ajustes' ? 'active' : '' ?>">
             <i class="bi bi-sliders2"></i> <span>Ajustes</span>
         </a></li>
-        <?php endif; ?>
-        <?php if ($_navUserRol === 'superadmin'): ?>
-        <li class="nav-item" style="position:relative;" role="none">
-            <a href="#" class="nav-link <?= in_array($currentPage, ['empresas', 'usuarios_global', 'campos_global', 'impersonate'], true) ? 'active' : '' ?>" onclick="document.getElementById('submenu-plataforma').classList.toggle('d-none');return false;" role="menuitem" aria-haspopup="true">
-                <i class="bi bi-gear"></i> <span>Plataforma</span> <i class="bi bi-chevron-down" style="font-size:0.6rem;"></i>
-            </a>
-            <ul id="submenu-plataforma" class="<?= in_array($currentPage, ['empresas', 'usuarios_global', 'campos_global', 'impersonate'], true) ? '' : 'd-none' ?>" style="list-style:none;padding:0;margin:0;background:rgba(0,0,0,0.03);border-radius:6px;" role="menu">
-                <li role="none"><a href="/superadmin/empresas.php" class="nav-link <?= $currentPage === 'empresas' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-building"></i> Empresas
-                </a></li>
-                <li role="none"><a href="/superadmin/usuarios.php" class="nav-link <?= $currentPage === 'usuarios_global' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-people-fill"></i> Usuarios Globales
-                </a></li>
-                <li role="none"><a href="/superadmin/campos.php" class="nav-link <?= $currentPage === 'campos_global' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-sliders"></i> Campos Globales
-                </a></li>
-                <li role="none"><a href="/superadmin/impersonate.php" class="nav-link <?= $currentPage === 'impersonate' ? 'active' : '' ?>" style="padding-left:28px;font-size:0.82rem;" role="menuitem">
-                    <i class="bi bi-eye"></i> Impersonar
-                </a></li>
-            </ul>
-        </li>
         <?php endif; ?>
     </ul>
 </nav>

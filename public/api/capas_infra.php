@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API pública de Capas de Infraestructuras
+ * INFOCAMPO - API pública de Capas de Infraestructuras
  *
  * GET ?empresa_id=X → capas activas con GeoJSON y mapeo de campos
  */

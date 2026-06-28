@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Helper para ImageKit.io
+ * INFOCAMPO - Helper para ImageKit.io
  *
  * Encapsula la subida de imagenes mediante la API REST de ImageKit.
  * No requiere SDK externo — usa cURL directamente.

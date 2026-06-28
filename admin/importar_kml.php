@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Importar Infraestructuras desde KML
+ * INFOCAMPO - Importar Infraestructuras desde KML
  *
  * Acepta archivos KML/KMZ, extrae los Placemarks con coordenadas
  * y los inserta como infraestructuras de la empresa seleccionada.
@@ -148,27 +148,6 @@ if (empty($placemarks)) {
     exit;
 }
 
-// Verificar límite de infraestructuras
-$empStmt = $pdo->prepare("SELECT max_infraestructuras FROM empresas WHERE id = :id");
-$empStmt->execute([':id' => $empresaId]);
-$empresaData = $empStmt->fetch();
-
-$countStmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id");
-$countStmt->execute([':id' => $empresaId]);
-$currentCount = (int) $countStmt->fetchColumn();
-
-$maxInfras = $empresaData ? (int) $empresaData['max_infraestructuras'] : 0;
-$disponibles = $maxInfras - $currentCount;
-
-if ($disponibles <= 0) {
-    http_response_code(400);
-    echo json_encode([
-        'ok' => false,
-        'error' => "Límite de infraestructuras alcanzado ($maxInfras). No se pueden importar más.",
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
 // Cargar infraestructuras existentes para detección de duplicados
 $existStmt = $pdo->prepare(
     "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica
@@ -180,10 +159,10 @@ $existentes = $existStmt->fetchAll();
 $opcionDuplicados = $_POST['duplicados'] ?? 'omitir'; // 'omitir' o 'importar'
 
 // Preparar INSERT
-$insertStmt = $pdo->prepare(
+$insertStmt = $pdo->prepare(dbReturningId(
     "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
      VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
-);
+));
 
 $importados = 0;
 $omitidos = 0;
@@ -202,12 +181,6 @@ try {
 
         // Nombre obligatorio
         $nombre = $pm['nombre'] ?: 'Punto KML ' . ($idx + 1);
-
-        // Verificar límite
-        if (($currentCount + $importados) >= $maxInfras) {
-            $errores[] = "Límite de infraestructuras alcanzado. Se importaron $importados de " . count($placemarks) . " puntos.";
-            break;
-        }
 
         // Detección de duplicados (por coordenadas cercanas o nombre exacto)
         if ($opcionDuplicados === 'omitir') {
@@ -269,7 +242,7 @@ try {
 
         // Añadir a la lista de existentes para evitar duplicados en la misma importación
         $existentes[] = [
-            'id' => $pdo->lastInsertId(),
+            'id' => dbLastId($pdo, $insertStmt),
             'nombre' => $nombre,
             'codigo_unico' => $codigo,
             'lat_teorica' => $pm['lat'],

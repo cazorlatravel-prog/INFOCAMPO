@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Gestión de Campos del Formulario (Admin)
+ * INFOCAMPO - Gestión de Campos del Formulario (Admin)
  *
  * Permite a admins gestionar los campos dinámicos del formulario
  * de visita: crear, editar, reordenar, importar CSV y exportar CSV/Excel.

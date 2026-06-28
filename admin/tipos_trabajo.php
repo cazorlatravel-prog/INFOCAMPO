@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Gestión de Tipos de Trabajo (Admin)
+ * INFOCAMPO - Gestión de Tipos de Trabajo (Admin)
  *
  * Permite al administrador de empresa crear, editar y gestionar
  * los tipos de trabajo que verán los operadores en campo.
@@ -26,14 +26,20 @@ $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     $action = $_POST['action'] ?? '';
 
+    // Los supervisores tienen acceso de SOLO LECTURA: bloquear toda escritura
+    // (la UI oculta los botones, pero el endpoint POST es accesible directamente)
+    if (($_SESSION['user_rol'] ?? '') === 'supervisor') {
+        $action = '';
+        $msg = 'Los supervisores tienen acceso de solo lectura. Acción no permitida.';
+        $msgType = 'danger';
+    }
+
     if ($action === 'create' || $action === 'update') {
         $id          = (int) ($_POST['id'] ?? 0);
         $nombre      = trim($_POST['nombre'] ?? '');
         $codigo      = trim($_POST['codigo'] ?? '');
         $descripcion = trim($_POST['descripcion'] ?? '');
-        $targetEmpId = (int) ($_POST['empresa_id'] ?? $empresaId);
-
-        if ($nombre === '' || $targetEmpId <= 0) {
+        if ($nombre === '' || $empresaId <= 0) {
             $msg = 'El nombre es obligatorio.';
             $msgType = 'danger';
         } else {
@@ -43,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
                      VALUES (:emp_id, :nombre, :codigo, :descripcion)"
                 );
                 $stmt->execute([
-                    ':emp_id'      => $targetEmpId,
+                    ':emp_id'      => $empresaId,
                     ':nombre'      => $nombre,
                     ':codigo'      => $codigo ?: null,
                     ':descripcion' => $descripcion ?: null,
@@ -53,13 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             } else {
                 $stmt = $pdo->prepare(
                     "UPDATE tipos_trabajo SET nombre = :nombre, codigo = :codigo, descripcion = :descripcion
-                     WHERE id = :id"
+                     WHERE id = :id AND empresa_id = :emp_id"
                 );
                 $stmt->execute([
                     ':nombre'      => $nombre,
                     ':codigo'      => $codigo ?: null,
                     ':descripcion' => $descripcion ?: null,
                     ':id'          => $id,
+                    ':emp_id'      => $empresaId,
                 ]);
                 $msg = 'Tipo de trabajo actualizado.';
                 $msgType = 'success';
@@ -70,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     if ($action === 'toggle') {
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0) {
-            $pdo->prepare("UPDATE tipos_trabajo SET activa = NOT activa WHERE id = :id")
-                ->execute([':id' => $id]);
+            $pdo->prepare("UPDATE tipos_trabajo SET activa = NOT activa WHERE id = :id AND empresa_id = :emp_id")
+                ->execute([':id' => $id, ':emp_id' => $empresaId]);
             $msg = 'Estado actualizado.';
             $msgType = 'info';
         }
@@ -86,18 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             $msgType = 'success';
         }
     }
-}
-
-// ---------------------------------------------------------------
-// Cargar empresas (solo superadmin)
-// ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
 }
 
 // ---------------------------------------------------------------
@@ -122,8 +117,8 @@ if ($empresaId > 0) {
 $editTipo = null;
 if (isset($_GET['edit'])) {
     $editId = (int) $_GET['edit'];
-    $stmt = $pdo->prepare("SELECT * FROM tipos_trabajo WHERE id = :id");
-    $stmt->execute([':id' => $editId]);
+    $stmt = $pdo->prepare("SELECT * FROM tipos_trabajo WHERE id = :id AND empresa_id = :emp_id");
+    $stmt->execute([':id' => $editId, ':emp_id' => $empresaId]);
     $editTipo = $stmt->fetch();
 }
 ?>
@@ -145,19 +140,6 @@ if (isset($_GET['edit'])) {
             <h4 class="mb-0"><i class="bi bi-briefcase me-2"></i>Tipos de Trabajo</h4>
 
             <div class="d-flex gap-2 align-items-center">
-                <?php if ($isSuperadmin): ?>
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <label class="fw-semibold small text-nowrap">Empresa:</label>
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Seleccionar --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formTipo">
                         <i class="bi bi-plus-lg"></i> Nuevo Tipo

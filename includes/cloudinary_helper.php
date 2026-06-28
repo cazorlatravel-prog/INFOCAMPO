@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Helper para Cloudinary
+ * INFOCAMPO - Helper para Cloudinary
  *
  * Encapsula la subida de imágenes mediante la API REST de Cloudinary.
  * No requiere SDK externo — usa cURL directamente para mantener

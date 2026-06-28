@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Mi Perfil (Super Admin)
+ * INFOCAMPO - Mi Perfil (Super Admin)
  *
  * Permite al superadmin cambiar su propio nombre y contraseña.
  */

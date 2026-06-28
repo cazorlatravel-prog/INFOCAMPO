@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Redirect al Dashboard Unificado
+ * INFOCAMPO - Redirect al Dashboard Unificado
  *
  * El dashboard de superadmin ahora es /admin/dashboard.php
  */

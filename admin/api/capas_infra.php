@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Capas de Infraestructuras (Admin)
+ * INFOCAMPO - API de Capas de Infraestructuras (Admin)
  *
  * GET:  Listar capas activas de la empresa
  * POST action=analizar: Sube KML/KMZ/SHP(ZIP), parsea a GeoJSON, devuelve atributos
@@ -217,10 +217,10 @@ if ($action === 'guardar') {
         $campoTabla = 'codigo_unico';
     }
 
-    $stmt = $pdo->prepare(
+    $stmt = $pdo->prepare(dbReturningId(
         "INSERT INTO capas_infraestructuras (empresa_id, nombre, geojson, campo_capa, campo_tabla, color)
          VALUES (:emp, :nombre, :geojson, :campo_capa, :campo_tabla, :color)"
-    );
+    ));
     $stmt->execute([
         ':emp' => $empresaId,
         ':nombre' => $nombre,
@@ -230,7 +230,7 @@ if ($action === 'guardar') {
         ':color' => $color,
     ]);
 
-    $newId = (int) $pdo->lastInsertId();
+    $newId = dbLastId($pdo, $stmt);
 
     echo json_encode([
         'ok' => true,

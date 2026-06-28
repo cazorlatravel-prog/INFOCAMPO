@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Descarga masiva de fotos seleccionadas (ZIP)
+ * INFOCAMPO - Descarga masiva de fotos seleccionadas (ZIP)
  *
  * GET ?ids=1,2,3
  *
@@ -9,11 +9,14 @@
 
 declare(strict_types=1);
 
+set_time_limit(600);
+
 require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin', 'supervisor', 'superadmin']);
 
 $idsRaw = $_GET['ids'] ?? '';
 $ids = array_filter(array_map('intval', explode(',', $idsRaw)), fn($id) => $id > 0);
+$ids = array_slice($ids, 0, 500);
 
 if (empty($ids)) {
     http_response_code(400);
@@ -22,7 +25,7 @@ if (empty($ids)) {
 }
 
 $pdo = getDB();
-$empresaId = $_SESSION['empresa_id'];
+$empresaId = getEmpresaIdSeguro();
 
 // Build placeholders for IN clause
 $placeholders = implode(',', array_fill(0, count($ids), '?'));
@@ -57,24 +60,33 @@ if ($zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) {
 }
 
 $idx = 1;
+$added = 0;
 foreach ($registros as $reg) {
     $url = $reg['url_cloudinary'];
     if (empty($url)) continue;
 
-    $imageData = @file_get_contents($url);
-    if ($imageData === false) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-        $imageData = curl_exec($ch);
-        curl_close($ch);
+    // Validar que la URL apunta a un dominio permitido (prevenir SSRF)
+    $parsedUrl = parse_url($url);
+    $allowedHosts = ['res.cloudinary.com', 'ik.imagekit.io'];
+    if (!$parsedUrl || !in_array($parsedUrl['host'] ?? '', $allowedHosts, true)) {
+        if (($parsedUrl['host'] ?? '') !== ($_SERVER['HTTP_HOST'] ?? '')) {
+            continue;
+        }
     }
 
-    if ($imageData === false) continue;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_FAILONERROR    => true,
+    ]);
+    $imageData = curl_exec($ch);
+    $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($imageData === false || $httpCode !== 200 || $imageData === '') continue;
 
     $fecha = date('Ymd_His', strtotime($reg['fecha']));
     $filename = sprintf(
@@ -87,9 +99,22 @@ foreach ($registros as $reg) {
 
     $zip->addFromString($filename, $imageData);
     $idx++;
+    $added++;
 }
 
 $zip->close();
+
+// Limpiar temp file en caso de error fatal
+register_shutdown_function(function() use ($tmpFile) {
+    if (file_exists($tmpFile)) @unlink($tmpFile);
+});
+
+if ($added === 0) {
+    @unlink($tmpFile);
+    http_response_code(502);
+    echo 'No se pudo descargar ninguna foto (las imágenes remotas no están disponibles).';
+    exit;
+}
 
 $zipName = 'fotos_seleccionadas_' . date('Ymd_His') . '.zip';
 

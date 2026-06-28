@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Importar Infraestructuras desde KML + Excel combinado
+ * INFOCAMPO - Importar Infraestructuras desde KML + Excel combinado
  *
  * Recibe un archivo KML (coordenadas) y un Excel (datos: municipio, monte, etc.)
  * y los cruza por nombre para crear infraestructuras completas.
@@ -319,33 +319,7 @@ foreach ($excelRows as $exRow) {
 }
 
 // ---------------------------------------------------------------
-// 5) Verificar límite de infraestructuras
-// ---------------------------------------------------------------
-$empStmt = $pdo->prepare("SELECT max_infraestructuras FROM empresas WHERE id = :id");
-$empStmt->execute([':id' => $empresaId]);
-$empresaData = $empStmt->fetch();
-
-$countStmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id");
-$countStmt->execute([':id' => $empresaId]);
-$currentCount = (int) $countStmt->fetchColumn();
-
-$maxInfras = $empresaData ? (int) $empresaData['max_infraestructuras'] : 0;
-$totalAInsertar = count($matchResults) + count($excelSinMatch);
-
-if (($currentCount + $totalAInsertar) > $maxInfras && $maxInfras > 0) {
-    $disponibles = $maxInfras - $currentCount;
-    if ($disponibles <= 0) {
-        http_response_code(400);
-        echo json_encode([
-            'ok' => false,
-            'error' => "Límite de infraestructuras alcanzado ($maxInfras). No se pueden importar más.",
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-}
-
-// ---------------------------------------------------------------
-// 6) Cargar existentes para detección de duplicados
+// 5) Cargar existentes para detección de duplicados
 // ---------------------------------------------------------------
 $existStmt = $pdo->prepare(
     "SELECT id, nombre, codigo_unico, lat_teorica, lon_teorica
@@ -359,10 +333,10 @@ $opcionDuplicados = $_POST['duplicados'] ?? 'omitir';
 // ---------------------------------------------------------------
 // 7) Insertar registros combinados
 // ---------------------------------------------------------------
-$insertStmt = $pdo->prepare(
+$insertStmt = $pdo->prepare(dbReturningId(
     "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
      VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
-);
+));
 
 $importados = 0;
 $omitidos = 0;
@@ -376,11 +350,6 @@ $pdo->beginTransaction();
 try {
     // A) Insertar puntos KML (con o sin datos de Excel)
     foreach ($matchResults as $mr) {
-        if (($currentCount + $importados) >= $maxInfras && $maxInfras > 0) {
-            $errores[] = "Límite de infraestructuras alcanzado.";
-            break;
-        }
-
         // Combinar datos: Excel tiene prioridad para atributos, KML para coordenadas
         $excel = $mr['excel'];
         $nombre     = $excel ? $excel['nombre'] : $mr['kml_nombre'];
@@ -462,7 +431,7 @@ try {
         ];
 
         $existentes[] = [
-            'id' => $pdo->lastInsertId(),
+            'id' => dbLastId($pdo, $insertStmt),
             'nombre' => $nombre,
             'codigo_unico' => $codigo,
             'lat_teorica' => $lat,
@@ -472,10 +441,6 @@ try {
 
     // B) Insertar filas Excel sin match (sin coordenadas)
     foreach ($excelSinMatch as $exRow) {
-        if (($currentCount + $importados) >= $maxInfras && $maxInfras > 0) {
-            $errores[] = "Límite de infraestructuras alcanzado.";
-            break;
-        }
 
         $nombre = $exRow['nombre'];
         $codigo = $exRow['codigo'] !== '' ? $exRow['codigo'] : 'XLS-' . strtoupper(substr(md5($nombre . $importados . microtime()), 0, 8));
@@ -531,7 +496,7 @@ try {
         ];
 
         $existentes[] = [
-            'id' => $pdo->lastInsertId(),
+            'id' => dbLastId($pdo, $insertStmt),
             'nombre' => $nombre,
             'codigo_unico' => $codigo,
             'lat_teorica' => 0,

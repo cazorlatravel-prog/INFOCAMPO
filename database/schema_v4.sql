@@ -14,5 +14,5 @@ ALTER TABLE infraestructuras
 
 -- Índice para filtrado rápido por provincia/municipio
 ALTER TABLE infraestructuras
-    ADD INDEX IF NOT EXISTS idx_infra_provincia (empresa_id, provincia),
-    ADD INDEX IF NOT EXISTS idx_infra_municipio (empresa_id, provincia, municipio);
+    ADD INDEX idx_infra_provincia (empresa_id, provincia),
+    ADD INDEX idx_infra_municipio (empresa_id, provincia, municipio);

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Comparador de Fotos Side-by-Side (Admin)
+ * INFOCAMPO - Comparador de Fotos Side-by-Side (Admin)
  *
  * Muestra visitas comparativas de una infraestructura en formato
  * before/after con slider deslizante.
@@ -308,6 +308,11 @@ if ($infra) {
         updateComparison();
     }
 
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
     function updateComparison() {
         var leftIdx = parseInt(document.getElementById('select-left').value);
         var rightIdx = parseInt(document.getElementById('select-right').value);
@@ -337,8 +342,8 @@ if ($infra) {
                 html += '<div class="compare-label right">' + right.fecha_display + '</div>';
                 html += '</div>';
                 html += '<div class="d-flex justify-content-between mt-1 small text-muted">';
-                if (fotoL.obs) html += '<em>' + fotoL.obs.substring(0, 60) + '</em>';
-                if (fotoR.obs) html += '<em>' + fotoR.obs.substring(0, 60) + '</em>';
+                if (fotoL.obs) html += '<em>' + esc(fotoL.obs.substring(0, 60)) + '</em>';
+                if (fotoR.obs) html += '<em>' + esc(fotoR.obs.substring(0, 60)) + '</em>';
                 html += '</div>';
                 html += '</div>';
             } else {
@@ -395,7 +400,7 @@ if ($infra) {
         var rect = container.getBoundingClientRect();
         var clientX = e.touches ? e.touches[0].clientX : e.clientX;
         var x = clientX - rect.left;
-        var pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        var pct = Math.max(1, Math.min(100, (x / rect.width) * 100));
 
         var afterDiv = document.getElementById('after-' + idx);
         var sliderDiv = document.getElementById('slider-' + idx);

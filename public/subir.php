@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Endpoint de subida de inspección
+ * INFOCAMPO - Endpoint de subida de inspección
  *
  * Recibe por POST:
  *   - imagen       : archivo JPEG del canvas
@@ -55,7 +55,7 @@ if (!validateCsrf()) {
 // ---------------------------------------------------------------
 // 1. Validar campos obligatorios
 // ---------------------------------------------------------------
-$requiredFields = ['infra_id', 'usuario_id', 'lat_real', 'lon_real'];
+$requiredFields = ['infra_id', 'lat_real', 'lon_real'];
 foreach ($requiredFields as $field) {
     if (!isset($_POST[$field]) || trim((string)$_POST[$field]) === '') {
         http_response_code(400);
@@ -82,7 +82,9 @@ if (!in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'], true)) {
 
 // Sanitizar y castear
 $infraId     = (int) $_POST['infra_id'];
-$usuarioId   = (int) $_POST['usuario_id'];
+// El operador se toma SIEMPRE de la sesión, nunca del cliente (evita suplantar
+// la autoría del registro enviando otro usuario_id por POST).
+$usuarioId   = (int) ($_SESSION['user_id'] ?? 0);
 $latReal     = (float) $_POST['lat_real'];
 $lonReal     = (float) $_POST['lon_real'];
 $incidencia  = $_POST['estado_incidencia'] ?? 'antes';
@@ -95,6 +97,9 @@ $secuenciaComparativa  = isset($_POST['secuencia_comparativa']) && $_POST['secue
 $nombreArchivo         = isset($_POST['nombre_archivo']) ? trim((string) $_POST['nombre_archivo']) : null;
 $unidadObraId          = isset($_POST['unidad_obra_id']) && $_POST['unidad_obra_id'] !== '' ? (int) $_POST['unidad_obra_id'] : null;
 $tipoTrabajoId         = isset($_POST['tipo_trabajo_id']) && $_POST['tipo_trabajo_id'] !== '' ? (int) $_POST['tipo_trabajo_id'] : null;
+// Token de idempotencia (evita registros duplicados al reintentar una subida)
+$clientToken           = isset($_POST['client_token']) ? substr(trim((string) $_POST['client_token']), 0, 64) : null;
+if ($clientToken === '') $clientToken = null;
 
 // Validar enum de situación
 $situacionesPermitidas = ['antes', 'durante', 'despues'];
@@ -125,35 +130,74 @@ if ($infraId <= 0 || $usuarioId <= 0) {
 }
 
 // ---------------------------------------------------------------
-// 2. Generar nombre de archivo según formato configurado por la empresa
+// 1b. Idempotencia: si ya existe un registro con este client_token,
+//     devolver éxito sin volver a subir la imagen (evita duplicados)
+// ---------------------------------------------------------------
+if ($clientToken !== null) {
+    try {
+        $pdo = getDB();
+        $dupStmt = $pdo->prepare(
+            "SELECT id, url_cloudinary, nombre_archivo FROM registros WHERE client_token = :tk LIMIT 1"
+        );
+        $dupStmt->execute([':tk' => $clientToken]);
+        $dupRow = $dupStmt->fetch();
+        if ($dupRow) {
+            echo json_encode([
+                'ok'            => true,
+                'registro_id'   => (int) $dupRow['id'],
+                'url_imagen'    => $dupRow['url_cloudinary'],
+                'nombre_archivo'=> $dupRow['nombre_archivo'],
+                'duplicado'     => true,
+            ]);
+            exit;
+        }
+    } catch (\PDOException $e) {
+        // Si la columna client_token no existe todavía (migración pendiente),
+        // continuar sin deduplicar en lugar de fallar
+    }
+}
+
+// ---------------------------------------------------------------
+// 2. Validar infraestructura y tenant (autorización: debe fallar CERRADA)
+//    Esta comprobación va fuera del try de generación de nombre: un error de
+//    BD aquí no debe permitir continuar sin validar la propiedad del recurso.
 // ---------------------------------------------------------------
 try {
     $pdo = getDB();
-
-    // Obtener código de infraestructura y empresa_id
     $stmtInfra = $pdo->prepare(
-        "SELECT i.codigo, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
+        "SELECT i.codigo_unico, i.nombre, i.empresa_id FROM infraestructuras i WHERE i.id = :id"
     );
     $stmtInfra->execute([':id' => $infraId]);
     $infraRow = $stmtInfra->fetch();
+} catch (\PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Error de base de datos']);
+    exit;
+}
 
-    if (!$infraRow) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Infraestructura no encontrada']);
-        exit;
-    }
+if (!$infraRow) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Infraestructura no encontrada']);
+    exit;
+}
 
-    $infraCodigo = $infraRow['codigo'] ?: $infraRow['nombre'];
-    $infraEmpresaId = (int) $infraRow['empresa_id'];
+$infraCodigo = $infraRow['codigo_unico'] ?: $infraRow['nombre'];
+$infraEmpresaId = (int) $infraRow['empresa_id'];
 
-    // Validar que la infraestructura pertenece a la empresa del usuario
-    $sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
-    if ($sessionEmpresaId > 0 && $infraEmpresaId !== $sessionEmpresaId) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Infraestructura no pertenece a tu empresa']);
-        exit;
-    }
+// Validar que la infraestructura pertenece a la empresa del usuario.
+// Sin un empresa_id de sesión válido (>0) se deniega (fail-closed).
+$sessionEmpresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+if ($sessionEmpresaId <= 0 || $infraEmpresaId !== $sessionEmpresaId) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Infraestructura no pertenece a tu empresa']);
+    exit;
+}
 
+// ---------------------------------------------------------------
+// 2b. Generar nombre de archivo según formato configurado por la empresa
+//     (degradable: si falla, se usa un nombre por defecto)
+// ---------------------------------------------------------------
+try {
     // Obtener formato de nombre configurado para la empresa
     $stmtFmt = $pdo->prepare("SELECT formato_nombre_foto FROM empresas WHERE id = :id");
     $stmtFmt->execute([':id' => $infraEmpresaId]);
@@ -197,6 +241,37 @@ try {
     // Si falla la generación de nombre, usar el nombre original del frontend
     if (!$nombreArchivo) {
         $nombreArchivo = 'foto_' . time();
+    }
+}
+
+// ---------------------------------------------------------------
+// 2c. Derivar secuencia comparativa en el servidor (fuente de verdad)
+//     El contador del cliente puede no ser fiable (sync offline, continuar
+//     visita, varios operadores). Si la secuencia recibida es nula o ya existe
+//     para esta infraestructura, asignar MAX(secuencia)+1.
+// ---------------------------------------------------------------
+if ($tipoFoto === 'comparativo') {
+    try {
+        $needsDerive = ($secuenciaComparativa === null);
+        if (!$needsDerive) {
+            $chkSeq = $pdo->prepare(
+                "SELECT COUNT(*) FROM registros
+                  WHERE infra_id = :infra AND tipo_foto = 'comparativo'
+                    AND secuencia_comparativa = :seq"
+            );
+            $chkSeq->execute([':infra' => $infraId, ':seq' => $secuenciaComparativa]);
+            $needsDerive = ((int) $chkSeq->fetchColumn() > 0);
+        }
+        if ($needsDerive) {
+            $maxSeq = $pdo->prepare(
+                "SELECT COALESCE(MAX(secuencia_comparativa), 0) FROM registros
+                  WHERE infra_id = :infra AND tipo_foto = 'comparativo'"
+            );
+            $maxSeq->execute([':infra' => $infraId]);
+            $secuenciaComparativa = (int) $maxSeq->fetchColumn() + 1;
+        }
+    } catch (\PDOException $e) {
+        // Si falla la derivación, conservar el valor recibido del cliente
     }
 }
 
@@ -305,17 +380,16 @@ try {
 try {
     if (!isset($pdo)) $pdo = getDB();
 
-    $sql = "INSERT INTO registros
+    $sql = dbReturningId("INSERT INTO registros
                 (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
                  url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
-                 tipo_foto, secuencia_comparativa, nombre_archivo)
+                 tipo_foto, secuencia_comparativa, nombre_archivo, client_token)
             VALUES
                 (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
                  :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
-                 :tipo_foto, :secuencia_comp, :nombre_archivo)";
+                 :tipo_foto, :secuencia_comp, :nombre_archivo, :client_token)");
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
+    $params = [
         ':infra_id'          => $infraId,
         ':unidad_obra_id'    => $unidadObraId,
         ':tipo_trabajo_id'   => $tipoTrabajoId,
@@ -329,22 +403,72 @@ try {
         ':tipo_foto'         => $tipoFoto,
         ':secuencia_comp'    => $secuenciaComparativa,
         ':nombre_archivo'    => $nombreArchivo,
-    ]);
+        ':client_token'      => $clientToken,
+    ];
 
-    $registroId = (int) $pdo->lastInsertId();
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+    } catch (\PDOException $e) {
+        // Duplicado por client_token (índice único): otra pasada de sync ya
+        // insertó esta foto. Tratar como éxito idempotente, no como error.
+        if ($clientToken !== null && (int) $e->getCode() === 23000) {
+            $dupStmt = $pdo->prepare(
+                "SELECT id, url_cloudinary, nombre_archivo FROM registros WHERE client_token = :tk LIMIT 1"
+            );
+            $dupStmt->execute([':tk' => $clientToken]);
+            $dupRow = $dupStmt->fetch();
+            if ($dupRow) {
+                echo json_encode([
+                    'ok'             => true,
+                    'registro_id'    => (int) $dupRow['id'],
+                    'url_imagen'     => $dupRow['url_cloudinary'],
+                    'nombre_archivo' => $dupRow['nombre_archivo'],
+                    'duplicado'      => true,
+                ]);
+                exit;
+            }
+            throw $e;
+        }
+        // Fallback si la columna client_token aún no existe (migración pendiente)
+        if (stripos($e->getMessage(), 'client_token') !== false) {
+            $sqlFallback = dbReturningId("INSERT INTO registros
+                    (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha, lat_real, lon_real,
+                     url_cloudinary, datos_tecnicos, estado_incidencia, observaciones,
+                     tipo_foto, secuencia_comparativa, nombre_archivo)
+                VALUES
+                    (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(), :lat_real, :lon_real,
+                     :url_cloudinary, :datos_tecnicos, :estado_incidencia, :observaciones,
+                     :tipo_foto, :secuencia_comp, :nombre_archivo)");
+            unset($params[':client_token']);
+            $stmt = $pdo->prepare($sqlFallback);
+            $stmt->execute($params);
+        } else {
+            throw $e;
+        }
+    }
+
+    $registroId = dbLastId($pdo, $stmt);
 
     // ---------------------------------------------------------------
     // 5. Guardar campos dinámicos (si existen)
     // ---------------------------------------------------------------
     $camposDinamicos = $_POST['campos'] ?? [];
     if (is_array($camposDinamicos) && !empty($camposDinamicos)) {
+        // Validar que los campo_id pertenecen a la empresa del usuario
+        $stmtValidCampos = $pdo->prepare(
+            "SELECT id FROM campos_formulario WHERE empresa_id = :emp AND activo = 1"
+        );
+        $stmtValidCampos->execute([':emp' => $sessionEmpresaId]);
+        $validCampoIds = array_column($stmtValidCampos->fetchAll(), 'id');
+
         $stmtCampo = $pdo->prepare(
             "INSERT INTO valores_campo (registro_id, campo_id, valor)
              VALUES (:registro_id, :campo_id, :valor)"
         );
         foreach ($camposDinamicos as $campoId => $valor) {
             $campoId = (int) $campoId;
-            if ($campoId > 0) {
+            if ($campoId > 0 && in_array($campoId, $validCampoIds, true)) {
                 $stmtCampo->execute([
                     ':registro_id' => $registroId,
                     ':campo_id'    => $campoId,
@@ -355,9 +479,11 @@ try {
     }
 
     echo json_encode([
-        'ok'          => true,
-        'registro_id' => $registroId,
-        'url_imagen'  => $cloudinaryUrl,
+        'ok'                    => true,
+        'registro_id'           => $registroId,
+        'url_imagen'            => $cloudinaryUrl,
+        'nombre_archivo'        => $nombreArchivo,
+        'secuencia_comparativa' => $secuenciaComparativa,
     ]);
 
 } catch (\PDOException $e) {

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Capas KML (Pública / Operador)
+ * INFOCAMPO - API de Capas KML (Pública / Operador)
  *
  * GET: Devuelve las capas KML activas de la empresa (solo lectura).
  */

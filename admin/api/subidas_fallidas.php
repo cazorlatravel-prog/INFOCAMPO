@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Subidas fallidas
+ * INFOCAMPO - API: Subidas fallidas
  *
  * GET: Lista las subidas fallidas sin resolver para la empresa
  * POST action=resolver: Marca una subida como resuelta
@@ -11,6 +11,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
+
+// Solo personal del panel (no operadores)
+requireRole(['admin', 'supervisor', 'superadmin']);
 
 $pdo = getDB();
 

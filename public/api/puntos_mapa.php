@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Puntos de mapa personalizados
+ * INFOCAMPO - API: Puntos de mapa personalizados
  *
  * GET  ?empresa_id=X              → listar puntos activos (operador)
  * GET  ?empresa_id=X&todos=1      → listar todos incluidos inactivos (admin)
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // Usar empresa_id de sesión (seguro); superadmin puede ver cualquier empresa
+    // empresa_id siempre desde la sesión (el superadmin puede pasar uno explícito)
     $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
     if (($_SESSION['user_rol'] ?? '') === 'superadmin' && isset($_GET['empresa_id'])) {
         $empresaId = (int) $_GET['empresa_id'];
@@ -70,10 +70,14 @@ if (!in_array($userRole, ['admin', 'superadmin'], true)) {
     exit;
 }
 
-validateCsrf();
+if (!validateCsrf()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+    exit;
+}
 
 $action = $_POST['action'] ?? '';
-// Usar empresa_id de sesión; superadmin puede especificar otra empresa
+// empresa_id siempre desde la sesión (el superadmin puede pasar uno explícito)
 $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 if ($userRole === 'superadmin' && isset($_POST['empresa_id'])) {
     $empresaId = (int) $_POST['empresa_id'];
@@ -101,10 +105,10 @@ try {
                 exit;
             }
 
-            $stmt = $pdo->prepare(
+            $stmt = $pdo->prepare(dbReturningId(
                 "INSERT INTO puntos_mapa (empresa_id, nombre, descripcion, lat, lon, icono, color, created_by)
                  VALUES (:empresa_id, :nombre, :descripcion, :lat, :lon, :icono, :color, :created_by)"
-            );
+            ));
             $stmt->execute([
                 ':empresa_id' => $empresaId,
                 ':nombre' => $nombre,
@@ -116,7 +120,7 @@ try {
                 ':created_by' => (int) ($_SESSION['user_id'] ?? 0),
             ]);
 
-            echo json_encode(['ok' => true, 'id' => (int) $pdo->lastInsertId()]);
+            echo json_encode(['ok' => true, 'id' => dbLastId($pdo, $stmt)]);
             break;
 
         case 'editar':

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Guardar visita sin foto
+ * INFOCAMPO - Guardar visita sin foto
  *
  * Permite al operador registrar una visita a una infraestructura
  * sin necesidad de tomar una foto. Guarda observaciones, campos
@@ -25,6 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 if (!isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => 'No autenticado']);
+    exit;
+}
+
+// Protección CSRF
+if (!validateCsrf()) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
     exit;
 }
 
@@ -74,14 +81,14 @@ try {
     }
 
     // Insertar registro de visita sin foto
-    $sql = "INSERT INTO registros
+    $sql = dbReturningId("INSERT INTO registros
                 (infra_id, unidad_obra_id, tipo_trabajo_id, usuario_id, fecha,
                  lat_real, lon_real, url_cloudinary, estado_incidencia,
                  observaciones, tipo_foto, es_visita_sin_foto)
             VALUES
                 (:infra_id, :unidad_obra_id, :tipo_trabajo_id, :usuario_id, NOW(),
                  :lat_real, :lon_real, NULL, :estado_incidencia,
-                 :observaciones, 'aleatorio', 1)";
+                 :observaciones, 'aleatorio', 1)");
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
@@ -95,7 +102,7 @@ try {
         ':observaciones'     => $observaciones,
     ]);
 
-    $registroId = (int) $pdo->lastInsertId();
+    $registroId = dbLastId($pdo, $stmt);
 
     // Guardar campos dinámicos
     $camposDinamicos = $_POST['campos'] ?? [];

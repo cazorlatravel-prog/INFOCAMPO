@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Buscar/crear infraestructuras
+ * INFOCAMPO - API: Buscar/crear infraestructuras
  *
  * GET  ?empresa_id=X&q=texto                    → buscar por nombre/código
  * GET  ?empresa_id=X&provincia=Y                → filtrar por provincia
@@ -173,6 +173,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 // POST: crear nueva infraestructura
 // ---------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+        exit;
+    }
     $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
     $nombre    = trim($_POST['nombre'] ?? '');
     $lat       = (float) ($_POST['lat'] ?? 0);
@@ -188,14 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Auto-generar código único
-    $codigo = 'INF-' . strtoupper(substr(md5($nombre . time()), 0, 8));
+    $codigo = 'INF-' . strtoupper(substr(md5($nombre . bin2hex(random_bytes(4))), 0, 8));
 
     if ($hasLocationCols) {
         if ($hasMonteCols) {
-            $stmt = $pdo->prepare(
+            $stmt = $pdo->prepare(dbReturningId(
                 "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, activa)
                  VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, :provincia, :municipio, :monte, 1)"
-            );
+            ));
             $stmt->execute([
                 ':emp_id'    => $empresaId,
                 ':nombre'    => $nombre,
@@ -207,10 +212,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':monte'     => $monte ?: null,
             ]);
         } else {
-            $stmt = $pdo->prepare(
+            $stmt = $pdo->prepare(dbReturningId(
                 "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, activa)
                  VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, :provincia, :municipio, 1)"
-            );
+            ));
             $stmt->execute([
                 ':emp_id'    => $empresaId,
                 ':nombre'    => $nombre,
@@ -222,10 +227,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
     } else {
-        $stmt = $pdo->prepare(
+        $stmt = $pdo->prepare(dbReturningId(
             "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, activa)
              VALUES (:emp_id, :nombre, :codigo, :lat, :lon, NULL, 1)"
-        );
+        ));
         $stmt->execute([
             ':emp_id'  => $empresaId,
             ':nombre'  => $nombre,
@@ -235,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
     }
 
-    $newId = (int) $pdo->lastInsertId();
+    $newId = dbLastId($pdo, $stmt);
 
     echo json_encode([
         'ok' => true,

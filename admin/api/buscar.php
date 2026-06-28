@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Búsqueda Global (Admin)
+ * INFOCAMPO - API de Búsqueda Global (Admin)
  *
  * Busca simultáneamente en infraestructuras, registros y usuarios.
  * Responde JSON para alimentar el buscador global del header.
@@ -11,6 +11,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
+
+// Solo personal del panel: evita que un operador acceda a la búsqueda global
+requireRole(['admin', 'supervisor', 'superadmin']);
 
 $pdo = getDB();
 

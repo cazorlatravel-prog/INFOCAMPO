@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Gestión de Usuarios (Admin de Empresa)
+ * INFOCAMPO - Gestión de Usuarios (Admin de Empresa)
  *
  * Permite al administrador de empresa crear, gestionar usuarios
  * y obtener automáticamente el enlace de acceso para cada operador.
@@ -26,6 +26,14 @@ $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     $action = $_POST['action'] ?? '';
 
+    // Los supervisores tienen acceso de SOLO LECTURA: bloquear toda escritura
+    // (la UI oculta los botones, pero el endpoint POST es accesible directamente)
+    if (($_SESSION['user_rol'] ?? '') === 'supervisor') {
+        $action = '';
+        $msg = 'Los supervisores tienen acceso de solo lectura. Acción no permitida.';
+        $msgType = 'danger';
+    }
+
     // --- Crear usuario ---
     if ($action === 'create_user') {
         $nombre   = trim($_POST['nombre'] ?? '');
@@ -49,8 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         } elseif ($email === null && $telefono === null) {
             $msg = 'Debes introducir al menos un email o un teléfono.';
             $msgType = 'danger';
-        } elseif (strlen($password) < 12) {
-            $msg = 'La contraseña debe tener al menos 12 caracteres.';
+        } elseif (strlen($password) < 6) {
+            $msg = 'La contraseña debe tener al menos 6 caracteres.';
             $msgType = 'danger';
         } elseif (!in_array($rol, ['admin', 'supervisor', 'operador'], true)) {
             $msg = 'Rol no válido.';
@@ -65,62 +73,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
             // Verificar email único (si se proporcionó)
             $duplicado = false;
             if ($email !== null) {
-                $check = $pdo->prepare("SELECT id FROM usuarios WHERE email = :email");
+                $check = $pdo->prepare("SELECT id, nombre, empresa_id, rol FROM usuarios WHERE email = :email");
                 $check->execute([':email' => $email]);
-                if ($check->fetch()) {
-                    $msg = 'Ya existe un usuario con ese email.';
+                $existing = $check->fetch();
+                if ($existing) {
+                    $quien = htmlspecialchars($existing['nombre'] ?: '(sin nombre)');
+                    $rolEx = $existing['rol'];
+                    if ($rolEx === 'superadmin') {
+                        $msg = 'Ese email ya lo usa la cuenta de administrador principal '
+                             . '(<strong>' . $quien . '</strong>). Esa cuenta no aparece en la lista. '
+                             . 'Usa un email distinto para el nuevo usuario.';
+                    } elseif ((int) $existing['empresa_id'] !== $empresaId) {
+                        $msg = 'Ya existe un usuario con ese email asignado a otra empresa '
+                             . '(<strong>' . $quien . '</strong>, ID empresa ' . (int) $existing['empresa_id'] . '). '
+                             . 'Puedes reclamarlo o eliminarlo en la sección "Usuarios huérfanos" más abajo.';
+                    } else {
+                        $msg = 'Ya existe un usuario con ese email en esta empresa '
+                             . '(<strong>' . $quien . '</strong>, rol ' . htmlspecialchars($rolEx) . '). '
+                             . 'Búscalo en la lista de abajo.';
+                    }
                     $msgType = 'danger';
                     $duplicado = true;
                 }
             }
             // Verificar teléfono único (si se proporcionó)
             if (!$duplicado && $telefono !== null) {
-                $check = $pdo->prepare("SELECT id FROM usuarios WHERE telefono = :tel");
+                $check = $pdo->prepare("SELECT id, nombre, empresa_id, rol FROM usuarios WHERE telefono = :tel");
                 $check->execute([':tel' => $telefono]);
-                if ($check->fetch()) {
-                    $msg = 'Ya existe un usuario con ese teléfono.';
+                $existing = $check->fetch();
+                if ($existing) {
+                    $quien = htmlspecialchars($existing['nombre'] ?: '(sin nombre)');
+                    $rolEx = $existing['rol'];
+                    if ($rolEx === 'superadmin') {
+                        $msg = 'Ese teléfono ya lo usa la cuenta de administrador principal '
+                             . '(<strong>' . $quien . '</strong>). Esa cuenta no aparece en la lista. '
+                             . 'Usa un teléfono distinto para el nuevo usuario.';
+                    } elseif ((int) $existing['empresa_id'] !== $empresaId) {
+                        $msg = 'Ya existe un usuario con ese teléfono asignado a otra empresa '
+                             . '(<strong>' . $quien . '</strong>, ID empresa ' . (int) $existing['empresa_id'] . '). '
+                             . 'Puedes reclamarlo o eliminarlo en la sección "Usuarios huérfanos" más abajo.';
+                    } else {
+                        $msg = 'Ya existe un usuario con ese teléfono en esta empresa '
+                             . '(<strong>' . $quien . '</strong>, rol ' . htmlspecialchars($rolEx) . '). '
+                             . 'Búscalo en la lista de abajo.';
+                    }
                     $msgType = 'danger';
                     $duplicado = true;
                 }
             }
 
             if (!$duplicado) {
-                // Verificar límite de usuarios de la empresa
-                $empStmt = $pdo->prepare("SELECT max_usuarios FROM empresas WHERE id = :id");
-                $empStmt->execute([':id' => $empresaId]);
-                $empresa = $empStmt->fetch();
+                $hash = hashPassword($password);
+                $stmt = $pdo->prepare(dbReturningId(
+                    "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
+                     VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
+                ));
+                $stmt->execute([
+                    ':emp_id'    => $empresaId,
+                    ':nombre'    => $nombre,
+                    ':email'     => $email,
+                    ':telefono'  => $telefono,
+                    ':password'  => $hash,
+                    ':rol'       => $rol,
+                ]);
+                $newUserId = dbLastId($pdo, $stmt);
+                $msg = 'Usuario creado correctamente.';
+                $msgType = 'success';
 
-                $countStmt = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE empresa_id = :id AND rol != 'superadmin'");
-                $countStmt->execute([':id' => $empresaId]);
-                $currentCount = (int) $countStmt->fetchColumn();
-
-                if ($empresa && $currentCount >= (int) $empresa['max_usuarios']) {
-                    $msg = 'Se ha alcanzado el límite máximo de usuarios (' . $empresa['max_usuarios'] . ').';
-                    $msgType = 'warning';
-                } else {
-                    $hash = hashPassword($password);
-                    $stmt = $pdo->prepare(
-                        "INSERT INTO usuarios (empresa_id, nombre, email, telefono, password, rol, activo)
-                         VALUES (:emp_id, :nombre, :email, :telefono, :password, :rol, 1)"
-                    );
-                    $stmt->execute([
-                        ':emp_id'    => $empresaId,
-                        ':nombre'    => $nombre,
-                        ':email'     => $email,
-                        ':telefono'  => $telefono,
-                        ':password'  => $hash,
-                        ':rol'       => $rol,
-                    ]);
-                    $newUserId = (int) $pdo->lastInsertId();
-                    $msg = 'Usuario creado correctamente.';
-                    $msgType = 'success';
-
-                    // Si es operador, mostrar el enlace generado
-                    if ($rol === 'operador') {
-                        $link = APP_URL . '/public/operador.php?user=' . $newUserId . '&empresa=' . $empresaId;
-                        $msg .= ' Enlace de acceso: <br><code>' . htmlspecialchars($link) . '</code>';
-                    }
+                if ($rol === 'operador') {
+                    $msg .= ' El operador puede acceder desde <code>' . htmlspecialchars(APP_URL . '/login.php') . '</code>';
                 }
+            }
+        }
+    }
+
+    // --- Reclamar usuario huérfano (reasignar a esta empresa) ---
+    if ($action === 'claim_user') {
+        $targetId = (int) ($_POST['user_id'] ?? 0);
+        if ($targetId > 0 && $empresaId > 0) {
+            $stmt = $pdo->prepare("SELECT id, nombre, empresa_id FROM usuarios WHERE id = :id AND empresa_id != :emp_id AND rol != 'superadmin'");
+            $stmt->execute([':id' => $targetId, ':emp_id' => $empresaId]);
+            $orphan = $stmt->fetch();
+            if ($orphan) {
+                $pdo->prepare("UPDATE usuarios SET empresa_id = :emp_id WHERE id = :id")
+                    ->execute([':emp_id' => $empresaId, ':id' => $targetId]);
+                $msg = 'Usuario <strong>' . htmlspecialchars($orphan['nombre']) . '</strong> reasignado a esta empresa correctamente.';
+                $msgType = 'success';
+            } else {
+                $msg = 'No se pudo reclamar el usuario.';
+                $msgType = 'danger';
+            }
+        }
+    }
+
+    // --- Eliminar usuario huérfano ---
+    if ($action === 'delete_orphan') {
+        $targetId = (int) ($_POST['user_id'] ?? 0);
+        if ($targetId > 0 && $empresaId > 0) {
+            $stmt = $pdo->prepare("SELECT id, nombre, empresa_id FROM usuarios WHERE id = :id AND empresa_id != :emp_id AND rol != 'superadmin'");
+            $stmt->execute([':id' => $targetId, ':emp_id' => $empresaId]);
+            $orphan = $stmt->fetch();
+            if ($orphan) {
+                $pdo->prepare("DELETE FROM valores_campo WHERE registro_id IN (SELECT id FROM registros WHERE usuario_id = :uid)")
+                    ->execute([':uid' => $targetId]);
+                $pdo->prepare("DELETE FROM registros WHERE usuario_id = :uid")
+                    ->execute([':uid' => $targetId]);
+                $pdo->prepare("DELETE FROM usuarios WHERE id = :id")
+                    ->execute([':id' => $targetId]);
+                $msg = 'Usuario huérfano <strong>' . htmlspecialchars($orphan['nombre']) . '</strong> eliminado.';
+                $msgType = 'success';
+            } else {
+                $msg = 'No se pudo eliminar el usuario.';
+                $msgType = 'danger';
             }
         }
     }
@@ -134,8 +198,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
         if ($targetId <= 0) {
             $msg = 'Usuario no válido.';
             $msgType = 'danger';
-        } elseif (strlen($newPass) < 12) {
-            $msg = 'La contraseña debe tener al menos 12 caracteres.';
+        } elseif (strlen($newPass) < 6) {
+            $msg = 'La contraseña debe tener al menos 6 caracteres.';
             $msgType = 'danger';
         } elseif ($newPass !== $confirmPass) {
             $msg = 'Las contraseñas no coinciden.';
@@ -194,17 +258,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && validateCsrf()) {
     }
 }
 
-// ---------------------------------------------------------------
-// Cargar empresas (solo superadmin)
-// ---------------------------------------------------------------
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 AND id != 9999 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
 
 // ---------------------------------------------------------------
 // Cargar datos de la empresa y usuarios
@@ -232,6 +285,18 @@ $countActivos = 0;
 foreach ($usuarios as $u) {
     if ($u['activo']) $countActivos++;
 }
+
+// Buscar usuarios huérfanos (existen en la BD con otra empresa_id, no superadmin)
+$huerfanos = [];
+if ($empresaId > 0) {
+    $stmt = $pdo->prepare(
+        "SELECT * FROM usuarios
+         WHERE empresa_id != :emp_id AND rol != 'superadmin'
+         ORDER BY nombre ASC"
+    );
+    $stmt->execute([':emp_id' => $empresaId]);
+    $huerfanos = $stmt->fetchAll();
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -255,19 +320,6 @@ foreach ($usuarios as $u) {
             <h4 class="mb-0"><i class="bi bi-people me-2"></i>Usuarios</h4>
 
             <div class="d-flex gap-2 align-items-center">
-                <?php if ($isSuperadmin): ?>
-                <form method="get" class="d-flex gap-2 align-items-center">
-                    <label class="fw-semibold small text-nowrap">Empresa:</label>
-                    <select name="empresa_id" class="form-select form-select-sm" style="width:220px;" onchange="this.form.submit()">
-                        <option value="">-- Seleccionar --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($emp['nombre']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </form>
-                <?php endif; ?>
                 <?php if ($empresaId > 0): ?>
                     <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#formUsuario">
                         <i class="bi bi-plus-lg"></i> Nuevo Usuario
@@ -287,28 +339,16 @@ foreach ($usuarios as $u) {
 
             <!-- Estadísticas rápidas -->
             <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
+                <div class="col-6">
                     <div class="stat-card">
                         <div class="stat-number"><?= count($usuarios) ?></div>
                         <div class="stat-label">Total Usuarios</div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
+                <div class="col-6">
                     <div class="stat-card">
                         <div class="stat-number"><?= $countActivos ?></div>
                         <div class="stat-label">Activos</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-number"><?= $empresaData ? $empresaData['max_usuarios'] : '-' ?></div>
-                        <div class="stat-label">Límite Plan</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <div class="stat-number"><?= $empresaData ? ((int)$empresaData['max_usuarios'] - $countActivos) : '-' ?></div>
-                        <div class="stat-label">Disponibles</div>
                     </div>
                 </div>
             </div>
@@ -343,7 +383,7 @@ foreach ($usuarios as $u) {
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold small">Contraseña *</label>
-                                <input type="password" name="password" class="form-control" required minlength="12" placeholder="Min. 12 caracteres">
+                                <input type="password" name="password" class="form-control" required minlength="6" placeholder="Min. 6 caracteres">
                             </div>
                             <div class="col-md-1 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary w-100">
@@ -380,7 +420,7 @@ foreach ($usuarios as $u) {
                                         'operador'    => 'bg-secondary',
                                         default       => 'bg-dark',
                                     };
-                                    $operadorLink = APP_URL . '/public/operador.php?user=' . $u['id'] . '&empresa=' . $empresaId;
+                                    $operadorLink = APP_URL . '/login.php';
                                     ?>
                                     <tr class="<?= $u['activo'] ? '' : 'opacity-50' ?>">
                                         <td>
@@ -463,6 +503,75 @@ foreach ($usuarios as $u) {
                 </div>
             </div>
 
+            <?php if (!empty($huerfanos)): ?>
+            <!-- Usuarios huérfanos (existen en BD con otra empresa_id) -->
+            <div class="card mt-4 border-warning">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Usuarios huérfanos (<?= count($huerfanos) ?>)</h5>
+                    <small class="text-muted">Estos usuarios existen en la base de datos pero están asignados a otra empresa. Bloquean la creación de nuevos usuarios con el mismo email/teléfono.</small>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                                <tr class="text-muted small">
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Empresa ID</th>
+                                    <th>Estado</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($huerfanos as $h): ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($h['nombre']) ?></strong>
+                                            <?php if (!empty($h['email'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-envelope"></i> <?= htmlspecialchars($h['email']) ?></small>
+                                            <?php endif; ?>
+                                            <?php if (!empty($h['telefono'])): ?>
+                                                <br><small class="text-muted"><i class="bi bi-phone"></i> <?= htmlspecialchars($h['telefono']) ?></small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><span class="badge bg-dark badge-rol"><?= htmlspecialchars($h['rol']) ?></span></td>
+                                        <td><code><?= (int) $h['empresa_id'] ?></code></td>
+                                        <td>
+                                            <?php if ($h['activo']): ?>
+                                                <span class="badge bg-success badge-rol">Activo</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-danger badge-rol">Inactivo</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-flex gap-1 justify-content-end">
+                                                <form method="post" class="d-inline" onsubmit="return confirm('¿Reasignar este usuario a tu empresa? Podrá acceder con sus credenciales actuales.')">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="action" value="claim_user">
+                                                    <input type="hidden" name="user_id" value="<?= $h['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Reclamar para esta empresa">
+                                                        <i class="bi bi-person-plus"></i> Reclamar
+                                                    </button>
+                                                </form>
+                                                <form method="post" class="d-inline" onsubmit="return confirm('¿ELIMINAR este usuario huérfano permanentemente? Se borrarán sus registros. Esta acción no se puede deshacer.')">
+                                                    <?= csrfField() ?>
+                                                    <input type="hidden" name="action" value="delete_orphan">
+                                                    <input type="hidden" name="user_id" value="<?= $h['id'] ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar permanentemente">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
         <?php else: ?>
             <div class="text-center py-5">
                 <i class="bi bi-people" style="font-size:3rem;color:#adb5bd;"></i>
@@ -492,12 +601,12 @@ foreach ($usuarios as $u) {
                         </p>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Nueva contraseña</label>
-                            <input type="password" name="new_password" class="form-control" required minlength="12"
-                                   placeholder="Mínimo 12 caracteres">
+                            <input type="password" name="new_password" class="form-control" required minlength="6"
+                                   placeholder="Mínimo 6 caracteres">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Confirmar contraseña</label>
-                            <input type="password" name="confirm_password" class="form-control" required minlength="12"
+                            <input type="password" name="confirm_password" class="form-control" required minlength="6"
                                    placeholder="Repetir contraseña">
                         </div>
                     </div>

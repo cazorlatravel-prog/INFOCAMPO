@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Visitas del Operador
+ * INFOCAMPO - API de Visitas del Operador
  *
  * GET: Lista visitas (registros) del operador agrupadas por infraestructura y fecha
  *   - usuario_id: ID del operador
@@ -127,6 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido']);
+        exit;
+    }
     $action = $_POST['action'] ?? '';
     $registroId = isset($_POST['registro_id']) ? (int) $_POST['registro_id'] : 0;
     $usuarioId = (int) ($_SESSION['user_id'] ?? 0);
@@ -137,9 +142,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // Verificar que el registro pertenece al usuario
-        $stmt = $pdo->prepare("SELECT id FROM registros WHERE id = :id AND usuario_id = :uid");
-        $stmt->execute([':id' => $registroId, ':uid' => $usuarioId]);
+        // Verificar que el registro pertenece al usuario Y a su empresa (tenant scope)
+        $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
+        $stmt = $pdo->prepare(
+            "SELECT r.id FROM registros r
+             INNER JOIN infraestructuras i ON r.infra_id = i.id
+             WHERE r.id = :id AND r.usuario_id = :uid AND i.empresa_id = :emp"
+        );
+        $stmt->execute([':id' => $registroId, ':uid' => $usuarioId, ':emp' => $empresaId]);
         if (!$stmt->fetch()) {
             echo json_encode(['ok' => false, 'error' => 'No tienes permiso para editar este registro']);
             exit;

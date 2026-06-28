@@ -45,6 +45,10 @@
         bearing: null, // degrees 0-360, null if unavailable
         // Reverse geocoding cache
         geoLocation: null, // { city, province, postcode, country }
+        // High-quality capture
+        videoTrack: null,   // active MediaStreamTrack (capabilities/torch/focus)
+        imageCapture: null, // ImageCapture instance for full-resolution stills
+        torchOn: false,     // estado de la linterna (torch)
     };
 
     const SITUACIONES = ['antes', 'durante', 'despues'];
@@ -98,6 +102,8 @@
     const btnShutter     = $('#btn-shutter');
     const btnGhostToggle = $('#btn-ghost-toggle');
     const btnLoadPrev    = $('#btn-load-prev');
+    const btnTorch       = $('#btn-torch');
+    const camFocusRing   = $('#cam-focus-ring');
     const ghostOpacityBar    = $('#ghost-opacity-bar');
     const ghostOpacitySlider = $('#ghost-opacity-slider');
     const ghostOpacityValue  = $('#ghost-opacity-value');
@@ -157,16 +163,154 @@
         initOffline();
         registerServiceWorker();
         initExitConfirmation();
+        initCsrfRefresh();
+        initPhotoLightbox();
+    }
+
+    // ===================================================================
+    // VISOR DE FOTO HD (lightbox con carga progresiva: miniatura → completa)
+    // ===================================================================
+    let _lightboxToken = 0; // evita races si se abren fotos rápidamente
+
+    /**
+     * Devuelve una URL de miniatura ligera para imágenes de Cloudinary
+     * (inserta una transformación tras `/upload/`). Para otras fuentes
+     * (ImageKit, objectURL local, blob) devuelve la URL original.
+     */
+    function cloudinaryThumb(url, width) {
+        if (!url || typeof url !== 'string') return url;
+        if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+        const marker = '/upload/';
+        const i = url.indexOf(marker);
+        if (i === -1 || !url.includes('res.cloudinary.com')) return url;
+        const after = i + marker.length;
+        // No duplicar si ya lleva transformación de ancho
+        if (url.slice(after).startsWith('c_limit,w_')) return url;
+        const t = `c_limit,w_${width},q_auto,f_auto/`;
+        return url.slice(0, after) + t + url.slice(after);
+    }
+
+    function initPhotoLightbox() {
+        const box = $('#photo-lightbox');
+        if (!box) return;
+        const closeBtn = $('#photo-lightbox-close');
+
+        if (closeBtn) closeBtn.addEventListener('click', closePhotoLightbox);
+        // Cerrar al tocar el fondo (no la imagen)
+        box.addEventListener('click', (e) => {
+            if (e.target === box || e.target.classList.contains('photo-lightbox-stage')) {
+                closePhotoLightbox();
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !box.classList.contains('hidden')) closePhotoLightbox();
+        });
+
+        // Delegación: abrir el visor al tocar una miniatura de la galería
+        if (galleryGrid) {
+            galleryGrid.addEventListener('click', (e) => {
+                const item = e.target.closest('.gallery-item');
+                if (!item) return;
+                const full = item.dataset.full || (item.querySelector('img') && item.querySelector('img').src);
+                if (!full) return;
+                const thumb = item.querySelector('img') ? item.querySelector('img').src : full;
+                const caption = item.dataset.caption || '';
+                openPhotoLightbox(full, thumb, caption);
+            });
+        }
+    }
+
+    /**
+     * Abre el visor mostrando primero la miniatura (instantánea) y cargando la
+     * versión a resolución completa en segundo plano; al terminar, la sustituye.
+     * Un token evita condiciones de carrera si el usuario cambia de foto rápido.
+     */
+    function openPhotoLightbox(fullUrl, thumbUrl, caption) {
+        const box = $('#photo-lightbox');
+        const img = $('#photo-lightbox-img');
+        const spinner = $('#photo-lightbox-spinner');
+        const cap = $('#photo-lightbox-caption');
+        if (!box || !img) return;
+
+        const token = ++_lightboxToken;
+
+        // 1) Miniatura al instante (ya suele estar en caché)
+        img.src = thumbUrl || fullUrl;
+        img.classList.add('loading');
+        if (cap) cap.textContent = caption || '';
+        if (spinner && fullUrl && fullUrl !== thumbUrl) spinner.classList.remove('hidden');
+        box.classList.remove('hidden');
+
+        // 2) Cargar la versión HD en segundo plano
+        if (fullUrl && fullUrl !== thumbUrl) {
+            const hd = new Image();
+            hd.onload = () => {
+                if (token !== _lightboxToken) return; // el usuario abrió otra foto
+                img.src = fullUrl;
+                img.classList.remove('loading');
+                if (spinner) spinner.classList.add('hidden');
+            };
+            hd.onerror = () => {
+                if (token !== _lightboxToken) return;
+                img.classList.remove('loading');
+                if (spinner) spinner.classList.add('hidden');
+            };
+            hd.src = fullUrl;
+        } else {
+            img.classList.remove('loading');
+            if (spinner) spinner.classList.add('hidden');
+        }
+    }
+
+    function closePhotoLightbox() {
+        const box = $('#photo-lightbox');
+        const img = $('#photo-lightbox-img');
+        if (!box) return;
+        _lightboxToken++; // cancela cargas HD en vuelo
+        box.classList.add('hidden');
+        if (img) { img.src = ''; img.classList.remove('loading'); }
+    }
+
+    function initCsrfRefresh() {
+        const url = (CFG.endpoints && CFG.endpoints.csrfRefresh) || 'api/csrf_refresh.php';
+        setInterval(async () => {
+            try {
+                const r = await fetch(url, { credentials: 'same-origin' });
+                if (r.ok) {
+                    const d = await r.json();
+                    if (d.ok && d.token) CFG.csrfToken = d.token;
+                }
+            } catch (_) {}
+        }, 15 * 60 * 1000);
     }
 
     // ===================================================================
     // EXIT CONFIRMATION — prevent accidental close with unsaved data
     // ===================================================================
+    // Marca de navegación intencional (logout, enlaces) para no mostrar el aviso
+    let intentionalNavigation = false;
+
+    // ¿Hay datos de visita sin finalizar que se perderían?
+    function hasUnsavedData() {
+        return Array.isArray(state.photos) && state.photos.length > 0;
+    }
+
     function initExitConfirmation() {
+        // Permitir salir sin aviso al pulsar "Cerrar sesión" u otros enlaces de salida
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a[href]');
+            if (link && (link.classList.contains('user-menu-logout') || link.dataset.allowExit === '1')) {
+                intentionalNavigation = true;
+            }
+        }, true);
+
         window.addEventListener('beforeunload', (e) => {
-            // Always ask before leaving the app
+            // Solo avisar si hay fotos sin finalizar y no es una salida intencional
+            if (intentionalNavigation || !hasUnsavedData()) {
+                return;
+            }
             e.preventDefault();
-            e.returnValue = '¿Seguro que quieres salir de INFOCAMPO?';
+            e.returnValue = '¿Seguro que quieres salir? Tienes fotos sin finalizar.';
             return e.returnValue;
         });
 
@@ -180,12 +324,14 @@
                     showScreen('ficha');
                     return;
                 }
-                // On ficha screen, ask before leaving the app
-                if (!confirm('¿Quieres salir de INFOCAMPO? Asegúrate de haber guardado tus datos antes de cerrar.')) {
+                // En la ficha: solo preguntar si hay datos sin guardar
+                if (hasUnsavedData() &&
+                    !confirm('¿Quieres salir de FotoGPS? Tienes fotos sin finalizar.')) {
                     history.pushState(null, '', location.href);
                     return;
                 }
                 // Allow navigation out
+                intentionalNavigation = true;
                 history.back();
             });
         }
@@ -198,6 +344,7 @@
         if (!window.InfocampoOffline) return;
 
         window.InfocampoOffline.init({
+            csrfUrl: (CFG.endpoints && CFG.endpoints.csrfRefresh) || 'api/csrf_refresh.php',
             onStatusChange: (online) => {
                 const indicator = $('#offline-indicator');
                 const dot = $('#offline-dot');
@@ -303,11 +450,19 @@
                 if (progressWrap) progressWrap.style.display = 'none';
                 if (btnSync) btnSync.classList.remove('spinning');
 
-                // Reload gallery with synced photos
+                // Marcar como sincronizadas las fotos que ya están en la galería
+                // como pendientes (empareja por client_token). Solo si no se
+                // encuentra el item (p.ej. la página se recargó) se añade uno nuevo,
+                // con la etiqueta correcta según su tipo.
                 results.forEach(r => {
-                    if (r.ok && r.result) {
-                        addToGallery(r.result.url_imagen, 'synced', r.result.nombre_archivo || 'foto', null);
-                    }
+                    if (!r.ok || !r.result) return;
+                    // Secuencia final: la que asignó el servidor manda
+                    const seq = (r.result.secuencia_comparativa != null)
+                        ? r.result.secuencia_comparativa
+                        : (r.secuencia_comparativa != null ? r.secuencia_comparativa : null);
+                    if (markGalleryItemSynced(r.client_token, seq)) return;
+                    const tipo = r.tipo_foto === 'comparativo' ? 'comparativo' : 'aleatorio';
+                    addToGallery(r.result.url_imagen, tipo, r.result.nombre_archivo || 'foto', seq);
                 });
             },
             onPrecacheProgress: ({ loaded, total }) => {
@@ -527,21 +682,70 @@
         }
     }
 
+    // Brújula obtenida del sensor de orientación absoluta (método principal).
+    // Los eventos `deviceorientation` no se disparan de forma fiable en Android
+    // (la brújula se queda en Norte), por eso usamos AbsoluteOrientationSensor.
+    let _orientationSensor = null;
+    let _sensorCompassActive = false; // true cuando el sensor entrega lecturas
+
     function _startCompassListener() {
-        window.addEventListener('deviceorientationabsolute', (e) => {
-            if (e.absolute && e.alpha != null) {
-                state.bearing = Math.round(360 - e.alpha) % 360;
-            }
-        }, true);
-        // Fallback to non-absolute
-        window.addEventListener('deviceorientation', (e) => {
-            if (state.bearing != null) return; // prefer absolute
-            if (e.webkitCompassHeading != null) {
-                state.bearing = Math.round(e.webkitCompassHeading);
-            } else if (e.alpha != null) {
-                state.bearing = Math.round(360 - e.alpha) % 360;
-            }
-        }, true);
+        // 1) Intentar el sensor de orientación absoluta (Generic Sensor API)
+        _startSensorCompass();
+
+        // 2) Respaldo: deviceorientation (iOS usa webkitCompassHeading)
+        window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
+        window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+    }
+
+    function _onDeviceOrientation(e) {
+        // Si el sensor absoluto ya entrega lecturas, no lo pisamos con el respaldo
+        if (_sensorCompassActive) return;
+        if (e.webkitCompassHeading != null) {
+            state.bearing = Math.round(e.webkitCompassHeading);
+        } else if (e.absolute && e.alpha != null) {
+            state.bearing = Math.round(360 - e.alpha) % 360;
+        }
+    }
+
+    function _startSensorCompass() {
+        if (typeof AbsoluteOrientationSensor !== 'function') return false;
+        try {
+            _orientationSensor = new AbsoluteOrientationSensor({ frequency: 20, referenceFrame: 'device' });
+            _orientationSensor.addEventListener('reading', () => {
+                const q = _orientationSensor && _orientationSensor.quaternion;
+                if (!q) return;
+                const heading = _cameraHeadingFromQuaternion(q);
+                if (heading != null && isFinite(heading)) {
+                    state.bearing = Math.round(heading) % 360;
+                    _sensorCompassActive = true;
+                }
+            });
+            _orientationSensor.addEventListener('error', () => {
+                // Permiso denegado o sensor no disponible → usar el respaldo
+                _sensorCompassActive = false;
+                try { _orientationSensor.stop(); } catch (_e) {}
+                _orientationSensor = null;
+            });
+            _orientationSensor.start();
+            return true;
+        } catch (_e) {
+            _orientationSensor = null;
+            return false;
+        }
+    }
+
+    /**
+     * Convierte el cuaternión del sensor (marco Tierra ENU) en el rumbo de
+     * brújula hacia donde apunta la cámara trasera (eje -Z del dispositivo).
+     * heading = atan2(Este, Norte), normalizado a 0-360.
+     */
+    function _cameraHeadingFromQuaternion(q) {
+        const x = q[0], y = q[1], z = q[2], w = q[3];
+        // Vector -Z del dispositivo rotado al marco Tierra (Este, Norte, Arriba)
+        const east  = -2 * (x * z + w * y);
+        const north = -2 * (y * z - w * x);
+        let heading = Math.atan2(east, north) * 180 / Math.PI;
+        return (heading + 360) % 360;
     }
 
     function bearingToCardinal(deg) {
@@ -574,19 +778,30 @@
             camGpsText.textContent = 'UTM: Sin GPS';
             return;
         }
+        // Evitar duplicar el watch si ya está activo
+        if (state.gpsWatchId !== null) {
+            return;
+        }
 
         state.gpsWatchId = navigator.geolocation.watchPosition(
             (pos) => {
                 state.gps.lat = pos.coords.latitude;
                 state.gps.lon = pos.coords.longitude;
+                // Altitud (m sobre el nivel del mar) para incrustarla en EXIF
+                if (pos.coords.altitude != null && isFinite(pos.coords.altitude)) {
+                    state.gps.alt = pos.coords.altitude;
+                }
                 camGpsDot.classList.add('active');
+                camGpsDot.classList.remove('error');
                 const utm = latLonToUTM(state.gps.lat, state.gps.lon);
                 camGpsText.textContent = `UTM: ${utm.str}`;
                 // Trigger reverse geocoding in background (throttled internally)
                 reverseGeocode(state.gps.lat, state.gps.lon);
             },
             () => {
-                camGpsText.textContent = 'UTM: Error GPS';
+                camGpsDot.classList.remove('active');
+                camGpsDot.classList.add('error');
+                camGpsText.textContent = 'UTM: Sin señal GPS';
             },
             { enableHighAccuracy: true, maximumAge: 3000 }
         );
@@ -828,9 +1043,11 @@
         // Reset situación selector in Ficha
         const sitSel = $('#situacion-selector');
         if (sitSel) {
-            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-            const firstBtn = sitSel.querySelector('[data-sit="0"]');
-            if (firstBtn) firstBtn.classList.add('active');
+            sitSel.querySelectorAll('.situacion-option').forEach(b => {
+                const isFirst = b.dataset.sit === '0';
+                b.classList.toggle('active', isFirst);
+                b.setAttribute('aria-checked', isFirst ? 'true' : 'false');
+            });
         }
         const obsField = $('#observaciones-general');
         if (obsField) obsField.value = '';
@@ -996,9 +1213,14 @@
     // SCREEN MANAGEMENT
     // ===================================================================
     function showScreen(name) {
+        const prev = state.screen;
         Object.values(screens).forEach(s => s.classList.remove('active'));
         screens[name].classList.add('active');
         state.screen = name;
+        if (prev === 'preview' && name === 'ficha' && state.capturedBlob) {
+            state.capturedBlob = null;
+            state.baseImageData = null;
+        }
     }
 
     // ===================================================================
@@ -1006,6 +1228,9 @@
     // ===================================================================
     async function openCamera(mode) {
         state.currentMode = mode;
+
+        // Reactivar el seguimiento GPS (closeCamera lo detiene para ahorrar batería)
+        initGPS();
 
         // Update UI
         camInfraName.textContent = state.infraName;
@@ -1048,15 +1273,23 @@
                 state.stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: { ideal: 'environment' },
-                        width: { ideal: 3264 },
-                        height: { ideal: 2448 },
-                        aspectRatio: { ideal: 3 / 4 },
+                        // Pedimos resolución muy alta; el navegador la limita a la
+                        // máxima soportada. El recorte 3:4 se hace en captureFrame.
+                        width: { ideal: 4096 },
+                        height: { ideal: 3072 },
                     },
                     audio: false,
                 });
             }
             camVideo.srcObject = state.stream;
             await camVideo.play();
+
+            // Configuración de captura de alta calidad (best-effort, con fallbacks)
+            const track = state.stream.getVideoTracks()[0] || null;
+            state.videoTrack = track;
+            await applyBestCameraConstraints(track);
+            setupImageCapture(track);
+            setupTorchUI(track);
         } catch (err) {
             // Limpiar stream si fue adquirido pero play() falló
             if (state.stream) {
@@ -1064,11 +1297,163 @@
                 state.stream = null;
             }
             camVideo.srcObject = null;
+            state.videoTrack = null;
+            state.imageCapture = null;
             alert('No se pudo acceder a la cámara: ' + err.message);
             return;
         }
 
         showScreen('camera');
+    }
+
+    // ===================================================================
+    // HIGH-QUALITY CAPTURE HELPERS (resolución, enfoque, linterna)
+    // ===================================================================
+
+    /**
+     * Aplica la resolución máxima real del dispositivo y modos continuos de
+     * enfoque/exposición/balance de blancos. Todo best-effort: si el navegador
+     * no soporta getCapabilities/applyConstraints, no hace nada (sin romper).
+     */
+    async function applyBestCameraConstraints(track) {
+        if (!track || typeof track.getCapabilities !== 'function') return;
+        try {
+            const caps = track.getCapabilities();
+            const constraints = {};
+            const advanced = [];
+
+            if (caps.width && caps.width.max)  constraints.width  = { ideal: caps.width.max };
+            if (caps.height && caps.height.max) constraints.height = { ideal: caps.height.max };
+
+            if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+                advanced.push({ focusMode: 'continuous' });
+            }
+            if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes('continuous')) {
+                advanced.push({ exposureMode: 'continuous' });
+            }
+            if (Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes('continuous')) {
+                advanced.push({ whiteBalanceMode: 'continuous' });
+            }
+            if (advanced.length) constraints.advanced = advanced;
+
+            if (Object.keys(constraints).length) {
+                await track.applyConstraints(constraints);
+            }
+        } catch (_e) {
+            // Best-effort: ignorar si el dispositivo no lo soporta
+        }
+    }
+
+    /**
+     * Crea un ImageCapture para sacar fotos a resolución completa del sensor
+     * (Android Chrome). En iOS Safari no existe → fallback a frame de vídeo.
+     */
+    function setupImageCapture(track) {
+        state.imageCapture = null;
+        if (track && typeof window.ImageCapture === 'function') {
+            try {
+                state.imageCapture = new ImageCapture(track);
+            } catch (_e) {
+                state.imageCapture = null;
+            }
+        }
+    }
+
+    /**
+     * Muestra el botón de linterna solo si el dispositivo tiene torch.
+     */
+    function setupTorchUI(track) {
+        state.torchOn = false;
+        if (btnTorch) {
+            btnTorch.classList.remove('active');
+            btnTorch.setAttribute('aria-pressed', 'false');
+        }
+        let hasTorch = false;
+        try {
+            if (track && typeof track.getCapabilities === 'function') {
+                const caps = track.getCapabilities();
+                hasTorch = !!caps.torch;
+            }
+        } catch (_e) { hasTorch = false; }
+        if (btnTorch) btnTorch.classList.toggle('hidden', !hasTorch);
+    }
+
+    /**
+     * Enciende/apaga la linterna (torch) vía applyConstraints.
+     */
+    async function toggleTorch() {
+        const track = state.videoTrack;
+        if (!track || typeof track.applyConstraints !== 'function') return;
+        const next = !state.torchOn;
+        try {
+            await track.applyConstraints({ advanced: [{ torch: next }] });
+            state.torchOn = next;
+            if (btnTorch) {
+                btnTorch.classList.toggle('active', next);
+                btnTorch.setAttribute('aria-pressed', String(next));
+            }
+        } catch (_e) {
+            // No soportado en este dispositivo
+        }
+    }
+
+    /**
+     * Apaga la linterna si estaba encendida (al cerrar/detener la cámara).
+     */
+    async function turnOffTorch() {
+        if (!state.torchOn) return;
+        const track = state.videoTrack;
+        if (track && typeof track.applyConstraints === 'function') {
+            try { await track.applyConstraints({ advanced: [{ torch: false }] }); } catch (_e) {}
+        }
+        state.torchOn = false;
+        if (btnTorch) {
+            btnTorch.classList.remove('active');
+            btnTorch.setAttribute('aria-pressed', 'false');
+        }
+    }
+
+    /**
+     * Toca-para-enfocar: muestra un anillo de feedback y, si el dispositivo lo
+     * soporta, fija el punto de enfoque (pointsOfInterest).
+     */
+    function tapToFocus(evt) {
+        const rect = camVideo.getBoundingClientRect();
+        const clientX = (evt.touches && evt.touches[0]) ? evt.touches[0].clientX : evt.clientX;
+        const clientY = (evt.touches && evt.touches[0]) ? evt.touches[0].clientY : evt.clientY;
+        if (clientX == null || clientY == null) return;
+
+        // Feedback visual del anillo en el punto tocado
+        if (camFocusRing) {
+            camFocusRing.style.left = (clientX) + 'px';
+            camFocusRing.style.top  = (clientY) + 'px';
+            camFocusRing.classList.remove('hidden');
+            // reiniciar animación
+            void camFocusRing.offsetWidth;
+            clearTimeout(camFocusRing._hideTimer);
+            camFocusRing._hideTimer = setTimeout(() => camFocusRing.classList.add('hidden'), 700);
+        }
+
+        // Intentar fijar el punto de enfoque (soporte muy limitado)
+        const track = state.videoTrack;
+        if (track && typeof track.getCapabilities === 'function' &&
+            typeof track.applyConstraints === 'function') {
+            try {
+                const caps = track.getCapabilities();
+                if (caps.pointsOfInterest || (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot'))) {
+                    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                    const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+                    const adv = {};
+                    if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
+                        adv.focusMode = 'single-shot';
+                    }
+                    if (caps.pointsOfInterest) {
+                        adv.pointsOfInterest = [{ x, y }];
+                    }
+                    track.applyConstraints({ advanced: [adv] }).catch(() => {});
+                }
+            } catch (_e) { /* no soportado */ }
+        }
     }
 
     function closeCamera() {
@@ -1089,6 +1474,12 @@
     // ===================================================================
     async function checkPreviousPhotos() {
         if (!state.infraId) return;
+
+        // Liberar blob URLs del lote anterior para evitar fugas de memoria
+        if (state.prevPhotos && state.prevPhotos.length > 0 &&
+            window.InfocampoOffline && window.InfocampoOffline.revokeBlobUrls) {
+            window.InfocampoOffline.revokeBlobUrls(state.prevPhotos);
+        }
 
         // Try cached photos first when offline
         if (!navigator.onLine && window.InfocampoOffline) {
@@ -1201,44 +1592,101 @@
         }
 
         try {
-            const vw = camVideo.videoWidth;
-            const vh = camVideo.videoHeight;
+            // Adquirir el mejor fotograma disponible:
+            //  - ImageCapture.takePhoto() → foto a resolución completa del sensor
+            //  - fallback: fotograma del vídeo en directo (iOS Safari, etc.)
+            let photoSource = camVideo;
+            let fullW = camVideo.videoWidth;
+            let fullH = camVideo.videoHeight;
+            let bitmap = null;
+            let photoObjUrl = null; // objectURL a revocar si usamos el fallback <img>
 
-            if (!vw || !vh) {
-                console.warn('captureFrame: video not ready (dimensions 0)');
+            if (state.imageCapture && typeof state.imageCapture.takePhoto === 'function') {
+                try {
+                    const photoBlob = await state.imageCapture.takePhoto({ fillLightMode: 'off' });
+                    try {
+                        // Vía preferida: decodifica respetando la orientación EXIF
+                        bitmap = await createImageBitmap(photoBlob, { imageOrientation: 'from-image' });
+                        photoSource = bitmap;
+                        fullW = bitmap.width;
+                        fullH = bitmap.height;
+                    } catch (_bmErr) {
+                        // Fallback: decodificar el blob con <img> (mantiene la
+                        // resolución completa del sensor; el navegador aplica EXIF).
+                        const imgEl = await loadImageFromBlob(photoBlob);
+                        photoSource = imgEl;
+                        photoObjUrl = imgEl._objUrl || null;
+                        fullW = imgEl.naturalWidth;
+                        fullH = imgEl.naturalHeight;
+                    }
+                } catch (_e) {
+                    // Último recurso: fotograma del vídeo en directo
+                    bitmap = null;
+                    photoObjUrl = null;
+                    photoSource = camVideo;
+                    fullW = camVideo.videoWidth;
+                    fullH = camVideo.videoHeight;
+                }
+            }
+
+            if (!fullW || !fullH) {
+                console.warn('captureFrame: fuente no lista (dimensiones 0)');
+                if (bitmap) bitmap.close();
                 _capturing = false;
                 if (btnShutter) { btnShutter.disabled = false; btnShutter.style.opacity = ''; }
                 return;
             }
 
-            // Force 3:4 portrait crop from center of video frame
-            let srcX = 0, srcY = 0, srcW = vw, srcH = vh;
-            const targetRatio = 3 / 4; // width / height
-            const videoRatio = vw / vh;
+            // Recorte 3:4 vertical desde el centro de la fuente
+            let srcX = 0, srcY = 0, srcW = fullW, srcH = fullH;
+            const targetRatio = 3 / 4; // ancho / alto
+            const sourceRatio = fullW / fullH;
 
-            if (videoRatio > targetRatio) {
-                srcW = Math.round(vh * targetRatio);
-                srcX = Math.round((vw - srcW) / 2);
-            } else if (videoRatio < targetRatio) {
-                srcH = Math.round(vw / targetRatio);
-                srcY = Math.round((vh - srcH) / 2);
+            if (sourceRatio > targetRatio) {
+                srcW = Math.round(fullH * targetRatio);
+                srcX = Math.round((fullW - srcW) / 2);
+            } else if (sourceRatio < targetRatio) {
+                srcH = Math.round(fullW / targetRatio);
+                srcY = Math.round((fullH - srcH) / 2);
             }
 
             // Free previous canvas memory before allocating new
             state.baseImageData = null;
             state.capturedBlob = null;
 
-            camCapture.width = srcW;
-            camCapture.height = srcH;
+            // Tope de resolución: evita OOM con sensores muy grandes (p. ej. 108 MP).
+            // 4096 px de lado largo ≈ 12,6 MP, sobrado para documentación de campo.
+            // El path de fallback (vídeo ≤1080p) no se ve afectado (no se reescala).
+            const MAX_LONG = 4096;
+            let dstW = srcW, dstH = srcH;
+            if (srcH > MAX_LONG) {
+                const scale = MAX_LONG / srcH;
+                dstW = Math.round(srcW * scale);
+                dstH = MAX_LONG;
+            }
+
+            camCapture.width = dstW;
+            camCapture.height = dstH;
 
             const ctx = camCapture.getContext('2d');
-            ctx.drawImage(camVideo, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(photoSource, srcX, srcY, srcW, srcH, 0, 0, dstW, dstH);
+
+            // Liberar el bitmap / objectURL de alta resolución cuanto antes
+            if (bitmap) bitmap.close();
+            if (photoObjUrl) { URL.revokeObjectURL(photoObjUrl); photoObjUrl = null; }
+
+            // Reducción de ruido (proporcional a la oscuridad) + enfoque en una
+            // sola pasada, antes de aplicar el watermark.
+            enhanceCanvas(camCapture);
 
             camVideo.pause();
 
             // Freeze GPS coordinates at the exact moment of capture
             state.capturedGps.lat = state.gps.lat;
             state.capturedGps.lon = state.gps.lon;
+            state.capturedGps.alt = (state.gps.alt != null) ? state.gps.alt : null;
 
             // Update counters
             state.countTotal++;
@@ -1372,8 +1820,8 @@
     // PROCESS, UPLOAD & RETURN TO FICHA
     // ===================================================================
     async function processAndUploadPhoto(filename) {
-        // Convert preview canvas to blob
-        const blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.85);
+        // Convert preview canvas to blob (0.92: detalle alto para documentación de campo)
+        let blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.92);
         if (!blob) {
             alert('Error al procesar la foto.');
             camVideo.play();
@@ -1391,9 +1839,6 @@
         // Show upload overlay
         uploadOverlay.classList.remove('hidden');
 
-        // Save to device gallery (non-blocking)
-        saveToDeviceGallery(blob, filename);
-
         let seq = null;
         if (state.currentMode === 'comparativo') {
             seq = state.seqComparativa;
@@ -1402,9 +1847,27 @@
         // Use GPS frozen at capture moment for accuracy
         const captureLat = state.capturedGps.lat || state.gps.lat || 0;
         const captureLon = state.capturedGps.lon || state.gps.lon || 0;
+        const captureAlt = (state.capturedGps.alt != null) ? state.capturedGps.alt
+            : (state.gps && state.gps.alt != null ? state.gps.alt : null);
+
+        // Inyectar las coordenadas GPS en los metadatos EXIF del JPEG. Así la
+        // misma copia se guarda en galería, se sube a la nube y se encola
+        // offline con el geoposicionamiento incrustado (auditable).
+        blob = await ExifGps.injectGps(blob, captureLat, captureLon, captureAlt);
+
+        // Save to device gallery (non-blocking) — ya con EXIF GPS
+        saveToDeviceGallery(blob, filename);
+
+        // Token de idempotencia: identifica esta captura de forma única para
+        // evitar registros duplicados si la subida se reintenta tras un fallo de red
+        const clientToken = (self.crypto && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ('t' + Date.now() + '-' + Math.random().toString(36).slice(2));
 
         // Build upload data
         const uploadData = {
+            csrf_token: CFG.csrfToken,
+            client_token: clientToken,
             infra_id: state.infraId,
             usuario_id: CFG.usuarioId,
             lat_real: captureLat,
@@ -1452,7 +1915,7 @@
                 uploadOverlay.classList.add('hidden');
 
                 const localUrl = URL.createObjectURL(blob);
-                addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
+                addToGallery(localUrl, state.currentMode + ' pending', filename, seq, uploadData.client_token);
                 updateCounters(seq);
 
                 showScreen('ficha');
@@ -1470,6 +1933,7 @@
         // Online — upload directly
         const formData = new FormData();
         formData.append('csrf_token', CFG.csrfToken || '');
+        formData.append('client_token', uploadData.client_token || '');
         formData.append('imagen', blob, filename + '.jpg');
         formData.append('infra_id', uploadData.infra_id);
         formData.append('usuario_id', uploadData.usuario_id);
@@ -1503,8 +1967,10 @@
             uploadOverlay.classList.add('hidden');
 
             if (data.ok) {
-                addToGallery(data.url_imagen, state.currentMode, filename, seq);
-                updateCounters(seq);
+                // El servidor es la fuente de verdad de la secuencia comparativa
+                const finalSeq = (data.secuencia_comparativa != null) ? data.secuencia_comparativa : seq;
+                addToGallery(data.url_imagen, state.currentMode, data.nombre_archivo || filename, finalSeq);
+                updateCounters(finalSeq);
                 showScreen('ficha');
                 showNotification('Foto subida correctamente');
             } else {
@@ -1519,7 +1985,7 @@
                 try {
                     await window.InfocampoOffline.enqueue(blob, uploadData);
                     const localUrl = URL.createObjectURL(blob);
-                    addToGallery(localUrl, state.currentMode + ' pending', filename, seq);
+                    addToGallery(localUrl, state.currentMode + ' pending', filename, seq, uploadData.client_token);
                     updateCounters(seq);
                     showScreen('ficha');
                     showNotification('Foto guardada (pendiente de sincronizar)');
@@ -1535,10 +2001,15 @@
     }
 
     function stopCameraStream() {
+        // Apagar la linterna antes de soltar el track (best-effort)
+        turnOffTorch();
         if (state.stream) {
             state.stream.getTracks().forEach(t => t.stop());
             state.stream = null;
         }
+        state.videoTrack = null;
+        state.imageCapture = null;
+        if (btnTorch) btnTorch.classList.add('hidden');
         camVideo.pause();
         camVideo.srcObject = null;
     }
@@ -1571,25 +2042,62 @@
     // ===================================================================
     // GALLERY
     // ===================================================================
-    function addToGallery(url, type, name, seq) {
+    function addToGallery(url, type, name, seq, clientToken) {
         gallerySection.classList.remove('hidden');
 
         const isPending = type.includes('pending');
         const baseType = type.replace(' pending', '').replace(' synced', '');
-        let label = baseType === 'comparativo' ? 'W' + seq : 'ALEA';
+        // Para comparativas usamos 'W'+secuencia; si no hay secuencia válida,
+        // numeramos por orden de aparición para no mostrar "Wnull".
+        let label;
+        if (baseType === 'comparativo') {
+            const n = (seq != null && seq !== '') ? seq : (state.countComparativas || state.photos.filter(p => p.type === 'comparativo').length + 1);
+            label = 'W' + n;
+        } else {
+            label = 'ALEA';
+        }
         if (isPending) label += ' *';
 
         const div = document.createElement('div');
         div.className = 'gallery-item';
+        if (clientToken) div.dataset.clientToken = clientToken;
+        // Miniatura ligera para la rejilla; URL completa para el visor HD
+        const thumbUrl = cloudinaryThumb(url, 400);
+        div.dataset.full = url;
+        div.dataset.caption = name;
         div.innerHTML = `
-            <img src="${escHtml(url)}" alt="${escHtml(name)}" loading="lazy">
+            <img src="${escHtml(thumbUrl)}" alt="${escHtml(name)}" loading="lazy">
             <span class="gallery-type ${baseType}${isPending ? ' pending' : ''}">${label}</span>
             <div class="gallery-label">${escHtml(name)}</div>
         `;
         galleryGrid.appendChild(div);
 
-        state.photos.push({ url, type: baseType, seq, name, pending: isPending });
+        state.photos.push({ url, type: baseType, seq, name, pending: isPending, clientToken: clientToken || null });
         updateButtonState();
+    }
+
+    // Marca un item pendiente (offline) como sincronizado: quita el asterisco
+    // y la clase 'pending'. Si el servidor asignó otra secuencia comparativa,
+    // corrige la etiqueta W. Devuelve true si encontró y actualizó el item.
+    function markGalleryItemSynced(clientToken, serverSeq) {
+        if (!clientToken) return false;
+        const item = galleryGrid.querySelector(`.gallery-item[data-client-token="${CSS.escape(clientToken)}"]`);
+        if (!item) return false;
+        const badge = item.querySelector('.gallery-type');
+        if (badge) {
+            badge.classList.remove('pending');
+            if (serverSeq != null && badge.classList.contains('comparativo')) {
+                badge.textContent = 'W' + serverSeq;
+            } else {
+                badge.textContent = badge.textContent.replace(/\s*\*$/, '');
+            }
+        }
+        const photo = state.photos.find(p => p.clientToken === clientToken);
+        if (photo) {
+            photo.pending = false;
+            if (serverSeq != null) photo.seq = serverSeq;
+        }
+        return true;
     }
 
     // ===================================================================
@@ -1875,20 +2383,12 @@
             const centerX = 256 + pixelX;
             const centerY = 256 + pixelY;
 
-            // Verify tileCanvas is not tainted before compositing to main canvas
-            try {
-                tileCanvas.toDataURL();
-            } catch (_taintErr) {
-                console.warn('Mini-map: canvas tainted by tiles, skipping');
-                return;
-            }
-
             // Draw rounded rectangle clip path on mapCanvas
             roundRect(mapCtx, 0, 0, mapSize, mapSize, borderRadius);
             mapCtx.clip();
 
-            // Draw the tile composite, cropped and scaled to mapSize
-            const srcSize = mapSize * (256 / mapSize);
+            // Recortar exactamente mapSize px de los tiles (escala 1:1, sin reescalado borroso)
+            const srcSize = mapSize;
             mapCtx.drawImage(tileCanvas,
                 centerX - srcSize / 2, centerY - srcSize / 2, srcSize, srcSize,
                 0, 0, mapSize, mapSize
@@ -2025,9 +2525,21 @@
     // EVENTS
     // ===================================================================
     function bindEvents() {
+        // Confirmar antes de descartar fotos sin finalizar al cambiar de filtro
+        function confirmDiscardUnsaved() {
+            if (!hasUnsavedData()) return true;
+            return confirm('Tienes fotos sin finalizar. Si cambias el filtro se descartarán. ¿Continuar?');
+        }
+        // Guardar el valor previo de cada select para poder revertir si se cancela
+        [filterProvincia, filterMunicipio, filterMonte].forEach((sel) => {
+            if (sel) sel.addEventListener('focus', () => { sel.dataset.prev = sel.value; });
+        });
+
         // Provincia / municipio / monte filters
         if (filterProvincia) {
             filterProvincia.addEventListener('change', () => {
+                if (!confirmDiscardUnsaved()) { filterProvincia.value = filterProvincia.dataset.prev || ''; return; }
+                filterProvincia.dataset.prev = filterProvincia.value;
                 loadMunicipios(filterProvincia.value);
                 loadMontes();
                 clearInfra();
@@ -2035,12 +2547,16 @@
         }
         if (filterMunicipio) {
             filterMunicipio.addEventListener('change', () => {
+                if (!confirmDiscardUnsaved()) { filterMunicipio.value = filterMunicipio.dataset.prev || ''; return; }
+                filterMunicipio.dataset.prev = filterMunicipio.value;
                 loadMontes();
                 clearInfra();
             });
         }
         if (filterMonte) {
             filterMonte.addEventListener('change', () => {
+                if (!confirmDiscardUnsaved()) { filterMonte.value = filterMonte.dataset.prev || ''; return; }
+                filterMonte.dataset.prev = filterMonte.value;
                 clearInfra();
             });
         }
@@ -2048,7 +2564,7 @@
         // Infrastructure search
         infraSearch.addEventListener('input', (e) => searchInfra(e.target.value.trim()));
         infraSearch.addEventListener('focus', () => searchInfra(infraSearch.value.trim()));
-        infraClear.addEventListener('click', clearInfra);
+        infraClear.addEventListener('click', () => { if (confirmDiscardUnsaved()) clearInfra(); });
 
         // Close search results on outside click
         document.addEventListener('click', (e) => {
@@ -2084,6 +2600,16 @@
         // Camera
         btnCamBack.addEventListener('click', closeCamera);
         btnShutter.addEventListener('click', captureFrame);
+
+        // Linterna (torch)
+        if (btnTorch) {
+            btnTorch.addEventListener('click', toggleTorch);
+        }
+
+        // Toca-para-enfocar sobre el vídeo
+        if (camVideo) {
+            camVideo.addEventListener('click', tapToFocus);
+        }
 
         // Ghost toggle
         btnGhostToggle.addEventListener('click', () => {
@@ -2185,8 +2711,11 @@
                 btn.addEventListener('click', () => {
                     const sitIdx = parseInt(btn.dataset.sit);
                     state.situacionIdx = sitIdx;
-                    situacionSelector.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
+                    situacionSelector.querySelectorAll('.situacion-option').forEach(b => {
+                        const isActive = b === btn;
+                        b.classList.toggle('active', isActive);
+                        b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+                    });
                 });
             });
         }
@@ -2220,6 +2749,8 @@
     const mapBaseLayers = {};
     let mapAdminPointsLayer = null; // Admin custom points layer
     let mapAllInfrasCache = [];     // Cache for search
+    let mapPhotoPointsLayer = null; // Capa de puntos de foto en su GPS real (lat_real/lon_real)
+    let mapPhotoPointsVisible = true;
 
     // Navigation mode state
     let navActive = false;
@@ -2280,11 +2811,16 @@
             layerControl.onAdd = function() {
                 const div = L.DomUtil.create('div', 'op-layer-switcher');
                 div.innerHTML =
-                    '<select id="op-base-layer-select" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;">' +
+                    '<select id="op-base-layer-select" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #ccc;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;width:100%;">' +
                     '<option value="osm">Mapa</option>' +
                     '<option value="ortofoto">Ortofoto</option>' +
                     '<option value="topografico">Topográfico</option>' +
-                    '</select>';
+                    '</select>' +
+                    '<button type="button" id="op-toggle-photos" title="Mostrar/ocultar puntos de foto" ' +
+                    'style="margin-top:6px;display:flex;align-items:center;justify-content:center;gap:5px;' +
+                    'font-size:11px;padding:6px 8px;border-radius:6px;border:1px solid #9db4f8;background:#eef2ff;' +
+                    'box-shadow:0 2px 6px rgba(0,0,0,0.2);cursor:pointer;width:100%;font-weight:700;color:#1a1a2e;">' +
+                    '<i class="bi bi-camera-fill"></i> Fotos</button>';
                 L.DomEvent.disableClickPropagation(div);
                 return div;
             };
@@ -2296,6 +2832,11 @@
                 mapActiveBaseLayer.addTo(leafletMap);
                 mapActiveBaseLayer.bringToBack();
             });
+
+            const btnTogglePhotos = document.getElementById('op-toggle-photos');
+            if (btnTogglePhotos) {
+                btnTogglePhotos.addEventListener('click', toggleMapPhotoPoints);
+            }
 
             // Set initial view to current GPS or Spain center
             if (state.gps.lat && state.gps.lon) {
@@ -2424,7 +2965,7 @@
         try {
             // Load registros AND all infrastructures in parallel
             const [regRes, infraRes] = await Promise.all([
-                fetch(`${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=500`).then(r => r.json()),
+                fetch(`${CFG.endpoints.registrosMapa}?empresa_id=${CFG.empresaId}&limit=5000`).then(r => r.json()),
                 fetch(`${CFG.endpoints.infraestructuras}?empresa_id=${CFG.empresaId}&q=`).then(r => r.json()),
             ]);
 
@@ -2558,6 +3099,9 @@
                 const totalReg = regRes.ok ? (regRes.registros?.length || 0) : 0;
                 sub.textContent = `${totalInfra} infraestructura${totalInfra !== 1 ? 's' : ''} · ${visitedCount} visitada${visitedCount !== 1 ? 's' : ''} · ${totalReg} foto${totalReg !== 1 ? 's' : ''}`;
             }
+
+            // Pintar puntos de foto individuales en su GPS real (lat_real/lon_real)
+            renderMapPhotoPoints(regRes.ok ? regRes.registros : []);
 
             // Load KML layers from DB
             loadMapKmlLayers();
@@ -2889,20 +3433,56 @@
     }
 
     function doMapSearch(query, resultsEl) {
-        const matches = mapAllInfrasCache.filter(inf => {
+        // Search infrastructure by name/code (max 10)
+        const infraMatches = mapAllInfrasCache.filter(inf => {
             const nombre = (inf.nombre || '').toLowerCase();
             const codigo = (inf.codigo || '').toLowerCase();
             return nombre.includes(query) || codigo.includes(query);
-        }).slice(0, 15);
+        }).slice(0, 10);
 
-        if (matches.length === 0) {
+        // Search photo points by operator name, date, estado, observations, infra name (max 10)
+        const photoMatches = [];
+        for (const inf of mapAllInfrasCache) {
+            if (photoMatches.length >= 10) break;
+            if (!inf.registros) continue;
+            for (const r of inf.registros) {
+                if (photoMatches.length >= 10) break;
+                const lat = parseFloat(r.lat_real);
+                const lon = parseFloat(r.lon_real);
+                if (!lat || !lon) continue;
+
+                const operador = (r.usuario_nombre || '').toLowerCase();
+                const estado = (r.estado_incidencia || '').toLowerCase();
+                const obs = (r.observaciones || '').toLowerCase();
+                const infraNombre = (r.infra_nombre || inf.nombre || '').toLowerCase();
+                const fecha = r.fecha ? new Date(r.fecha).toLocaleString('es-ES', {
+                    timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                }) : '';
+                const fechaLower = fecha.toLowerCase();
+
+                if (operador.includes(query) || estado.includes(query) || obs.includes(query) || infraNombre.includes(query) || fechaLower.includes(query)) {
+                    photoMatches.push({
+                        ...r,
+                        _infraNombre: r.infra_nombre || inf.nombre || '',
+                        _fecha: fecha,
+                        _lat: lat,
+                        _lon: lon,
+                    });
+                }
+            }
+        }
+
+        if (infraMatches.length === 0 && photoMatches.length === 0) {
             resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:#9ca3af;font-size:0.82rem;">Sin resultados</div>';
             resultsEl.classList.remove('hidden');
             return;
         }
 
         let html = '';
-        matches.forEach(inf => {
+
+        // Infrastructure results
+        infraMatches.forEach(inf => {
             const hasPhotos = inf.registros && inf.registros.length > 0;
             const dotColor = hasPhotos ? '#22c55e' : '#9ca3af';
             let distHtml = '';
@@ -2920,17 +3500,59 @@
             </div>`;
         });
 
+        // Photo results section
+        if (photoMatches.length > 0) {
+            if (infraMatches.length > 0) {
+                html += '<div style="border-top:1px solid #e5e7eb;margin:4px 0;"></div>';
+                html += '<div style="padding:4px 12px 2px;font-size:0.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Fotos</div>';
+            }
+            photoMatches.forEach(p => {
+                const estado = (p.estado_incidencia || '').toUpperCase();
+                html += `<div class="mapa-search-item photo-result" data-lat="${p._lat}" data-lon="${p._lon}" data-reg-id="${p.id}">
+                    <span class="search-dot" style="background:#f59e0b;display:flex;align-items:center;justify-content:center;"><i class="bi bi-camera-fill" style="font-size:8px;color:#fff;"></i></span>
+                    <div class="search-info">
+                        <strong>${escHtml(p._infraNombre)}</strong>
+                        <small>${escHtml(p._fecha)} · ${escHtml(p.usuario_nombre || '')} · ${escHtml(estado)}</small>
+                    </div>
+                </div>`;
+            });
+        }
+
         resultsEl.innerHTML = html;
         resultsEl.classList.remove('hidden');
 
-        // Click handler for results
-        resultsEl.querySelectorAll('.mapa-search-item').forEach(el => {
+        // Click handler for infrastructure results
+        resultsEl.querySelectorAll('.mapa-search-item:not(.photo-result)').forEach(el => {
             el.addEventListener('click', () => {
                 const infraId = parseInt(el.dataset.infraId);
                 const infra = mapAllInfrasCache.find(i => i.id === infraId || i.id === String(infraId));
                 if (infra && infra.lat && infra.lon) {
                     leafletMap.setView([infra.lat, infra.lon], 17, { animate: true });
                     showInfraDetail(infra);
+                }
+                resultsEl.classList.add('hidden');
+                document.getElementById('mapa-search-bar').classList.add('hidden');
+                document.getElementById('mapa-search-input').value = '';
+            });
+        });
+
+        // Click handler for photo results
+        resultsEl.querySelectorAll('.mapa-search-item.photo-result').forEach(el => {
+            el.addEventListener('click', () => {
+                const lat = parseFloat(el.dataset.lat);
+                const lon = parseFloat(el.dataset.lon);
+                const regId = el.dataset.regId;
+                if (lat && lon) {
+                    leafletMap.flyTo([lat, lon], 18, { animate: true });
+                    // Try to find and open the photo marker popup
+                    if (mapPhotoPointsLayer) {
+                        mapPhotoPointsLayer.eachLayer(layer => {
+                            const latlng = layer.getLatLng();
+                            if (Math.abs(latlng.lat - lat) < 0.00001 && Math.abs(latlng.lng - lon) < 0.00001) {
+                                setTimeout(() => layer.openPopup(), 600);
+                            }
+                        });
+                    }
                 }
                 resultsEl.classList.add('hidden');
                 document.getElementById('mapa-search-bar').classList.add('hidden');
@@ -2956,6 +3578,46 @@
         // Build detail body
         let html = '';
         const regs = infra.registros;
+
+        // Progress timeline section
+        if (regs.length > 0) {
+            const antes = regs.filter(r => r.estado_incidencia === 'antes');
+            const durante = regs.filter(r => r.estado_incidencia === 'durante');
+            const despues = regs.filter(r => r.estado_incidencia === 'despues');
+            const total = regs.length;
+            const pctAntes = Math.round(antes.length / total * 100);
+            const pctDurante = Math.round(durante.length / total * 100);
+            const pctDespues = Math.round(despues.length / total * 100);
+
+            html += `<div class="progress-timeline">
+                <div class="progress-timeline-bar">
+                    <div class="progress-timeline-segment progress-timeline-antes" style="width:${pctAntes}%"></div>
+                    <div class="progress-timeline-segment progress-timeline-durante" style="width:${pctDurante}%"></div>
+                    <div class="progress-timeline-segment progress-timeline-despues" style="width:${pctDespues}%"></div>
+                </div>
+                <div class="progress-timeline-labels">
+                    <span class="progress-timeline-label" style="color:#3b82f6;">Antes ${antes.length}</span>
+                    <span class="progress-timeline-label" style="color:#f59e0b;">Durante ${durante.length}</span>
+                    <span class="progress-timeline-label" style="color:#22c55e;">Despues ${despues.length}</span>
+                </div>
+                <div class="progress-timeline-scroll">`;
+
+            const groups = [
+                { items: antes, cls: 'antes' },
+                { items: durante, cls: 'durante' },
+                { items: despues, cls: 'despues' }
+            ];
+            groups.forEach(g => {
+                g.items.forEach(r => {
+                    const thumb = r.url_cloudinary || '';
+                    html += `<div class="progress-timeline-thumb progress-timeline-thumb--${g.cls}">
+                        <img src="${escHtml(thumb)}" alt="" loading="lazy">
+                    </div>`;
+                });
+            });
+
+            html += `</div></div>`;
+        }
 
         // Show comparativas first, then aleatorias
         const comparativas = regs.filter(r => r.tipo_foto === 'comparativo');
@@ -3137,11 +3799,105 @@
         ${r.observaciones ? '<div class="mapa-detail-obs">' + escHtml(r.observaciones) + '</div>' : ''}`;
     }
 
+    // ===================================================================
+    // PUNTOS DE FOTO EN EL MAPA (GPS real de cada foto)
+    // ===================================================================
+
+    /**
+     * Pinta un marcador por cada foto en su ubicación GPS real (lat_real/lon_real).
+     * Permite ver en el mapa dónde se tomó exactamente cada foto y revisarlas
+     * en las siguientes visitas. Coloreado por estado (antes/durante/después).
+     */
+    function renderMapPhotoPoints(registros) {
+        // Limpiar capa anterior para evitar acumulación
+        if (mapPhotoPointsLayer) {
+            leafletMap.removeLayer(mapPhotoPointsLayer);
+            mapPhotoPointsLayer = null;
+        }
+        if (!registros || registros.length === 0) return;
+
+        const stateColors = { 'antes': '#3b82f6', 'durante': '#f59e0b', 'despues': '#22c55e' };
+        const group = L.layerGroup();
+
+        registros.forEach(r => {
+            const lat = parseFloat(r.lat_real);
+            const lon = parseFloat(r.lon_real);
+            // Saltar coordenadas inválidas (0 / null / NaN / cerca de 0,0)
+            if (!lat || !lon || Math.abs(lat) < 0.0001 || Math.abs(lon) < 0.0001) return;
+            if (!r.url_cloudinary) return;
+
+            const color = stateColors[r.estado_incidencia] || '#9ca3af';
+            const icon = L.divIcon({
+                className: 'op-photo-point',
+                html: '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +
+                      'background:' + color + ';border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.5);' +
+                      'display:flex;align-items:center;justify-content:center;">' +
+                      '<i class="bi bi-camera-fill" style="transform:rotate(45deg);font-size:9px;color:#fff;"></i>' +
+                      '</div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 20],
+            });
+
+            const marker = L.marker([lat, lon], { icon, zIndexOffset: 200 });
+            marker.bindPopup(buildPhotoPointPopup(r), { maxWidth: 240 });
+            group.addLayer(marker);
+        });
+
+        mapPhotoPointsLayer = group;
+        if (mapPhotoPointsVisible) group.addTo(leafletMap);
+    }
+
+    /**
+     * Contenido del popup de un punto de foto: miniatura (ampliable), datos y estado.
+     */
+    function buildPhotoPointPopup(r) {
+        const fecha = new Date(r.fecha).toLocaleString('es-ES', {
+            timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+        });
+        const isComp = r.tipo_foto === 'comparativo';
+        const seqLabel = isComp && r.secuencia_comparativa ? ' · W' + r.secuencia_comparativa : '';
+        const url = escHtml(r.url_cloudinary);
+        const estado = escHtml(r.estado_incidencia || '');
+        return '<div style="width:200px;">' +
+            '<a href="' + url + '" target="_blank" rel="noopener">' +
+            '<img src="' + url + '" alt="" style="width:100%;border-radius:8px;display:block;" loading="lazy"></a>' +
+            '<div style="font-size:0.74rem;font-weight:700;margin-top:6px;color:#1a1a2e;">' + escHtml(r.infra_nombre || '') + '</div>' +
+            '<div style="font-size:0.68rem;color:#5a6675;margin-top:2px;">' + fecha + ' · ' + escHtml(r.usuario_nombre || '') + seqLabel + '</div>' +
+            '<div style="margin-top:4px;"><span class="estado-badge ' + estado + '">' + estado.toUpperCase() + '</span></div>' +
+            (r.observaciones ? '<div style="font-size:0.68rem;color:#46505f;margin-top:4px;">' + escHtml(r.observaciones) + '</div>' : '') +
+            '</div>';
+    }
+
+    /**
+     * Muestra/oculta la capa de puntos de foto.
+     */
+    function toggleMapPhotoPoints() {
+        mapPhotoPointsVisible = !mapPhotoPointsVisible;
+        if (mapPhotoPointsLayer) {
+            if (mapPhotoPointsVisible) {
+                mapPhotoPointsLayer.addTo(leafletMap);
+            } else {
+                leafletMap.removeLayer(mapPhotoPointsLayer);
+            }
+        }
+        const btn = document.getElementById('op-toggle-photos');
+        if (btn) {
+            btn.style.background = mapPhotoPointsVisible ? '#eef2ff' : '#fff';
+            btn.style.borderColor = mapPhotoPointsVisible ? '#9db4f8' : '#ccc';
+            btn.style.opacity = mapPhotoPointsVisible ? '1' : '0.7';
+        }
+    }
+
     function startVisitFromMap(mode) {
         if (!mapSelectedInfra) return;
 
         // Stop navigation if active
         if (navActive) stopNavigation();
+
+        // Detener el watch GPS del mapa para no dejar dos watches activos
+        // (el de la cámara se inicia en openCamera) — ahorra batería.
+        stopMapGpsTracking();
 
         // Select the infrastructure in the ficha
         selectInfra(mapSelectedInfra.id, mapSelectedInfra.nombre, mapSelectedInfra.codigo);
@@ -3399,13 +4155,13 @@
      * Retake photo: undo counters, resume camera.
      */
     function retakePhoto() {
-        // Undo the counters incremented in captureFrame
-        state.countTotal--;
+        // Undo the counters incremented in captureFrame (sin bajar de 0)
+        state.countTotal = Math.max(0, state.countTotal - 1);
         if (state.currentMode === 'comparativo') {
-            state.seqComparativa--;
-            state.countComparativas--;
+            state.seqComparativa = Math.max(0, state.seqComparativa - 1);
+            state.countComparativas = Math.max(0, state.countComparativas - 1);
         } else {
-            state.countAleatorias--;
+            state.countAleatorias = Math.max(0, state.countAleatorias - 1);
         }
 
         // Persist decremented counter
@@ -3469,6 +4225,181 @@
         return dashIdx >= 0 ? text.substring(dashIdx + 3) : text;
     }
 
+    /**
+     * Reducción de ruido + enfoque (unsharp mask) en una sola pasada 3x3.
+     *   resultado = kd·centro + ka·media,  con
+     *   kd = (1-nr)·(1+s)   y   ka = nr·(1+s) - s
+     * Donde `nr` (reducción de ruido) crece cuanto más oscura es la escena y
+     * `s` es el enfoque. En escenas claras predomina el enfoque; en oscuras,
+     * la reducción de ruido evita amplificar grano en sombras.
+     */
+    function enhanceCanvas(canvas) {
+        try {
+            const w = canvas.width, h = canvas.height;
+            if (w < 8 || h < 8) return;
+            const ctx = canvas.getContext('2d');
+            const src = ctx.getImageData(0, 0, w, h);
+            const s = src.data;
+
+            // Estimar luminancia media de la escena por muestreo disperso
+            let sum = 0, n = 0;
+            for (let i = 0; i < s.length; i += 4 * 97) {
+                sum += s[i] * 0.299 + s[i + 1] * 0.587 + s[i + 2] * 0.114;
+                n++;
+            }
+            const avgLum = n ? sum / n : 128;
+
+            const nr = Math.max(0.05, Math.min(0.6, 0.6 * (1 - avgLum / 140)));
+            const sharp = 0.55;
+            const kd = (1 - nr) * (1 + sharp);
+            const ka = nr * (1 + sharp) - sharp;
+
+            const out = ctx.createImageData(w, h);
+            const o = out.data;
+            o.set(s); // copia base (bordes quedan sin procesar)
+
+            const rb = w * 4; // bytes por fila
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    const idx = (y * w + x) * 4;
+                    for (let c = 0; c < 3; c++) {
+                        const p = idx + c;
+                        const mean = (
+                            s[p - rb - 4] + s[p - rb] + s[p - rb + 4] +
+                            s[p - 4]      + s[p]      + s[p + 4] +
+                            s[p + rb - 4] + s[p + rb] + s[p + rb + 4]
+                        ) / 9;
+                        const v = kd * s[p] + ka * mean;
+                        o[p] = v < 0 ? 0 : (v > 255 ? 255 : v);
+                    }
+                }
+            }
+            ctx.putImageData(out, 0, 0);
+        } catch (e) {
+            // getImageData puede fallar (canvas tainted) — no es crítico
+            console.warn('enhanceCanvas omitido:', e);
+        }
+    }
+
+    /**
+     * Escritor mínimo de EXIF GPS (sin librerías externas).
+     * Construye el segmento APP1 (TIFF/IFD big-endian "MM") con un IFD0 que
+     * apunta al GPS IFD, e inserta las coordenadas en formato DMS (rationals).
+     * La altitud es opcional. Se inyecta justo tras el marcador SOI (FFD8).
+     */
+    const ExifGps = (() => {
+        function toDMSRationals(dec) {
+            dec = Math.abs(dec);
+            const deg = Math.floor(dec);
+            const minF = (dec - deg) * 60;
+            const min = Math.floor(minF);
+            const sec = (minF - min) * 60;
+            return [[deg, 1], [min, 1], [Math.round(sec * 10000), 10000]];
+        }
+
+        function buildApp1(lat, lon, alt) {
+            const hasAlt = (typeof alt === 'number' && isFinite(alt));
+            const latRef = lat >= 0 ? 'N' : 'S';
+            const lonRef = lon >= 0 ? 'E' : 'W';
+            const latR = toDMSRationals(lat);
+            const lonR = toDMSRationals(lon);
+
+            const entries = [];
+            entries.push({ tag: 0x0000, type: 1, count: 4, inline: [2, 2, 0, 0] });               // GPSVersionID
+            entries.push({ tag: 0x0001, type: 2, count: 2, inline: [latRef.charCodeAt(0), 0] });   // GPSLatitudeRef
+            entries.push({ tag: 0x0002, type: 5, count: 3, rationals: latR });                     // GPSLatitude
+            entries.push({ tag: 0x0003, type: 2, count: 2, inline: [lonRef.charCodeAt(0), 0] });    // GPSLongitudeRef
+            entries.push({ tag: 0x0004, type: 5, count: 3, rationals: lonR });                     // GPSLongitude
+            if (hasAlt) {
+                entries.push({ tag: 0x0005, type: 1, count: 1, inline: [alt < 0 ? 1 : 0, 0, 0, 0] });      // GPSAltitudeRef
+                entries.push({ tag: 0x0006, type: 5, count: 1, rationals: [[Math.round(Math.abs(alt) * 100), 100]] }); // GPSAltitude
+            }
+
+            const numEntries = entries.length;
+            const ifd0Offset = 8;
+            const gpsIfdOffset = ifd0Offset + 2 + 12 + 4; // tras IFD0 (1 entrada)
+            let cursor = gpsIfdOffset + 2 + numEntries * 12 + 4; // tras entradas del GPS IFD
+            entries.forEach(e => {
+                if (e.rationals) { e.dataOffset = cursor; cursor += e.rationals.length * 8; }
+            });
+            const tiffSize = cursor;
+
+            const totalExif = 6 + tiffSize; // "Exif\0\0" + TIFF
+            const buf = new ArrayBuffer(totalExif);
+            const dv = new DataView(buf);
+            let p = 0;
+            [0x45, 0x78, 0x69, 0x66, 0x00, 0x00].forEach(b => dv.setUint8(p++, b)); // "Exif\0\0"
+            const tiff = p; // inicio TIFF
+            dv.setUint16(tiff, 0x4D4D);        // big-endian
+            dv.setUint16(tiff + 2, 0x002A);
+            dv.setUint32(tiff + 4, ifd0Offset);
+
+            // IFD0: 1 entrada → puntero al GPS IFD (0x8825)
+            let q = tiff + ifd0Offset;
+            dv.setUint16(q, 1); q += 2;
+            dv.setUint16(q, 0x8825); q += 2;
+            dv.setUint16(q, 4); q += 2;
+            dv.setUint32(q, 1); q += 4;
+            dv.setUint32(q, gpsIfdOffset); q += 4;
+            dv.setUint32(q, 0); q += 4; // siguiente IFD = 0
+
+            // GPS IFD
+            let g = tiff + gpsIfdOffset;
+            dv.setUint16(g, numEntries); g += 2;
+            entries.forEach(e => {
+                dv.setUint16(g, e.tag); g += 2;
+                dv.setUint16(g, e.type); g += 2;
+                dv.setUint32(g, e.count); g += 4;
+                if (e.rationals) {
+                    dv.setUint32(g, e.dataOffset); g += 4;
+                } else {
+                    for (let i = 0; i < 4; i++) dv.setUint8(g + i, e.inline[i] || 0);
+                    g += 4;
+                }
+            });
+            dv.setUint32(g, 0); g += 4; // siguiente IFD = 0
+
+            // Área de datos (rationals)
+            entries.forEach(e => {
+                if (e.rationals) {
+                    let d = tiff + e.dataOffset;
+                    e.rationals.forEach(r => {
+                        dv.setUint32(d, r[0]); d += 4;
+                        dv.setUint32(d, r[1]); d += 4;
+                    });
+                }
+            });
+
+            const app1Len = 2 + totalExif; // el campo de longitud se cuenta a sí mismo
+            const app1 = new Uint8Array(4 + totalExif);
+            app1[0] = 0xFF; app1[1] = 0xE1;
+            app1[2] = (app1Len >> 8) & 0xFF;
+            app1[3] = app1Len & 0xFF;
+            app1.set(new Uint8Array(buf), 4);
+            return app1;
+        }
+
+        async function injectGps(blob, lat, lon, alt) {
+            try {
+                if (lat == null || lon == null || !isFinite(lat) || !isFinite(lon)) return blob;
+                if (Math.abs(lat) < 0.0000001 && Math.abs(lon) < 0.0000001) return blob;
+                const buf = new Uint8Array(await blob.arrayBuffer());
+                if (buf.length < 2 || buf[0] !== 0xFF || buf[1] !== 0xD8) return blob; // sin SOI
+                const app1 = buildApp1(lat, lon, alt);
+                const out = new Uint8Array(buf.length + app1.length);
+                out.set(buf.subarray(0, 2), 0);             // SOI
+                out.set(app1, 2);                            // APP1 EXIF
+                out.set(buf.subarray(2), 2 + app1.length);   // resto del JPEG
+                return new Blob([out], { type: 'image/jpeg' });
+            } catch (e) {
+                console.warn('ExifGps.injectGps falló:', e);
+                return blob;
+            }
+        }
+
+        return { injectGps, buildApp1 };
+    })();
+
     function canvasToBlob(canvas, type, quality) {
         return new Promise((resolve, reject) => {
             const timer = setTimeout(() => {
@@ -3502,6 +4433,24 @@
             img.onload = () => { clearTimeout(timer); resolve(img); };
             img.onerror = () => { clearTimeout(timer); reject(new Error('Image load error')); };
             img.src = src;
+        });
+    }
+
+    // Decodifica un Blob a <img> vía objectURL (fallback cuando createImageBitmap
+    // no está disponible o falla). El objectURL se expone en img._objUrl para
+    // revocarlo tras usarlo y evitar fugas de memoria.
+    function loadImageFromBlob(blob) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            const timer = setTimeout(() => {
+                img.onload = img.onerror = null;
+                URL.revokeObjectURL(url);
+                reject(new Error('Image decode timeout'));
+            }, 8000);
+            img.onload = () => { clearTimeout(timer); img._objUrl = url; resolve(img); };
+            img.onerror = () => { clearTimeout(timer); URL.revokeObjectURL(url); reject(new Error('Image decode error')); };
+            img.src = url;
         });
     }
 
@@ -3610,7 +4559,8 @@
             if (outcome === 'accepted') {
                 const menuBtn = document.getElementById('btn-install-menu');
                 if (menuBtn) menuBtn.style.display = 'none';
-                banner.classList.add('hidden');
+                const installBanner = document.getElementById('install-banner');
+                if (installBanner) installBanner.classList.add('hidden');
                 showNotification('App instalada correctamente');
             }
         } else {
@@ -3748,9 +4698,11 @@
         // Reset situación selector in Ficha
         const sitSel = $('#situacion-selector');
         if (sitSel) {
-            sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-            const firstBtn = sitSel.querySelector('[data-sit="0"]');
-            if (firstBtn) firstBtn.classList.add('active');
+            sitSel.querySelectorAll('.situacion-option').forEach(b => {
+                const isFirst = b.dataset.sit === '0';
+                b.classList.toggle('active', isFirst);
+                b.setAttribute('aria-checked', isFirst ? 'true' : 'false');
+            });
         }
 
         updateButtonState();
@@ -3873,9 +4825,11 @@
             // Update situación selector UI
             const sitSel = $('#situacion-selector');
             if (sitSel) {
-                sitSel.querySelectorAll('.situacion-option').forEach(b => b.classList.remove('active'));
-                const activeBtn = sitSel.querySelector(`[data-sit="${sitIdx}"]`);
-                if (activeBtn) activeBtn.classList.add('active');
+                sitSel.querySelectorAll('.situacion-option').forEach(b => {
+                    const isActive = b.dataset.sit === String(sitIdx);
+                    b.classList.toggle('active', isActive);
+                    b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+                });
             }
         }
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Mapa Avanzado de Fotos (Admin)
+ * INFOCAMPO - Mapa Avanzado de Fotos (Admin)
  *
  * Visualiza TODAS las fotos de campo geolocalizadas:
  * - Marcadores por infraestructura (agrupados)
@@ -18,18 +18,8 @@ requireRole(['admin', 'supervisor', 'superadmin']);
 $pdo = getDB();
 $currentPage = 'mapa';
 
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-
 // Admins y supervisores solo pueden ver su propia empresa
-if ($isSuperadmin) {
-    $empresaId = isset($_GET['empresa_id']) ? (int) $_GET['empresa_id'] : ($_SESSION['empresa_id'] ?? 0);
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
-    $empresas = [];
-}
+$empresaId = (int) ($_SESSION['empresa_id'] ?? 0);
 
 // Cargar datos para filtros
 $operadores = [];
@@ -369,20 +359,6 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
     <!-- Filter bar -->
     <div class="map-filter-bar" id="filter-drawer">
         <button class="filter-close-btn" onclick="toggleFilterDrawer()"><i class="bi bi-x-lg"></i> Cerrar filtros</button>
-        <?php if ($isSuperadmin): ?>
-        <div class="filter-group">
-            <label>Empresa</label>
-            <form method="get" id="form-empresa">
-                <select name="empresa_id" class="form-select" style="width:180px;" onchange="this.form.submit()">
-                    <?php foreach ($empresas as $emp): ?>
-                        <option value="<?= $emp['id'] ?>" <?= $empresaId === (int)$emp['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($emp['nombre']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </form>
-        </div>
-        <?php endif; ?>
         <div class="filter-group">
             <label>Operador</label>
             <select id="filter-operador" class="form-select" style="width:160px;">
@@ -531,20 +507,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
         <div class="container-fluid py-4">
             <div class="text-center py-5">
                 <i class="bi bi-map" style="font-size:3rem;color:#adb5bd;"></i>
-                <?php if ($isSuperadmin): ?>
-                <h5 class="mt-3 text-muted">Selecciona una empresa</h5>
-                <form method="get" class="d-inline-flex gap-2 mt-3">
-                    <select name="empresa_id" class="form-select" style="width:280px;">
-                        <option value="">-- Seleccionar empresa --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nombre']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-primary">Ir</button>
-                </form>
-                <?php else: ?>
                 <h5 class="mt-3 text-muted">No se encontró tu empresa. Contacta con el administrador.</h5>
-                <?php endif; ?>
             </div>
         </div>
     <?php endif; ?>
@@ -706,6 +669,11 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             }, { enableHighAccuracy: true, maximumAge: 5000 });
         });
 
+        function esc(s) {
+            if (s == null) return '';
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
         function renderMarkers(data) {
             if (clusterGroup) { map.removeLayer(clusterGroup); }
             clusterGroup = L.markerClusterGroup({
@@ -741,14 +709,14 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     '<div class="popup-photo">' +
                     '<img src="' + r.url + '" alt="" loading="lazy">' +
                     '<div class="popup-meta">' +
-                    '<strong>' + r.infra + '</strong> <code style="font-size:0.7rem;color:#2d6a9f;">' + r.codigo + '</code><br>' +
-                    '<span class="popup-badge ' + r.estado + '">' + r.estado.toUpperCase() + '</span> ' +
-                    '<span class="popup-badge ' + r.tipo + '">' + (isComp ? 'COMP W' + r.seq : 'ALEA') + '</span><br>' +
-                    '<i class="bi bi-person"></i> ' + r.operador + '<br>' +
-                    '<i class="bi bi-calendar3"></i> ' + r.fecha + '<br>' +
+                    '<strong>' + esc(r.infra) + '</strong> <code style="font-size:0.7rem;color:#2d6a9f;">' + esc(r.codigo) + '</code><br>' +
+                    '<span class="popup-badge ' + esc(r.estado) + '">' + esc(String(r.estado).toUpperCase()) + '</span> ' +
+                    '<span class="popup-badge ' + esc(r.tipo) + '">' + (isComp ? 'COMP W' + esc(r.seq) : 'ALEA') + '</span><br>' +
+                    '<i class="bi bi-person"></i> ' + esc(r.operador) + '<br>' +
+                    '<i class="bi bi-calendar3"></i> ' + esc(r.fecha) + '<br>' +
                     '<i class="bi bi-geo-alt"></i> ' + r.lat.toFixed(7) + ', ' + r.lon.toFixed(7) +
-                    (r.uo_nombre ? '<br><i class="bi bi-tools"></i> ' + r.uo_nombre : '') +
-                    (r.obs ? '<br><em style="color:#999;">' + r.obs.substring(0, 80) + '</em>' : '') +
+                    (r.uo_nombre ? '<br><i class="bi bi-tools"></i> ' + esc(r.uo_nombre) : '') +
+                    (r.obs ? '<br><em style="color:#999;">' + esc(r.obs.substring(0, 80)) + '</em>' : '') +
                     '</div>' +
                     '<div class="popup-actions">' +
                     '<a href="' + downloadUrl + '" class="btn btn-sm btn-outline-success" style="font-size:0.7rem;"><i class="bi bi-download"></i> Descargar</a> ' +
@@ -894,9 +862,9 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                 }
 
                 var popupHtml = '<div style="min-width:200px;">' +
-                    '<strong>' + inf.nombre + '</strong><br>' +
-                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
-                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + inf.tipo + '</span>' : '') +
+                    '<strong>' + esc(inf.nombre) + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + esc(inf.codigo) + '</code>' +
+                    (inf.tipo ? '<br><span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:0.6rem;">' + esc(inf.tipo) + '</span>' : '') +
                     '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
                     '<br><small><i class="bi bi-camera"></i> ' + inf.num_fotos + ' foto' + (inf.num_fotos !== 1 ? 's' : '') + '</small>' +
                     '<div style="margin-top:6px;">' +
@@ -982,8 +950,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
 
                 marker.bindPopup(
                     '<div style="min-width:180px;">' +
-                    '<strong>' + inf.nombre + '</strong><br>' +
-                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + inf.codigo + '</code>' +
+                    '<strong>' + esc(inf.nombre) + '</strong><br>' +
+                    '<code style="color:#2d6a9f;font-size:0.75rem;">' + esc(inf.codigo) + '</code>' +
                     '<br><small class="text-muted"><i class="bi bi-geo-alt"></i> ' + inf.lat.toFixed(7) + ', ' + inf.lon.toFixed(7) + '</small>' +
                     '<br><small style="color:#059669;"><i class="bi bi-arrows-move"></i> Arrastra para reubicar</small>' +
                     '</div>'
@@ -1266,7 +1234,7 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
                     shown++;
                 });
             } else if (desc) {
-                html += '<small>' + desc.substring(0, 150) + '</small><br>';
+                html += '<small>' + escapeXml(desc.substring(0, 150)) + '</small><br>';
             }
 
             if (center) {
@@ -2153,8 +2121,8 @@ $totalInfras = count(array_unique(array_column($registros, 'infra_id')));
             }
 
             var gpx = '<?xml version="1.0" encoding="UTF-8"?>\n' +
-                '<gpx version="1.1" creator="INFOCAMPO" xmlns="http://www.topografix.com/GPX/1/1">\n' +
-                '  <metadata><name>Fotos INFOCAMPO</name><time>' + new Date().toISOString() + '</time></metadata>\n';
+                '<gpx version="1.1" creator="FotoGPS.app" xmlns="http://www.topografix.com/GPX/1/1">\n' +
+                '  <metadata><name>Fotos FotoGPS</name><time>' + new Date().toISOString() + '</time></metadata>\n';
 
             // Number waypoints per infrastructure: CODIGO W1, W2, W3...
             var wpCountByInfra = {};

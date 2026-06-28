@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Dashboard de Administración
+ * INFOCAMPO - Dashboard de Administración
  *
  * Panel principal del administrador de empresa con:
  * - Estadísticas generales (infraestructuras, fotos, operadores, incidencias)
@@ -26,23 +26,8 @@ requireRole(['admin', 'supervisor', 'superadmin']);
 $pdo = getDB();
 $currentPage = 'dashboard';
 
-// Obtener empresa_id
+// Obtener empresa_id de la sesión (single-tenant: siempre TRAGSA)
 $empresaId = getEmpresaIdSeguro();
-
-// Solo superadmin puede ver/seleccionar otras empresas
-$isSuperadmin = ($_SESSION['user_role'] ?? '') === 'superadmin';
-if ($isSuperadmin) {
-    $empresas = $pdo->query(
-        "SELECT id, nombre FROM empresas WHERE activa = 1 ORDER BY nombre"
-    )->fetchAll();
-} else {
-    $empresas = [];
-}
-
-// Si estamos suplantando y no se ha seleccionado empresa
-if (isImpersonating() && $empresaId === 0 && isset($_SESSION['empresa_id'])) {
-    $empresaId = (int) $_SESSION['empresa_id'];
-}
 
 // ---------------------------------------------------------------
 // Cargar estadísticas de la empresa
@@ -66,18 +51,25 @@ if ($empresaId > 0) {
     $row = $stmt->fetch();
     if ($row) $empresaNombre = $row['nombre'];
 
+    // Fechas de corte calculadas en PHP (portable MySQL/PostgreSQL: evita
+    // las diferencias de sintaxis de INTERVAL entre motores)
+    $cut24 = (new DateTime('-24 hours'))->format('Y-m-d H:i:s');
+    $cut7  = (new DateTime('-7 days'))->format('Y-m-d H:i:s');
+    $cut30 = (new DateTime('-30 days'))->format('Y-m-d H:i:s');
+    $cut14 = (new DateTime('-14 days'))->format('Y-m-d H:i:s');
+
     // Estadísticas combinadas en una sola query con agregación condicional
     $stmt = $pdo->prepare(
         "SELECT
             COUNT(*) AS total_registros,
-            SUM(r.estado_incidencia = 'durante' AND r.fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS durante_24h,
-            SUM(r.fecha >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS registros_7d,
-            SUM(r.fecha >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS registros_30d
+            SUM(CASE WHEN r.estado_incidencia = 'durante' AND r.fecha >= :cut24 THEN 1 ELSE 0 END) AS durante_24h,
+            SUM(CASE WHEN r.fecha >= :cut7 THEN 1 ELSE 0 END) AS registros_7d,
+            SUM(CASE WHEN r.fecha >= :cut30 THEN 1 ELSE 0 END) AS registros_30d
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
          WHERE i.empresa_id = :id"
     );
-    $stmt->execute([':id' => $empresaId]);
+    $stmt->execute([':id' => $empresaId, ':cut24' => $cut24, ':cut7' => $cut7, ':cut30' => $cut30]);
     $aggRow = $stmt->fetch();
     $stats['registros']    = (int) ($aggRow['total_registros'] ?? 0);
     $stats['durante_24h']  = (int) ($aggRow['durante_24h'] ?? 0);
@@ -96,16 +88,16 @@ if ($empresaId > 0) {
     // Actividad diaria últimos 14 días (desglosada por fase)
     $stmt = $pdo->prepare(
         "SELECT DATE(r.fecha) AS dia,
-                SUM(r.estado_incidencia = 'antes') AS fot_antes,
-                SUM(r.estado_incidencia = 'durante') AS fot_durante,
-                SUM(r.estado_incidencia = 'despues') AS fot_despues
+                SUM(CASE WHEN r.estado_incidencia = 'antes' THEN 1 ELSE 0 END) AS fot_antes,
+                SUM(CASE WHEN r.estado_incidencia = 'durante' THEN 1 ELSE 0 END) AS fot_durante,
+                SUM(CASE WHEN r.estado_incidencia = 'despues' THEN 1 ELSE 0 END) AS fot_despues
          FROM registros r
          INNER JOIN infraestructuras i ON r.infra_id = i.id
-         WHERE i.empresa_id = :id AND r.fecha >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+         WHERE i.empresa_id = :id AND r.fecha >= :cut14
          GROUP BY DATE(r.fecha)
          ORDER BY dia ASC"
     );
-    $stmt->execute([':id' => $empresaId]);
+    $stmt->execute([':id' => $empresaId, ':cut14' => $cut14]);
     $actividadDiaria = $stmt->fetchAll();
 
     // Últimos 10 registros
@@ -208,22 +200,7 @@ for ($i = 13; $i >= 0; $i--) {
     <?php include __DIR__ . '/includes/header.php'; ?>
 
     <div class="container-fluid py-4">
-        <?php if ($empresaId <= 0 && $isSuperadmin): ?>
-            <!-- Selector de empresa (solo superadmin) -->
-            <div class="text-center py-5">
-                <i class="bi bi-speedometer2" style="font-size:3rem;color:#adb5bd;"></i>
-                <h5 class="mt-3 text-muted">Selecciona una empresa</h5>
-                <form method="get" class="d-inline-flex gap-2 mt-3">
-                    <select name="empresa_id" class="form-select" style="width:280px;">
-                        <option value="">-- Seleccionar empresa --</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nombre']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-primary">Ir</button>
-                </form>
-            </div>
-        <?php elseif ($empresaId <= 0): ?>
+        <?php if ($empresaId <= 0): ?>
             <div class="text-center py-5">
                 <i class="bi bi-speedometer2" style="font-size:3rem;color:#adb5bd;"></i>
                 <h5 class="mt-3 text-muted">No tienes empresa asignada</h5>

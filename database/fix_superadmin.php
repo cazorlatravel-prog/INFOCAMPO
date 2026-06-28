@@ -28,7 +28,7 @@ try {
         echo "[ERROR] Empresa 9999 NO existe. Creándola...\n";
         $pdo->exec(
             "INSERT INTO empresas (id, nombre, plan_suscripcion, email_contacto, activa, licencia_inicio, licencia_fin, max_usuarios, max_infraestructuras)
-             VALUES (9999, 'INFOCAMPO Platform', 'enterprise', 'admin@infocampo.app', 1, '2024-01-01', '2099-12-31', 999, 9999)"
+             VALUES (9999, 'TRAGSA', 'enterprise', 'admin@fotogps.app', 1, '2024-01-01', '2099-12-31', 999, 9999)"
         );
         echo "[FIX] Empresa 9999 creada.\n";
     }

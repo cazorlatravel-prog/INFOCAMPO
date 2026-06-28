@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API de Campos de Formulario (Admin)
+ * INFOCAMPO - API de Campos de Formulario (Admin)
  *
  * GET ?empresa_id=X            → Lista campos activos
  * GET ?empresa_id=X&export=csv → Exportar campos como CSV
@@ -89,7 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    validateCsrf();
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     $action = $_POST['action'] ?? '';
 
     // --- Crear campos por defecto ---
@@ -237,6 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nombre = trim($_POST['nombre'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $tipo = $_POST['tipo'] ?? 'texto';
+        if (!in_array($tipo, ['texto', 'numero', 'select', 'checkbox', 'textarea', 'fecha'], true)) {
+            $tipo = 'texto';
+        }
         $opciones = trim($_POST['opciones'] ?? '');
         $obligatorio = isset($_POST['obligatorio']) ? 1 : 0;
         $orden = (int) ($_POST['orden'] ?? 0);
@@ -258,10 +265,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $stmt = $pdo->prepare(
+        $stmt = $pdo->prepare(dbReturningId(
             "INSERT INTO campos_formulario (empresa_id, nombre, slug, tipo, opciones, obligatorio, orden)
              VALUES (:emp, :nombre, :slug, :tipo, :opciones, :obligatorio, :orden)"
-        );
+        ));
         $stmt->execute([
             ':emp' => $empresaId,
             ':nombre' => $nombre,
@@ -272,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':orden' => $orden,
         ]);
 
-        echo json_encode(['ok' => true, 'id' => (int) $pdo->lastInsertId()], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'id' => dbLastId($pdo, $stmt)], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -282,6 +289,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nombre = trim($_POST['nombre'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $tipo = $_POST['tipo'] ?? 'texto';
+        if (!in_array($tipo, ['texto', 'numero', 'select', 'checkbox', 'textarea', 'fecha'], true)) {
+            $tipo = 'texto';
+        }
         $opciones = trim($_POST['opciones'] ?? '');
         $obligatorio = isset($_POST['obligatorio']) ? 1 : 0;
         $orden = (int) ($_POST['orden'] ?? 0);

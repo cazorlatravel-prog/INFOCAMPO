@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Obtener unidades de obra de una empresa
+ * INFOCAMPO - API: Obtener unidades de obra de una empresa
  *
  * GET ?empresa_id=X → devuelve las unidades activas en JSON
  */

@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Puntos de Mapa para Operadores (Admin)
+ * INFOCAMPO - Puntos de Mapa para Operadores (Admin)
  *
  * Permite al administrador crear, editar y eliminar puntos
  * personalizados que aparecerán en el mapa del operador.

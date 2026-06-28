@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Importar Infraestructuras desde Excel
+ * INFOCAMPO - Importar Infraestructuras desde Excel
  *
  * Acepta archivos .xlsx / .xls / .csv con datos de infraestructuras.
  * Las infraestructuras importadas NO necesitan coordenadas GPS;
@@ -154,29 +154,6 @@ if (!isset($colMap['nombre'])) {
 }
 
 // ---------------------------------------------------------------
-// Verificar límite de infraestructuras
-// ---------------------------------------------------------------
-$empStmt = $pdo->prepare("SELECT max_infraestructuras FROM empresas WHERE id = :id");
-$empStmt->execute([':id' => $empresaId]);
-$empresaData = $empStmt->fetch();
-
-$countStmt = $pdo->prepare("SELECT COUNT(*) FROM infraestructuras WHERE empresa_id = :id");
-$countStmt->execute([':id' => $empresaId]);
-$currentCount = (int) $countStmt->fetchColumn();
-
-$maxInfras = $empresaData ? (int) $empresaData['max_infraestructuras'] : 0;
-$disponibles = $maxInfras - $currentCount;
-
-if ($disponibles <= 0) {
-    http_response_code(400);
-    echo json_encode([
-        'ok' => false,
-        'error' => "Límite de infraestructuras alcanzado ($maxInfras). No se pueden importar más.",
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-// ---------------------------------------------------------------
 // Cargar existentes para detección de duplicados
 // ---------------------------------------------------------------
 $existStmt = $pdo->prepare(
@@ -190,10 +167,10 @@ $opcionDuplicados = $_POST['duplicados'] ?? 'omitir';
 // ---------------------------------------------------------------
 // Insertar filas
 // ---------------------------------------------------------------
-$insertStmt = $pdo->prepare(
+$insertStmt = $pdo->prepare(dbReturningId(
     "INSERT INTO infraestructuras (empresa_id, nombre, codigo_unico, lat_teorica, lon_teorica, tipo, provincia, municipio, monte, descripcion, activa)
      VALUES (:emp_id, :nombre, :codigo, :lat, :lon, :tipo, :provincia, :municipio, :monte, :desc, 1)"
-);
+));
 
 $importados = 0;
 $omitidos   = 0;
@@ -210,12 +187,6 @@ try {
         if ($nombre === '') {
             $omitidos++;
             continue;
-        }
-
-        // Verificar límite
-        if (($currentCount + $importados) >= $maxInfras) {
-            $errores[] = "Límite de infraestructuras alcanzado. Se importaron $importados filas.";
-            break;
         }
 
         $codigo     = isset($colMap['codigo'])      ? trim((string) ($row[$colMap['codigo']] ?? ''))      : '';
@@ -283,7 +254,7 @@ try {
         ];
 
         $existentes[] = [
-            'id'            => $pdo->lastInsertId(),
+            'id'            => dbLastId($pdo, $insertStmt),
             'nombre'        => $nombre,
             'codigo_unico'  => $codigo,
         ];

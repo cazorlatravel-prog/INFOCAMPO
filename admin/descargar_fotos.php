@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Descarga masiva de fotos (ZIP)
+ * INFOCAMPO - Descarga masiva de fotos (ZIP)
  *
  * GET ?infra_id=123
  *
@@ -43,7 +43,7 @@ if (!$infra) {
     exit;
 }
 
-// Obtener registros con fotos — usar cursor para no cargar todo en memoria
+// Obtener registros con fotos (scoped por empresa, filtrando URLs vacías)
 $stmt = $pdo->prepare(
     "SELECT r.url_cloudinary, r.fecha, r.estado_incidencia, r.nombre_archivo
      FROM registros r
@@ -80,9 +80,11 @@ curl_setopt_array($ch, [
     CURLOPT_FOLLOWLOCATION => true,
     CURLOPT_SSL_VERIFYPEER => true,
     CURLOPT_ENCODING       => '', // Accept compressed responses
+    CURLOPT_FAILONERROR    => true, // devuelve false en respuestas >= 400
 ]);
 
 $idx = 1;
+$added = 0;
 $maxPhotos = 500; // Safety limit to prevent extreme cases
 $errors = 0;
 
@@ -92,13 +94,26 @@ foreach ($registros as $reg) {
     }
 
     $url = $reg['url_cloudinary'];
+    if (empty($url)) {
+        continue;
+    }
 
-    // Descargar imagen reutilizando el handle cURL
+    // Validar que la URL apunta a un dominio permitido (prevenir SSRF)
+    $parsedUrl = parse_url($url);
+    $allowedHosts = ['res.cloudinary.com', 'ik.imagekit.io'];
+    if (!$parsedUrl || !in_array($parsedUrl['host'] ?? '', $allowedHosts, true)) {
+        // Permitir URLs locales del propio servidor (fallback local)
+        if (($parsedUrl['host'] ?? '') !== ($_SERVER['HTTP_HOST'] ?? '')) {
+            $errors++;
+            continue;
+        }
+    }
+
     curl_setopt($ch, CURLOPT_URL, $url);
     $imageData = curl_exec($ch);
     $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-    if ($imageData === false || $httpCode !== 200) {
+    if ($imageData === false || $httpCode !== 200 || $imageData === '') {
         $errors++;
         continue;
     }
@@ -120,13 +135,28 @@ foreach ($registros as $reg) {
     unset($imageData);
 
     $idx++;
+    $added++;
 }
 
 curl_close($ch);
 $zip->close();
 
+// Si no se pudo descargar ninguna foto, no servir un ZIP vacío
+if ($added === 0) {
+    @unlink($tmpFile);
+    http_response_code(502);
+    echo 'No se pudo descargar ninguna foto (las imágenes remotas no están disponibles).';
+    exit;
+}
+
+// Limpiar temp file en caso de error fatal
+register_shutdown_function(function() use ($tmpFile) {
+    if (file_exists($tmpFile)) @unlink($tmpFile);
+});
+
 // Enviar ZIP al navegador
-$zipName = $infra['codigo_unico'] . '_fotos_' . date('Ymd') . '.zip';
+$safeCodigo = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $infra['codigo_unico']);
+$zipName = $safeCodigo . '_fotos_' . date('Ymd') . '.zip';
 
 header('Content-Type: application/zip');
 header('Content-Disposition: attachment; filename="' . $zipName . '"');

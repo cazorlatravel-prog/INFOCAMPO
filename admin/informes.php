@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - Página de Informes (Admin)
+ * INFOCAMPO - Página de Informes (Admin)
  *
  * Genera informes completos de infraestructura con:
  * - Datos de la infraestructura

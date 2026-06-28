@@ -1,6 +1,6 @@
 <?php
 /**
- * INFOCAMPO SaaS - API: Tipos de Trabajo
+ * INFOCAMPO - API: Tipos de Trabajo
  *
  * GET ?empresa_id=X → lista de tipos de trabajo activos
  */
