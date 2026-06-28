@@ -577,21 +577,70 @@
         }
     }
 
+    // Brújula obtenida del sensor de orientación absoluta (método principal).
+    // Los eventos `deviceorientation` no se disparan de forma fiable en Android
+    // (la brújula se queda en Norte), por eso usamos AbsoluteOrientationSensor.
+    let _orientationSensor = null;
+    let _sensorCompassActive = false; // true cuando el sensor entrega lecturas
+
     function _startCompassListener() {
-        window.addEventListener('deviceorientationabsolute', (e) => {
-            if (e.absolute && e.alpha != null) {
-                state.bearing = Math.round(360 - e.alpha) % 360;
-            }
-        }, true);
-        // Fallback to non-absolute
-        window.addEventListener('deviceorientation', (e) => {
-            if (state.bearing != null) return; // prefer absolute
-            if (e.webkitCompassHeading != null) {
-                state.bearing = Math.round(e.webkitCompassHeading);
-            } else if (e.alpha != null) {
-                state.bearing = Math.round(360 - e.alpha) % 360;
-            }
-        }, true);
+        // 1) Intentar el sensor de orientación absoluta (Generic Sensor API)
+        _startSensorCompass();
+
+        // 2) Respaldo: deviceorientation (iOS usa webkitCompassHeading)
+        window.addEventListener('deviceorientationabsolute', _onDeviceOrientation, true);
+        window.addEventListener('deviceorientation', _onDeviceOrientation, true);
+    }
+
+    function _onDeviceOrientation(e) {
+        // Si el sensor absoluto ya entrega lecturas, no lo pisamos con el respaldo
+        if (_sensorCompassActive) return;
+        if (e.webkitCompassHeading != null) {
+            state.bearing = Math.round(e.webkitCompassHeading);
+        } else if (e.absolute && e.alpha != null) {
+            state.bearing = Math.round(360 - e.alpha) % 360;
+        }
+    }
+
+    function _startSensorCompass() {
+        if (typeof AbsoluteOrientationSensor !== 'function') return false;
+        try {
+            _orientationSensor = new AbsoluteOrientationSensor({ frequency: 20, referenceFrame: 'device' });
+            _orientationSensor.addEventListener('reading', () => {
+                const q = _orientationSensor && _orientationSensor.quaternion;
+                if (!q) return;
+                const heading = _cameraHeadingFromQuaternion(q);
+                if (heading != null && isFinite(heading)) {
+                    state.bearing = Math.round(heading) % 360;
+                    _sensorCompassActive = true;
+                }
+            });
+            _orientationSensor.addEventListener('error', () => {
+                // Permiso denegado o sensor no disponible → usar el respaldo
+                _sensorCompassActive = false;
+                try { _orientationSensor.stop(); } catch (_e) {}
+                _orientationSensor = null;
+            });
+            _orientationSensor.start();
+            return true;
+        } catch (_e) {
+            _orientationSensor = null;
+            return false;
+        }
+    }
+
+    /**
+     * Convierte el cuaternión del sensor (marco Tierra ENU) en el rumbo de
+     * brújula hacia donde apunta la cámara trasera (eje -Z del dispositivo).
+     * heading = atan2(Este, Norte), normalizado a 0-360.
+     */
+    function _cameraHeadingFromQuaternion(q) {
+        const x = q[0], y = q[1], z = q[2], w = q[3];
+        // Vector -Z del dispositivo rotado al marco Tierra (Este, Norte, Arriba)
+        const east  = -2 * (x * z + w * y);
+        const north = -2 * (y * z - w * x);
+        let heading = Math.atan2(east, north) * 180 / Math.PI;
+        return (heading + 360) % 360;
     }
 
     function bearingToCardinal(deg) {
@@ -633,6 +682,10 @@
             (pos) => {
                 state.gps.lat = pos.coords.latitude;
                 state.gps.lon = pos.coords.longitude;
+                // Altitud (m sobre el nivel del mar) para incrustarla en EXIF
+                if (pos.coords.altitude != null && isFinite(pos.coords.altitude)) {
+                    state.gps.alt = pos.coords.altitude;
+                }
                 camGpsDot.classList.add('active');
                 camGpsDot.classList.remove('error');
                 const utm = latLonToUTM(state.gps.lat, state.gps.lon);
@@ -1505,11 +1558,16 @@
             // Liberar el bitmap de alta resolución cuanto antes
             if (bitmap) bitmap.close();
 
+            // Reducción de ruido (proporcional a la oscuridad) + enfoque en una
+            // sola pasada, antes de aplicar el watermark.
+            enhanceCanvas(camCapture);
+
             camVideo.pause();
 
             // Freeze GPS coordinates at the exact moment of capture
             state.capturedGps.lat = state.gps.lat;
             state.capturedGps.lon = state.gps.lon;
+            state.capturedGps.alt = (state.gps.alt != null) ? state.gps.alt : null;
 
             // Update counters
             state.countTotal++;
@@ -1644,7 +1702,7 @@
     // ===================================================================
     async function processAndUploadPhoto(filename) {
         // Convert preview canvas to blob (0.92: detalle alto para documentación de campo)
-        const blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.92);
+        let blob = await canvasToBlob(previewCanvas, 'image/jpeg', 0.92);
         if (!blob) {
             alert('Error al procesar la foto.');
             camVideo.play();
@@ -1662,9 +1720,6 @@
         // Show upload overlay
         uploadOverlay.classList.remove('hidden');
 
-        // Save to device gallery (non-blocking)
-        saveToDeviceGallery(blob, filename);
-
         let seq = null;
         if (state.currentMode === 'comparativo') {
             seq = state.seqComparativa;
@@ -1673,6 +1728,16 @@
         // Use GPS frozen at capture moment for accuracy
         const captureLat = state.capturedGps.lat || state.gps.lat || 0;
         const captureLon = state.capturedGps.lon || state.gps.lon || 0;
+        const captureAlt = (state.capturedGps.alt != null) ? state.capturedGps.alt
+            : (state.gps && state.gps.alt != null ? state.gps.alt : null);
+
+        // Inyectar las coordenadas GPS en los metadatos EXIF del JPEG. Así la
+        // misma copia se guarda en galería, se sube a la nube y se encola
+        // offline con el geoposicionamiento incrustado (auditable).
+        blob = await ExifGps.injectGps(blob, captureLat, captureLon, captureAlt);
+
+        // Save to device gallery (non-blocking) — ya con EXIF GPS
+        saveToDeviceGallery(blob, filename);
 
         // Token de idempotencia: identifica esta captura de forma única para
         // evitar registros duplicados si la subida se reintenta tras un fallo de red
@@ -4044,6 +4109,181 @@
         const dashIdx = text.indexOf(' - ');
         return dashIdx >= 0 ? text.substring(dashIdx + 3) : text;
     }
+
+    /**
+     * Reducción de ruido + enfoque (unsharp mask) en una sola pasada 3x3.
+     *   resultado = kd·centro + ka·media,  con
+     *   kd = (1-nr)·(1+s)   y   ka = nr·(1+s) - s
+     * Donde `nr` (reducción de ruido) crece cuanto más oscura es la escena y
+     * `s` es el enfoque. En escenas claras predomina el enfoque; en oscuras,
+     * la reducción de ruido evita amplificar grano en sombras.
+     */
+    function enhanceCanvas(canvas) {
+        try {
+            const w = canvas.width, h = canvas.height;
+            if (w < 8 || h < 8) return;
+            const ctx = canvas.getContext('2d');
+            const src = ctx.getImageData(0, 0, w, h);
+            const s = src.data;
+
+            // Estimar luminancia media de la escena por muestreo disperso
+            let sum = 0, n = 0;
+            for (let i = 0; i < s.length; i += 4 * 97) {
+                sum += s[i] * 0.299 + s[i + 1] * 0.587 + s[i + 2] * 0.114;
+                n++;
+            }
+            const avgLum = n ? sum / n : 128;
+
+            const nr = Math.max(0.05, Math.min(0.6, 0.6 * (1 - avgLum / 140)));
+            const sharp = 0.55;
+            const kd = (1 - nr) * (1 + sharp);
+            const ka = nr * (1 + sharp) - sharp;
+
+            const out = ctx.createImageData(w, h);
+            const o = out.data;
+            o.set(s); // copia base (bordes quedan sin procesar)
+
+            const rb = w * 4; // bytes por fila
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    const idx = (y * w + x) * 4;
+                    for (let c = 0; c < 3; c++) {
+                        const p = idx + c;
+                        const mean = (
+                            s[p - rb - 4] + s[p - rb] + s[p - rb + 4] +
+                            s[p - 4]      + s[p]      + s[p + 4] +
+                            s[p + rb - 4] + s[p + rb] + s[p + rb + 4]
+                        ) / 9;
+                        const v = kd * s[p] + ka * mean;
+                        o[p] = v < 0 ? 0 : (v > 255 ? 255 : v);
+                    }
+                }
+            }
+            ctx.putImageData(out, 0, 0);
+        } catch (e) {
+            // getImageData puede fallar (canvas tainted) — no es crítico
+            console.warn('enhanceCanvas omitido:', e);
+        }
+    }
+
+    /**
+     * Escritor mínimo de EXIF GPS (sin librerías externas).
+     * Construye el segmento APP1 (TIFF/IFD big-endian "MM") con un IFD0 que
+     * apunta al GPS IFD, e inserta las coordenadas en formato DMS (rationals).
+     * La altitud es opcional. Se inyecta justo tras el marcador SOI (FFD8).
+     */
+    const ExifGps = (() => {
+        function toDMSRationals(dec) {
+            dec = Math.abs(dec);
+            const deg = Math.floor(dec);
+            const minF = (dec - deg) * 60;
+            const min = Math.floor(minF);
+            const sec = (minF - min) * 60;
+            return [[deg, 1], [min, 1], [Math.round(sec * 10000), 10000]];
+        }
+
+        function buildApp1(lat, lon, alt) {
+            const hasAlt = (typeof alt === 'number' && isFinite(alt));
+            const latRef = lat >= 0 ? 'N' : 'S';
+            const lonRef = lon >= 0 ? 'E' : 'W';
+            const latR = toDMSRationals(lat);
+            const lonR = toDMSRationals(lon);
+
+            const entries = [];
+            entries.push({ tag: 0x0000, type: 1, count: 4, inline: [2, 2, 0, 0] });               // GPSVersionID
+            entries.push({ tag: 0x0001, type: 2, count: 2, inline: [latRef.charCodeAt(0), 0] });   // GPSLatitudeRef
+            entries.push({ tag: 0x0002, type: 5, count: 3, rationals: latR });                     // GPSLatitude
+            entries.push({ tag: 0x0003, type: 2, count: 2, inline: [lonRef.charCodeAt(0), 0] });    // GPSLongitudeRef
+            entries.push({ tag: 0x0004, type: 5, count: 3, rationals: lonR });                     // GPSLongitude
+            if (hasAlt) {
+                entries.push({ tag: 0x0005, type: 1, count: 1, inline: [alt < 0 ? 1 : 0, 0, 0, 0] });      // GPSAltitudeRef
+                entries.push({ tag: 0x0006, type: 5, count: 1, rationals: [[Math.round(Math.abs(alt) * 100), 100]] }); // GPSAltitude
+            }
+
+            const numEntries = entries.length;
+            const ifd0Offset = 8;
+            const gpsIfdOffset = ifd0Offset + 2 + 12 + 4; // tras IFD0 (1 entrada)
+            let cursor = gpsIfdOffset + 2 + numEntries * 12 + 4; // tras entradas del GPS IFD
+            entries.forEach(e => {
+                if (e.rationals) { e.dataOffset = cursor; cursor += e.rationals.length * 8; }
+            });
+            const tiffSize = cursor;
+
+            const totalExif = 6 + tiffSize; // "Exif\0\0" + TIFF
+            const buf = new ArrayBuffer(totalExif);
+            const dv = new DataView(buf);
+            let p = 0;
+            [0x45, 0x78, 0x69, 0x66, 0x00, 0x00].forEach(b => dv.setUint8(p++, b)); // "Exif\0\0"
+            const tiff = p; // inicio TIFF
+            dv.setUint16(tiff, 0x4D4D);        // big-endian
+            dv.setUint16(tiff + 2, 0x002A);
+            dv.setUint32(tiff + 4, ifd0Offset);
+
+            // IFD0: 1 entrada → puntero al GPS IFD (0x8825)
+            let q = tiff + ifd0Offset;
+            dv.setUint16(q, 1); q += 2;
+            dv.setUint16(q, 0x8825); q += 2;
+            dv.setUint16(q, 4); q += 2;
+            dv.setUint32(q, 1); q += 4;
+            dv.setUint32(q, gpsIfdOffset); q += 4;
+            dv.setUint32(q, 0); q += 4; // siguiente IFD = 0
+
+            // GPS IFD
+            let g = tiff + gpsIfdOffset;
+            dv.setUint16(g, numEntries); g += 2;
+            entries.forEach(e => {
+                dv.setUint16(g, e.tag); g += 2;
+                dv.setUint16(g, e.type); g += 2;
+                dv.setUint32(g, e.count); g += 4;
+                if (e.rationals) {
+                    dv.setUint32(g, e.dataOffset); g += 4;
+                } else {
+                    for (let i = 0; i < 4; i++) dv.setUint8(g + i, e.inline[i] || 0);
+                    g += 4;
+                }
+            });
+            dv.setUint32(g, 0); g += 4; // siguiente IFD = 0
+
+            // Área de datos (rationals)
+            entries.forEach(e => {
+                if (e.rationals) {
+                    let d = tiff + e.dataOffset;
+                    e.rationals.forEach(r => {
+                        dv.setUint32(d, r[0]); d += 4;
+                        dv.setUint32(d, r[1]); d += 4;
+                    });
+                }
+            });
+
+            const app1Len = 2 + totalExif; // el campo de longitud se cuenta a sí mismo
+            const app1 = new Uint8Array(4 + totalExif);
+            app1[0] = 0xFF; app1[1] = 0xE1;
+            app1[2] = (app1Len >> 8) & 0xFF;
+            app1[3] = app1Len & 0xFF;
+            app1.set(new Uint8Array(buf), 4);
+            return app1;
+        }
+
+        async function injectGps(blob, lat, lon, alt) {
+            try {
+                if (lat == null || lon == null || !isFinite(lat) || !isFinite(lon)) return blob;
+                if (Math.abs(lat) < 0.0000001 && Math.abs(lon) < 0.0000001) return blob;
+                const buf = new Uint8Array(await blob.arrayBuffer());
+                if (buf.length < 2 || buf[0] !== 0xFF || buf[1] !== 0xD8) return blob; // sin SOI
+                const app1 = buildApp1(lat, lon, alt);
+                const out = new Uint8Array(buf.length + app1.length);
+                out.set(buf.subarray(0, 2), 0);             // SOI
+                out.set(app1, 2);                            // APP1 EXIF
+                out.set(buf.subarray(2), 2 + app1.length);   // resto del JPEG
+                return new Blob([out], { type: 'image/jpeg' });
+            } catch (e) {
+                console.warn('ExifGps.injectGps falló:', e);
+                return blob;
+            }
+        }
+
+        return { injectGps, buildApp1 };
+    })();
 
     function canvasToBlob(canvas, type, quality) {
         return new Promise((resolve, reject) => {
